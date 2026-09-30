@@ -1,0 +1,17 @@
+# Dependencies and generated output
+node_modules/
+.cache/
+outputs/
+work/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+

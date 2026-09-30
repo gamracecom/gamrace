@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#03111b" />
+    <meta
+      name="description"
+      content="GamRace — originals, slots, live games, rewards and weekly races in one fast gaming lobby."
+    />
+    <title>GamRace</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23030e18'/%3E%3Cpath d='M47 17H29a17 17 0 1 0 0 34h18V35H32v7h6v2h-9a10 10 0 1 1 0-20h18z' fill='%232bd6ff'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="#top" aria-label="GamRace home">
+          <span class="brand-mark">[1]</span>
+          <span>Gam<span>Race</span></span>
+        </a>
+
+        <nav class="primary-nav">
+          <a class="nav-link active" href="#top"><span>[2]</span>Home</a>
+          <a class="nav-link" href="#originals"><span>[3]</span>Originals</a>
+          <a class="nav-link" href="#slots"><span>[4]</span>Casino</a>
+          <a class="nav-link" href="#live"><span>[5]</span>Live Casino</a>
+          <a class="nav-link" href="#promotions"><span>[6]</span>Promotions</a>
+          <a class="nav-link" href="#rewards"><span>[7]</span>Rewards</a>
+          <a class="nav-link" href="#vip"><span>[8]</span>VIP</a>
+          <a class="nav-link" href="#affiliates"><span>[9]</span>Affiliates</a>
+        </nav>
+
+        <div class="recently-played">
+          <p class="eyebrow">Recently played</p>
+          <a href="#originals"><span>[10]</span>Mines</a>
+          <a href="#originals"><span>[11]</span>Blackjack</a>
+          <a href="#originals"><span>[12]</span>Dice</a>
+          <a href="#originals"><span>[13]</span>Crash</a>
+          <a href="#originals"><span>[14]</span>Towers</a>
+        </div>
+
+        <section class="race-card" aria-label="Weekly Race promotion">
+          <span class="race-icon">[15]</span>
+          <p>Weekly<br />Race</p>
+          <strong>$50,000</strong>
+          <div class="race-lines" aria-hidden="true"></div>
+          <button type="button" data-toast="Leaderboard coming soon">View leaderboard <span>[16]</span></button>
+        </section>
+      </aside>
+
+      <main class="main-content" id="top">
+        <header class="topbar">
+          <a class="mobile-brand" href="#top"><span>[1]</span> Gam<span>Race</span></a>
+          <div class="account-actions">
+            <button class="utility rewards" type="button" data-toast="Rewards coming soon"><span>[17]</span>Rewards</button>
+            <button class="utility balance" type="button" data-toast="Balance options coming soon">$1,250.00 <span>[18]</span></button>
+            <button class="utility" type="button" data-toast="Wallet coming soon"><span>[19]</span>Wallet</button>
+            <button class="auth login" type="button" data-toast="Login coming soon">Login</button>
+            <button class="auth register" type="button" data-toast="Registration coming soon">Register</button>
+          </div>
+        </header>
+
+        <section class="hero-grid" aria-label="Featured promotions">
+          <article class="hero-card hero-house">
+            <div class="dot-field" aria-hidden="true"></div>
+            <div class="hero-copy">
+              <p>Play the</p>
+              <h1>House</h1>
+              <span>Classic games. Real rewards.</span>
+              <button type="button" data-scroll="originals">Play Now <b>[20]</b></button>
+            </div>
+            <div class="hero-art" aria-label="House games artwork placeholder">[house banner]</div>
+          </article>
+          <article class="hero-card hero-player">
+            <div class="dot-field" aria-hidden="true"></div>
+            <div class="hero-copy">
+              <p>Play the</p>
+              <h1>Player</h1>
+              <span>Real players. Bigger wins.</span>
+              <button type="button" data-scroll="live">Play Now <b>[21]</b></button>
+            </div>
+            <div class="hero-art" aria-label="Live games artwork placeholder">[player banner]</div>
+          </article>
+        </section>
+
+        <nav class="category-strip" aria-label="Game categories">
+          <button class="category active" type="button" data-filter="all"><span>[22]</span>All Games</button>
+          <button class="category" type="button" data-filter="original"><span>[23]</span>GamRace Originals</button>
+          <button class="category" type="button" data-filter="slot"><span>[24]</span>Slots</button>
+          <button class="category" type="button" data-filter="live"><span>[25]</span>Live Casino</button>
+          <button class="category" type="button" data-filter="live"><span>[26]</span>Game Shows</button>
+          <button class="category" type="button" data-filter="slot"><span>[27]</span>Table Games</button>
+          <button class="category" type="button" data-filter="all"><span>[28]</span>New Releases</button>
+          <button class="category" type="button" data-filter="all"><span>[29]</span>Providers</button>
+        </nav>
+
+        <label class="search-box">
+          <span aria-hidden="true">[30]</span>
+          <span class="sr-only">Search games</span>
+          <input id="game-search" type="search" placeholder="Search games, providers or categories..." autocomplete="off" />
+        </label>
+
+        <div id="game-sections">
+          <section class="game-section" id="originals" data-section="original">
+            <div class="section-heading">
+              <div>
+                <span class="section-icon cyan">[31]</span>
+                <h2>GamRace Originals</h2>
+                <p>Exclusive games, built for bigger wins.</p>
+              </div>
+              <button type="button" data-filter="original">View all <span>[32]</span></button>
+            </div>
+            <div class="card-row originals-grid">
+              <button class="game-card original" type="button" data-name="mines gamrace original" data-toast="Mines coming soon">
+                <span class="placeholder-art">[mines card]</span><strong>Mines</strong><small>GamRace</small>
+              </button>
+              <button class="game-card original" type="button" data-name="dice gamrace original" data-toast="Dice coming soon">
+                <span class="placeholder-art">[dice card]</span><strong>Dice</strong><small>GamRace</small>
+              </button>
+              <button class="game-card original" type="button" data-name="crash gamrace original" data-toast="Crash coming soon">
+                <span class="placeholder-art">[crash card]</span><strong>Crash</strong><small>GamRace</small>
+              </button>
+              <button class="game-card original" type="button" data-name="blackjack gamrace original" data-toast="Blackjack coming soon">
+                <span class="placeholder-art">[blackjack card]</span><strong>Blackjack</strong><small>GamRace</small>
+              </button>
+              <button class="game-card original" type="button" data-name="towers gamrace original" data-toast="Towers coming soon">
+                <span class="placeholder-art">[towers card]</span><strong>Towers</strong><small>GamRace</small>
+              </button>
+              <button class="game-card original" type="button" data-name="keno gamrace original" data-toast="Keno coming soon">
+                <span class="placeholder-art">[keno card]</span><strong>Keno</strong><small>GamRace</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="game-section" id="slots" data-section="slot">
+            <div class="section-heading">
+              <div>
+                <span class="section-icon coral">[33]</span>
+                <h2>Slots</h2>
+                <p>The most played games right now.</p>
+              </div>
+              <button type="button" data-filter="slot">View all <span>[34]</span></button>
+            </div>
+            <div class="card-row">
+              <button class="game-card slot" type="button" data-name="slot game" data-toast="Slot coming soon"><span class="placeholder-art">[slot card]</span></button>
+              <button class="game-card slot" type="button" data-name="slot game" data-toast="Slot coming soon"><span class="placeholder-art">[slot card]</span></button>
+              <button class="game-card slot" type="button" data-name="slot game" data-toast="Slot coming soon"><span class="placeholder-art">[slot card]</span></button>
+              <button class="game-card slot" type="button" data-name="slot game" data-toast="Slot coming soon"><span class="placeholder-art">[slot card]</span></button>
+              <button class="game-card slot" type="button" data-name="slot game" data-toast="Slot coming soon"><span class="placeholder-art">[slot card]</span></button>
+              <button class="game-card slot" type="button" data-name="slot game" data-toast="Slot coming soon"><span class="placeholder-art">[slot card]</span></button>
+            </div>
+          </section>
+
+          <section class="game-section" id="live" data-section="live">
+            <div class="section-heading">
+              <div>
+                <span class="section-icon red">[35]</span>
+                <h2>Live Casino</h2>
+                <p>Real dealers. Real wins.</p>
+              </div>
+              <button type="button" data-filter="live">View all <span>[36]</span></button>
+            </div>
+            <div class="card-row">
+              <button class="game-card live" type="button" data-name="live casino game" data-toast="Live game coming soon"><span class="placeholder-art">[live card]</span></button>
+              <button class="game-card live" type="button" data-name="live casino game" data-toast="Live game coming soon"><span class="placeholder-art">[live card]</span></button>
+              <button class="game-card live" type="button" data-name="live casino game" data-toast="Live game coming soon"><span class="placeholder-art">[live card]</span></button>
+              <button class="game-card live" type="button" data-name="live casino game show" data-toast="Live game coming soon"><span class="placeholder-art">[live card]</span></button>
+              <button class="game-card live" type="button" data-name="live casino game" data-toast="Live game coming soon"><span class="placeholder-art">[live card]</span></button>
+              <button class="game-card live" type="button" data-name="live casino game" data-toast="Live game coming soon"><span class="placeholder-art">[live card]</span></button>
+            </div>
+          </section>
+        </div>
+        <p class="empty-state" id="empty-state" hidden>No games match your search.</p>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
