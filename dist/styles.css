@@ -37,13 +37,6 @@ a { color: inherit; text-decoration: none; }
 .nav-link { display: flex; align-items: center; gap: 12px; min-height: 43px; padding: 0 12px; border-radius: 9px; color: #d6e0e8; font-size: .92rem; transition: .2s ease; }
 .nav-link span { min-width: 26px; color: #dce9f2; font-size: .74rem; }
 .nav-link:hover, .nav-link.active { background: linear-gradient(90deg, #0b1d2a, #091822); color: #fff; }
-.race-card { position: relative; min-height: 242px; padding: 20px 12px 14px; margin-top: auto; overflow: hidden; text-align: center; border: 1px solid #07588e; border-radius: 12px; background: radial-gradient(circle at 70% 26%, rgba(0, 148, 255, .28), transparent 40%), linear-gradient(150deg, #061521, #061c31); }
-.race-card::before { content: ""; position: absolute; inset: 55% -20% auto; height: 2px; background: var(--cyan); box-shadow: 0 0 16px 4px var(--blue); transform: rotate(-12deg); }
-.race-icon { display: block; color: var(--cyan); font-size: .8rem; }
-.race-card p { position: relative; margin: 8px 0 0; font-size: 1.1rem; font-weight: 800; line-height: 1.05; }
-.race-card strong { position: relative; display: block; margin-top: 5px; color: var(--cyan); font-size: 1.55rem; }
-.race-card button { position: absolute; inset: auto 13px 13px; min-height: 38px; border: 1px solid #315168; border-radius: 8px; background: #0b1b27; cursor: pointer; font-size: .76rem; }
-
 .main-content { min-height: 100vh; padding: 12px clamp(18px, 2.25vw, 44px) 0; margin-left: var(--sidebar); }
 .lobby-rail { width: min(100%, var(--content-max)); min-height: 100vh; margin-inline: auto; }
 .topbar { min-height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 9px; }
@@ -93,22 +86,15 @@ a { color: inherit; text-decoration: none; }
 .section-heading button { flex: 0 0 auto; border: 0; background: transparent; color: var(--cyan); cursor: pointer; font-size: .76rem; }
 .section-heading button span { margin-left: 5px; font-size: .65rem; }
 .card-row { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 11px; margin-top: 10px; }
-.game-card { position: relative; min-width: 0; min-height: 118px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: 0; background: transparent; cursor: pointer; transition: transform .18s ease; }
-.game-card:hover { transform: translateY(-2px); }
-.game-card:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.game-card { position: relative; min-width: 0; min-height: 118px; overflow: hidden; text-align: left; background: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .placeholder-art { min-height: 78px; display: grid; place-items: center; padding: 12px; color: #7ddfff; background: transparent; font-weight: 750; font-size: .84rem; text-align: center; text-shadow: 0 1px 9px rgba(0, 174, 255, .5); }
 .slot .placeholder-art { min-height: 116px; color: #ffc960; background: transparent; }
 .live .placeholder-art { min-height: 116px; color: #ffb4bd; background: transparent; }
-.game-card strong, .game-card small { display: block; padding: 0 9px; }
-.game-card strong { margin-top: 5px; font-size: .86rem; }
-.game-card small { padding-bottom: 6px; color: #91a7b8; font-size: .68rem; }
 .game-card[hidden], .game-section[hidden] { display: none; }
 .empty-state { min-height: 120px; display: grid; place-items: center; color: var(--muted); }
 .empty-state[hidden] { display: none; }
 .lobby-breathing-room { min-height: clamp(96px, 12vw, 190px); margin-top: 24px; background: transparent; }
-.toast { position: fixed; z-index: 30; left: 50%; bottom: 24px; min-width: 220px; padding: 12px 18px; transform: translate(-50%, 140%); border: 1px solid #1b8bb8; border-radius: 9px; background: #092131; color: #e9f8ff; text-align: center; box-shadow: 0 18px 50px #000b; opacity: 0; transition: .25s ease; }
-.toast.show { transform: translate(-50%, 0); opacity: 1; }
-
 @media (max-width: 1180px) {
   :root { --sidebar: 190px; }
   .main-content { padding-inline: 18px; }
@@ -116,13 +102,12 @@ a { color: inherit; text-decoration: none; }
   .hero-copy { padding-left: 28px; }
   .hero-copy > span { font-size: .62rem; }
   .card-row { grid-template-columns: repeat(3, 1fr); }
-  .race-card { min-height: 210px; }
 }
 
 @media (max-width: 860px) {
   :root { --sidebar: 0px; }
   .sidebar { position: sticky; top: 0; width: 100%; height: auto; padding: 7px 10px; overflow-x: auto; overflow-y: hidden; flex-direction: row; border: 0; border-bottom: 1px solid #173449; }
-  .sidebar .brand, .race-card { display: none; }
+  .sidebar .brand { display: none; }
   .primary-nav { display: flex; gap: 5px; margin: 0; }
   .nav-link { flex: 0 0 auto; min-height: 38px; padding: 0 11px; font-size: .78rem; }
   .nav-link:nth-child(n+6) { display: none; }
