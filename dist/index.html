@@ -59,26 +59,24 @@
           </div>
         </header>
 
-        <section class="hero-grid" aria-label="Featured promotions">
-          <article class="hero-card hero-house">
+        <section class="hero-grid" aria-label="Choose how to play">
+          <button class="hero-card hero-house active" type="button" data-mode="house" aria-pressed="true" aria-label="Show Play the House games">
             <div class="dot-field" aria-hidden="true"></div>
             <div class="hero-copy">
               <p>Play the</p>
               <h1>House</h1>
               <span>Classic games. Real rewards.</span>
-              <button type="button" data-scroll="originals">Play Now <b>[20]</b></button>
             </div>
-          </article>
-          <article class="hero-card hero-player">
+          </button>
+          <button class="hero-card hero-player" type="button" data-mode="player" aria-pressed="false" aria-label="Show Play the Player games">
             <div class="dot-field" aria-hidden="true"></div>
             <div class="hero-copy">
               <p>Play the</p>
               <h1>Player</h1>
               <span>Real players. Bigger wins.</span>
-              <button type="button" data-scroll="live">Play Now <b>[21]</b></button>
             </div>
             <span class="versus-mark" aria-hidden="true">VS</span>
-          </article>
+          </button>
         </section>
 
         <nav class="category-strip" aria-label="Game categories">
@@ -104,7 +102,7 @@
               <div>
                 <span class="section-icon cyan">[31]</span>
                 <h2>GamRace Originals</h2>
-                <p>Exclusive games, built for bigger wins.</p>
+                <p class="lobby-mode-label" id="lobby-mode-label">Play the House</p>
               </div>
               <button type="button" data-filter="original">View all <span>[32]</span></button>
             </div>
@@ -135,7 +133,6 @@
               <div>
                 <span class="section-icon coral">[33]</span>
                 <h2>Slots</h2>
-                <p>The most played games right now.</p>
               </div>
               <button type="button" data-filter="slot">View all <span>[34]</span></button>
             </div>
@@ -154,7 +151,6 @@
               <div>
                 <span class="section-icon red">[35]</span>
                 <h2>Live Casino</h2>
-                <p>Real dealers. Real wins.</p>
               </div>
               <button type="button" data-filter="live">View all <span>[36]</span></button>
             </div>
