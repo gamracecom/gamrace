@@ -1,14 +1,11 @@
 const search = document.querySelector("#game-search");
 const sections = [...document.querySelectorAll(".game-section")];
-const cards = [...document.querySelectorAll(".game-card")];
 const categories = [...document.querySelectorAll(".category")];
 const heroModes = [...document.querySelectorAll("[data-mode]")];
 const modeLabel = document.querySelector("#lobby-mode-label");
 const emptyState = document.querySelector("#empty-state");
-const toast = document.querySelector("#toast");
 let currentFilter = "all";
 let currentMode = "house";
-let toastTimer;
 
 function modeAllowsSection(sectionName) {
   if (currentMode === "browse") return true;
@@ -88,15 +85,6 @@ document.querySelectorAll("[data-filter]:not(.category)").forEach((button) => {
 });
 
 search.addEventListener("input", applyFilters);
-
-document.querySelectorAll("[data-toast]").forEach((button) => {
-  button.addEventListener("click", () => {
-    clearTimeout(toastTimer);
-    toast.textContent = button.dataset.toast;
-    toast.classList.add("show");
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
-  });
-});
 
 document.querySelectorAll(".nav-link").forEach((link) => {
   link.addEventListener("click", () => {
