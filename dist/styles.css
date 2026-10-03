@@ -94,7 +94,8 @@ a { color: inherit; text-decoration: none; }
 .section-heading .carousel-arrow:disabled { opacity: .3; cursor: default; box-shadow: none; }
 .card-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(130px, calc((100% - 55px) / 6)); gap: 11px; margin-top: 10px; padding-bottom: 2px; overflow-x: auto; scroll-behavior: smooth; scroll-snap-type: x proximity; overscroll-behavior-inline: contain; }
 .game-card { position: relative; min-width: 0; min-height: 118px; overflow: hidden; scroll-snap-align: start; text-align: left; background: transparent; }
-.game-card.original { width: 70%; justify-self: center; border-radius: 14px; cursor: pointer; transition: transform .18s ease, filter .18s ease; }
+.originals-grid { grid-auto-columns: clamp(176px, 11vw, 220px); gap: 8px; }
+.game-card.original { width: 100%; justify-self: start; border-radius: 7%; cursor: pointer; transition: transform .18s ease, filter .18s ease; }
 .game-card.original:hover { transform: translateY(-3px); filter: brightness(1.08); }
 .original-card-art { display: block; width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; border-radius: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
@@ -150,6 +151,7 @@ body.modal-open { overflow: hidden; }
   .hero-copy { padding-left: 28px; }
   .hero-copy > span { font-size: .62rem; }
   .card-row { grid-auto-columns: calc((100% - 22px) / 3); }
+  .originals-grid { grid-auto-columns: clamp(168px, 29vw, 190px); gap: 8px; }
 }
 
 @media (max-width: 860px) {
@@ -203,6 +205,7 @@ body.modal-open { overflow: hidden; }
   .section-heading .carousel-arrow { width: 38px; height: 38px; }
   .section-heading .carousel-arrow svg { width: 19px; height: 19px; }
   .card-row { grid-auto-columns: calc((100% - 11px) / 2); }
+  .originals-grid { grid-auto-columns: 46vw; gap: 8px; }
   .game-card { min-height: 108px; }
   .placeholder-art, .slot .placeholder-art, .live .placeholder-art { min-height: 92px; }
   .lobby-breathing-room { min-height: 84px; }
