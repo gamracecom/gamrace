@@ -8,6 +8,15 @@ const carouselControls = [...document.querySelectorAll("[data-carousel-controls]
 let currentFilter = "all";
 let currentMode = "house";
 
+function captureViewport() {
+  return { left: window.scrollX, top: window.scrollY };
+}
+
+function restoreViewport(position) {
+  window.scrollTo({ ...position, behavior: "instant" });
+  requestAnimationFrame(() => window.scrollTo({ ...position, behavior: "instant" }));
+}
+
 function updateCarouselState(controls) {
   const row = document.querySelector(`#${controls.dataset.carouselControls}`);
   if (!row) return;
@@ -64,6 +73,7 @@ function applyFilters() {
 }
 
 function setHeroMode(mode) {
+  const viewport = captureViewport();
   currentMode = mode;
   currentFilter = "all";
   sections.forEach((section) => section.classList.remove("expanded"));
@@ -83,7 +93,7 @@ function setHeroMode(mode) {
 
   modeLabel.textContent = mode === "house" ? "Play the House" : "Play the Player";
   applyFilters();
-  document.querySelector("#game-sections").scrollIntoView({ behavior: "smooth", block: "start" });
+  restoreViewport(viewport);
 }
 
 heroModes.forEach((banner) => {
@@ -92,6 +102,7 @@ heroModes.forEach((banner) => {
 
 categories.forEach((button) => {
   button.addEventListener("click", () => {
+    const viewport = captureViewport();
     currentMode = "browse";
     currentFilter = button.dataset.filter;
     sections.forEach((section) => section.classList.remove("expanded"));
@@ -107,30 +118,44 @@ categories.forEach((button) => {
     });
     modeLabel.textContent = currentFilter === "original" ? "GamRace Originals" : "Browse Games";
     applyFilters();
-    document.querySelector("#game-sections").scrollIntoView({ behavior: "smooth", block: "start" });
+    restoreViewport(viewport);
   });
 });
 
 document.querySelectorAll(".view-all-button").forEach((button) => {
   button.addEventListener("click", () => {
+    const viewport = captureViewport();
     const matchingCategory = categories.find((item) => item.dataset.filter === button.dataset.filter);
     matchingCategory?.click();
     const matchingSection = button.closest(".game-section");
     if (matchingSection) {
       matchingSection.classList.add("expanded");
       button.setAttribute("aria-pressed", "true");
-      matchingSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+    restoreViewport(viewport);
   });
 });
 
 search.addEventListener("input", applyFilters);
 
 document.querySelectorAll(".nav-link").forEach((link) => {
-  link.addEventListener("click", () => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    const viewport = captureViewport();
+    const destination = link.getAttribute("href");
     document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
     link.classList.add("active");
+    if (destination === "#top") setHeroMode("house");
+    if (destination === "#originals") categories.find((item) => item.dataset.filter === "original")?.click();
+    if (destination === "#slots") categories.find((item) => item.dataset.filter === "slot")?.click();
+    if (destination === "#live") categories.find((item) => item.dataset.filter === "live")?.click();
+    restoreViewport(viewport);
   });
+});
+
+document.querySelector(".topbar-brand").addEventListener("click", (event) => {
+  event.preventDefault();
+  setHeroMode("house");
 });
 
 const authModal = document.querySelector("#auth-modal");
