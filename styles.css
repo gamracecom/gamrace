@@ -17,13 +17,8 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); }
-html, body, * { scrollbar-width: thin; scrollbar-color: #16c9ff #03111b; }
-*::-webkit-scrollbar { width: 11px; height: 11px; }
-*::-webkit-scrollbar-track { background: #03111b; }
-*::-webkit-scrollbar-thumb { min-height: 42px; border: 2px solid #03111b; border-radius: 999px; background: linear-gradient(180deg, #35ddff, #078edb); box-shadow: inset 0 0 5px rgba(255, 255, 255, .3), 0 0 8px rgba(0, 183, 255, .35); }
-*::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #73eaff, #0ba8ef); }
-*::-webkit-scrollbar-button { width: 0; height: 0; display: none; }
-*::-webkit-scrollbar-corner { background: #03111b; }
+html, body { scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 button, input { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
