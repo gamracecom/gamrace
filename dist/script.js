@@ -93,4 +93,69 @@ document.querySelectorAll(".nav-link").forEach((link) => {
   });
 });
 
+const authModal = document.querySelector("#auth-modal");
+const authClose = authModal.querySelector(".auth-close");
+const authTabs = [...authModal.querySelectorAll(".auth-tab")];
+const authPanels = [...authModal.querySelectorAll("[data-auth-panel]")];
+
+function selectAuthMode(mode) {
+  authTabs.forEach((tab) => {
+    const selected = tab.dataset.authSwitch === mode;
+    tab.classList.toggle("active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+  });
+  authPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.authPanel !== mode;
+  });
+}
+
+function openAuth(mode) {
+  selectAuthMode(mode);
+  authModal.hidden = false;
+  document.body.classList.add("modal-open");
+  authClose.focus();
+}
+
+function closeAuth() {
+  authModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+document.querySelector(".auth.login").addEventListener("click", () => openAuth("login"));
+document.querySelector(".auth.register").addEventListener("click", () => openAuth("register"));
+
+authModal.querySelectorAll("[data-auth-switch]").forEach((button) => {
+  button.addEventListener("click", () => selectAuthMode(button.dataset.authSwitch));
+});
+
+authClose.addEventListener("click", closeAuth);
+authModal.addEventListener("click", (event) => {
+  if (event.target === authModal) closeAuth();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !authModal.hidden) closeAuth();
+});
+
+authModal.querySelectorAll(".password-toggle").forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = button.parentElement.querySelector("input");
+    const reveal = input.type === "password";
+    input.type = reveal ? "text" : "password";
+    button.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+  });
+});
+
+authModal.querySelectorAll("form").forEach((form) => {
+  form.addEventListener("submit", (event) => event.preventDefault());
+});
+
+const newPassword = authModal.querySelector('input[name="new-password"]');
+const confirmPassword = authModal.querySelector('input[name="confirm-password"]');
+function validatePasswordMatch() {
+  const mismatch = confirmPassword.value && confirmPassword.value !== newPassword.value;
+  confirmPassword.setCustomValidity(mismatch ? "Passwords do not match." : "");
+}
+newPassword.addEventListener("input", validatePasswordMatch);
+confirmPassword.addEventListener("input", validatePasswordMatch);
+
 applyFilters();
