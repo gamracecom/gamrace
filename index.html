@@ -14,7 +14,7 @@
       type="image/svg+xml"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23030e18'/%3E%3Cpath d='M47 17H29a17 17 0 1 0 0 34h18V35H32v7h6v2h-9a10 10 0 1 1 0-20h18z' fill='%232bd6ff'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="styles.css?v=806d8f7" />
+    <link rel="stylesheet" href="styles.css?v=fixed-header-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -33,20 +33,22 @@
       </aside>
 
       <main class="main-content" id="top">
-        <div class="lobby-rail">
         <header class="topbar">
-          <a class="topbar-brand" href="#top" aria-label="GamRace home"><span>[1]</span> Gam<span>Race</span></a>
-          <div class="account-actions">
-            <button class="utility rewards" type="button"><span>[17]</span>Rewards</button>
-            <button class="utility balance" type="button">$1,250.00 <span>[18]</span></button>
-            <button class="utility" type="button">Wallet</button>
-          </div>
-          <div class="auth-actions">
-            <button class="auth login" type="button">Login</button>
-            <button class="auth register" type="button">Register</button>
+          <div class="topbar-inner">
+            <a class="topbar-brand" href="#top" aria-label="GamRace home"><span>[1]</span> Gam<span>Race</span></a>
+            <div class="account-actions">
+              <button class="utility rewards" type="button"><span>[17]</span>Rewards</button>
+              <button class="utility balance" type="button">$1,250.00 <span>[18]</span></button>
+              <button class="utility" type="button">Wallet</button>
+            </div>
+            <div class="auth-actions">
+              <button class="auth login" type="button">Login</button>
+              <button class="auth register" type="button">Register</button>
+            </div>
           </div>
         </header>
 
+        <div class="lobby-rail">
         <section class="hero-grid" aria-label="Choose how to play">
           <button class="hero-card hero-house active" type="button" data-mode="house" aria-pressed="true" aria-label="Show Play the House games">
             <div class="dot-field" aria-hidden="true"></div>
@@ -164,6 +166,6 @@
       </main>
     </div>
 
-    <script src="script.js?v=806d8f7"></script>
+    <script src="script.js?v=fixed-header-2"></script>
   </body>
 </html>
