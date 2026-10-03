@@ -66,6 +66,8 @@ function applyFilters() {
 function setHeroMode(mode) {
   currentMode = mode;
   currentFilter = "all";
+  sections.forEach((section) => section.classList.remove("expanded"));
+  document.querySelectorAll(".view-all-button").forEach((button) => button.setAttribute("aria-pressed", "false"));
 
   heroModes.forEach((banner) => {
     const selected = banner.dataset.mode === mode;
@@ -92,6 +94,8 @@ categories.forEach((button) => {
   button.addEventListener("click", () => {
     currentMode = "browse";
     currentFilter = button.dataset.filter;
+    sections.forEach((section) => section.classList.remove("expanded"));
+    document.querySelectorAll(".view-all-button").forEach((item) => item.setAttribute("aria-pressed", "false"));
     categories.forEach((item) => {
       const selected = item === button;
       item.classList.toggle("active", selected);
@@ -107,10 +111,16 @@ categories.forEach((button) => {
   });
 });
 
-document.querySelectorAll("[data-filter]:not(.category)").forEach((button) => {
+document.querySelectorAll(".view-all-button").forEach((button) => {
   button.addEventListener("click", () => {
     const matchingCategory = categories.find((item) => item.dataset.filter === button.dataset.filter);
     matchingCategory?.click();
+    const matchingSection = button.closest(".game-section");
+    if (matchingSection) {
+      matchingSection.classList.add("expanded");
+      button.setAttribute("aria-pressed", "true");
+      matchingSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   });
 });
 
