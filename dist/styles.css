@@ -269,7 +269,6 @@ body.modal-open { overflow: hidden; }
 .mines-title-row h1 { margin: 0; font-size: 1.45rem; letter-spacing: -.035em; }
 .game-back { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #173c55; border-radius: 9px; background: #091925; color: #bfefff; font-size: 1.7rem; line-height: 1; }
 .game-back:hover { border-color: #18aeda; background: #0d2635; }
-.demo-pill { padding: 7px 11px; border: 1px solid rgba(38, 211, 255, .24); border-radius: 999px; background: rgba(12, 47, 65, .58); color: #9beaff; font-size: .69rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 
 .mines-stage { display: grid; grid-template-columns: minmax(310px, 390px) minmax(520px, 1fr); grid-template-rows: minmax(630px, auto) 64px; overflow: hidden; border: 1px solid #17394f; border-radius: 13px; background: #07131d; box-shadow: 0 20px 55px rgba(0, 0, 0, .32), inset 0 1px rgba(255, 255, 255, .025); }
 .mines-controls { min-width: 0; padding: 28px; border-right: 1px solid #1a3445; background: linear-gradient(155deg, #0b1b27, #07131c 72%); }
@@ -374,7 +373,6 @@ body.modal-open { overflow: hidden; }
   .mines-title-row { min-height: 58px; }
   .mines-title-row img { width: 34px; height: 34px; }
   .mines-title-row h1 { font-size: 1.2rem; }
-  .demo-pill { font-size: .58rem; }
   .mines-board-panel { min-height: auto; padding: 18px 12px 25px; }
   .mines-board { gap: 7px; }
   .mine-tile { border-radius: 8px; box-shadow: 0 5px 0 #07141d; }
@@ -390,4 +388,65 @@ body.modal-open { overflow: hidden; }
   .history-tabs { width: 100%; }
   .history-tab { min-width: 0; flex: 1; }
   .history-period select { width: 100%; }
+}
+
+/* Compact Mines layout */
+.mines-game { width: min(100%, 1240px); margin-inline: auto; }
+.mines-title-row { min-height: 52px; gap: 14px; }
+.mines-title-row img { width: 34px; height: 34px; }
+.mines-title-row h1 { font-size: 1.25rem; }
+.game-back { width: 30px; height: 30px; border-radius: 8px; font-size: 1.5rem; }
+.mines-stage { grid-template-columns: minmax(280px, 330px) minmax(480px, 1fr); grid-template-rows: minmax(520px, auto) 52px; border-radius: 12px; box-shadow: 0 18px 46px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .025); }
+.mines-controls { padding: 20px; }
+.mines-mode-tab { min-height: 42px; border-radius: 7px; font-size: .82rem; }
+.mines-control-stack { gap: 16px; margin-top: 20px; }
+.bet-input-shell, .select-shell { min-height: 48px; border-radius: 8px; }
+.bet-input-shell input { height: 46px; padding-inline: 10px; font-size: .83rem; }
+.bet-input-shell button { width: 42px; height: 36px; margin-right: 6px; border-radius: 7px; font-size: .8rem; }
+.select-shell select { height: 48px; padding: 0 42px 0 15px; font-size: .83rem; }
+.auto-selection-summary { min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 1px solid #17384d; border-radius: 8px; background: rgba(4, 17, 26, .58); color: #7f97a8; font-size: .72rem; }
+.auto-selection-summary strong { color: #dff8ff; }
+.round-summary div { gap: 4px; padding: 9px 7px; }
+.mines-primary-button { min-height: 48px; border-radius: 8px; font-size: .84rem; box-shadow: 0 0 18px rgba(0, 190, 244, .16), inset 0 1px rgba(255, 255, 255, .28); }
+.mines-board-panel { padding: clamp(24px, 3vw, 40px); }
+.mines-board { width: min(100%, 510px); grid-template-columns: repeat(5, minmax(54px, 1fr)); gap: clamp(8px, .75vw, 11px); }
+.mine-tile { border-radius: 9px; box-shadow: 0 5px 0 #07141d, inset 0 1px rgba(255, 255, 255, .045); }
+.mine-tile.auto-selectable { cursor: pointer; }
+.mine-tile.auto-selected { border-color: #23d6fa; background: radial-gradient(circle, rgba(35, 214, 250, .2), transparent 68%), #0b2635; box-shadow: 0 5px 0 #07141d, inset 0 0 0 2px rgba(35, 214, 250, .22), 0 0 15px rgba(35, 214, 250, .12); }
+.mine-tile.auto-selected::after { content: "✓"; width: 26%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #22caed; color: #00141e; font-size: clamp(.6rem, 1vw, .85rem); font-weight: 950; }
+.mines-stage-footer { padding-inline: 20px; }
+.mines-stage-footer > span:not(.fairness-label) { color: #315268; font-size: .95rem; font-weight: 900; letter-spacing: .05em; }
+.mines-stage-footer .fairness-label { justify-self: end; color: #8299a8; font-size: .63rem; text-decoration: underline; }
+.mines-history { margin-top: 22px; border-radius: 12px; }
+.history-toolbar { min-height: 58px; gap: 14px; padding: 9px 14px; }
+.history-tab { min-width: 106px; min-height: 38px; padding: 0 14px; border-radius: 7px; font-size: .76rem; }
+.history-period select { min-width: 126px; height: 40px; padding: 0 36px 0 14px; border-radius: 8px; font-size: .74rem; }
+.history-table td { height: 42px; padding: 10px 16px; }
+.history-skeleton i { display: block; width: min(74%, 110px); height: 10px; border-radius: 999px; background: #143149; opacity: .72; }
+.history-skeleton td:first-child i { width: 14px; height: 14px; border-radius: 50%; }
+.input-invalid { animation: input-invalid .36s ease; }
+
+@keyframes input-invalid { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+@media (max-width: 1080px) {
+  .mines-stage { grid-template-columns: minmax(270px, 305px) minmax(400px, 1fr); grid-template-rows: minmax(500px, auto) 50px; }
+  .mines-controls { padding: 18px; }
+  .mines-board-panel { padding: 24px; }
+  .mines-control-stack { gap: 14px; margin-top: 18px; }
+}
+
+@media (max-width: 780px) {
+  .mines-stage { grid-template-columns: 1fr; grid-template-rows: auto auto 50px; }
+  .mines-board-panel { min-height: 390px; padding: 20px; }
+}
+
+@media (max-width: 560px) {
+  .mines-title-row { min-height: 52px; }
+  .mines-board-panel { min-height: auto; padding: 16px 12px 22px; }
+  .mines-mode-tab { min-height: 40px; }
+  .mines-control-stack { gap: 13px; margin-top: 16px; }
+  .bet-input-shell, .select-shell, .select-shell select { min-height: 46px; height: 46px; }
+  .bet-input-shell input { height: 44px; }
+  .mines-stage-footer > span:not(.fairness-label) { display: none; }
+  .mines-stage-footer .fairness-label { display: inline; }
 }

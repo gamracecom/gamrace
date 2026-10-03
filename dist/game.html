@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=mines-1" />
+    <link rel="stylesheet" href="styles.css?v=mines-2" />
   </head>
   <body class="game-page">
     <div class="app-shell">
@@ -32,7 +32,7 @@
             </a>
             <div class="account-actions">
               <button class="utility rewards" type="button"><span>[17]</span>Rewards</button>
-              <button class="utility balance" id="header-balance" type="button" aria-label="Demo balance">$1,250.00 <span>[18]</span></button>
+              <button class="utility balance" id="header-balance" type="button" aria-label="Balance">$1,250.00 <span>[18]</span></button>
               <button class="utility" type="button">Wallet</button>
             </div>
             <div class="auth-actions">
@@ -50,7 +50,6 @@
                 <img src="assets/games/mines/gem.png" alt="" aria-hidden="true" />
                 <div><p>GamRace Originals</p><h1 id="mines-title">Mines</h1></div>
               </div>
-              <span class="demo-pill">Free-play demo</span>
             </div>
 
             <div class="mines-stage">
@@ -62,8 +61,8 @@
 
                 <div class="mines-control-stack" data-mode-panel="manual">
                   <label class="mines-field">
-                    <span><strong>Bet Amount</strong><small id="bet-usd-value">$0.00 demo</small></span>
-                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="1.00" aria-label="Bet amount" /><button type="button" data-bet-action="half">½</button><button type="button" data-bet-action="double">2×</button></span>
+                    <span><strong>Bet Amount</strong><small id="bet-usd-value">$1.00</small></span>
+                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="bet-amount" type="number" min="0" step="0.01" inputmode="decimal" value="1.00" aria-label="Bet amount" /><button type="button" data-bet-action="half">½</button><button type="button" data-bet-action="double">2×</button></span>
                   </label>
                   <label class="mines-field">
                     <span><strong>Mines</strong><small>1–24</small></span>
@@ -80,20 +79,17 @@
                 <div class="mines-control-stack" data-mode-panel="auto" hidden>
                   <label class="mines-field">
                     <span><strong>Bet Amount</strong><small>Per round</small></span>
-                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="auto-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="1.00" aria-label="Automatic bet amount" /><button type="button" data-auto-bet-action="half">½</button><button type="button" data-auto-bet-action="double">2×</button></span>
+                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="auto-bet-amount" type="number" min="0" step="0.01" inputmode="decimal" value="1.00" aria-label="Automatic bet amount" /><button type="button" data-auto-bet-action="half">½</button><button type="button" data-auto-bet-action="double">2×</button></span>
                   </label>
-                  <div class="mines-field-pair">
-                    <label class="mines-field"><span><strong>Mines</strong></span><span class="select-shell"><select id="auto-mine-count" aria-label="Automatic number of mines"></select><span aria-hidden="true">⌄</span></span></label>
-                    <label class="mines-field"><span><strong>Picks</strong></span><span class="select-shell"><select id="auto-pick-count" aria-label="Safe picks per round"></select><span aria-hidden="true">⌄</span></span></label>
-                  </div>
+                  <label class="mines-field"><span><strong>Mines</strong><small>1–24</small></span><span class="select-shell"><select id="auto-mine-count" aria-label="Automatic number of mines"></select><span aria-hidden="true">⌄</span></span></label>
+                  <div class="auto-selection-summary"><span>Selected Tiles</span><strong id="auto-selected-count">0 / 22</strong></div>
                   <label class="mines-field">
                     <span><strong>Number of Bets</strong><small>1–100</small></span>
                     <span class="bet-input-shell single-input"><input id="auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic bets" /></span>
                   </label>
                   <div class="round-summary auto-summary" aria-live="polite"><div><span>Rounds</span><strong id="auto-progress">0 / 10</strong></div><div><span>Profit</span><strong id="auto-profit">$0.00</strong></div></div>
-                  <button class="mines-primary-button" id="auto-action" type="button">Start Autoplay</button>
+                  <button class="mines-primary-button" id="auto-action" type="button" disabled>Start Autoplay</button>
                 </div>
-                <p class="mines-status" id="mines-status" aria-live="polite">Choose your bet and mine count, then start a round.</p>
               </section>
 
               <section class="mines-board-panel" aria-label="Mines board">
@@ -104,7 +100,7 @@
               <footer class="mines-stage-footer">
                 <div aria-label="Game tools"><span>[1]</span><span>[2]</span><span>[3]</span><span>[4]</span><span>[5]</span></div>
                 <span>GamRace</span>
-                <button type="button" id="fairness-button">Fair Play [6]</button>
+                <span class="fairness-label">Fair Play [6]</span>
               </footer>
             </div>
 
@@ -117,8 +113,16 @@
                 <label class="history-period"><span class="sr-only">Results period</span><select id="history-period"><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
               </div>
               <div class="history-table-wrap">
-                <table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody id="history-body"></tbody></table>
-                <p class="history-empty" id="history-empty">No completed wins yet. Cash out a Mines round to appear here.</p>
+                <table class="history-table">
+                  <thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead>
+                  <tbody aria-label="Results not available yet">
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                  </tbody>
+                </table>
               </div>
             </section>
           </section>
@@ -126,6 +130,6 @@
         </div>
       </main>
     </div>
-    <script src="mines.js?v=mines-1" defer></script>
+    <script src="mines.js?v=mines-2" defer></script>
   </body>
 </html>
