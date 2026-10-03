@@ -85,10 +85,15 @@ a { color: inherit; text-decoration: none; }
 .section-heading h2 { margin: 0; font-size: 1.2rem; letter-spacing: -.025em; }
 .section-heading p { margin: 0; color: var(--muted); font-size: .78rem; }
 .section-heading .lobby-mode-label { color: var(--cyan); font-weight: 760; letter-spacing: .02em; }
-.section-heading button { flex: 0 0 auto; border: 0; background: transparent; color: var(--cyan); cursor: pointer; font-size: .76rem; }
-.section-heading button span { margin-left: 5px; font-size: .65rem; }
-.card-row { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 11px; margin-top: 10px; }
-.game-card { position: relative; min-width: 0; min-height: 118px; overflow: hidden; text-align: left; background: transparent; }
+.section-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+.section-heading .view-all-button, .section-heading .carousel-arrow { flex: 0 0 auto; height: 50px; border: 1px solid rgba(33, 154, 211, .26); background: linear-gradient(180deg, #102638, #0a1b29); color: #d8f7ff; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 7px 18px rgba(0, 0, 0, .2); }
+.section-heading .view-all-button { min-width: 100px; padding: 0 22px; border-radius: 999px; font-size: .92rem; white-space: nowrap; }
+.section-heading .carousel-arrow { width: 50px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
+.section-heading .carousel-arrow svg { width: 22px; height: 22px; fill: none; stroke: #62dfff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.section-heading .view-all-button:hover, .section-heading .carousel-arrow:not(:disabled):hover { border-color: rgba(69, 213, 255, .72); background: linear-gradient(180deg, #15334a, #0c2536); box-shadow: 0 0 16px rgba(0, 187, 255, .16); }
+.section-heading .carousel-arrow:disabled { opacity: .3; cursor: default; box-shadow: none; }
+.card-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(130px, calc((100% - 55px) / 6)); gap: 11px; margin-top: 10px; padding-bottom: 2px; overflow-x: auto; scroll-behavior: smooth; scroll-snap-type: x proximity; overscroll-behavior-inline: contain; }
+.game-card { position: relative; min-width: 0; min-height: 118px; overflow: hidden; scroll-snap-align: start; text-align: left; background: transparent; }
 .mines-card { display: flex; justify-content: center; align-items: flex-start; }
 .mines-card img { display: block; width: 66.667%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
@@ -142,7 +147,7 @@ body.modal-open { overflow: hidden; }
   .hero-card { min-height: 232px; }
   .hero-copy { padding-left: 28px; }
   .hero-copy > span { font-size: .62rem; }
-  .card-row { grid-template-columns: repeat(3, 1fr); }
+  .card-row { grid-auto-columns: calc((100% - 22px) / 3); }
 }
 
 @media (max-width: 860px) {
@@ -190,7 +195,12 @@ body.modal-open { overflow: hidden; }
   .versus-mark { display: none; }
   .section-heading > div { align-items: center; flex-wrap: wrap; gap: 4px 8px; }
   .section-heading p { flex-basis: calc(100% - 34px); margin-left: 34px; }
-  .card-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .section-heading { gap: 8px; }
+  .section-heading .section-actions { flex-wrap: nowrap; gap: 6px; }
+  .section-heading .view-all-button { min-width: 72px; height: 38px; padding: 0 12px; font-size: .78rem; }
+  .section-heading .carousel-arrow { width: 38px; height: 38px; }
+  .section-heading .carousel-arrow svg { width: 19px; height: 19px; }
+  .card-row { grid-auto-columns: calc((100% - 11px) / 2); }
   .game-card { min-height: 108px; }
   .placeholder-art, .slot .placeholder-art, .live .placeholder-art { min-height: 92px; }
   .lobby-breathing-room { min-height: 84px; }

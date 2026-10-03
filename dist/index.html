@@ -10,7 +10,7 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=mines-card-test-2" />
+    <link rel="stylesheet" href="styles.css?v=carousel-controls-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -93,9 +93,17 @@
                 <h2>GamRace Originals</h2>
                 <p class="lobby-mode-label" id="lobby-mode-label">Play the House</p>
               </div>
-              <button type="button" data-filter="original">View all <span>[32]</span></button>
+              <div class="section-actions" data-carousel-controls="originals-row">
+                <button class="view-all-button" type="button" data-filter="original">View all</button>
+                <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous GamRace Originals games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+                </button>
+                <button class="carousel-arrow carousel-next" type="button" aria-label="Next GamRace Originals games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
             </div>
-            <div class="card-row originals-grid">
+            <div class="card-row originals-grid" id="originals-row">
               <div class="game-card original mines-card" data-name="mines gamrace original"><img src="assets/games/mines-card-test.png" alt="Mines by GamRace" /></div>
               <div class="game-card original" data-name="dice gamrace original"><span class="placeholder-art">[dice]</span></div>
               <div class="game-card original" data-name="crash gamrace original"><span class="placeholder-art">[crash]</span></div>
@@ -111,9 +119,17 @@
                 <span class="section-icon coral">[33]</span>
                 <h2>Slots</h2>
               </div>
-              <button type="button" data-filter="slot">View all <span>[34]</span></button>
+              <div class="section-actions" data-carousel-controls="slots-row">
+                <button class="view-all-button" type="button" data-filter="slot">View all</button>
+                <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous slot games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+                </button>
+                <button class="carousel-arrow carousel-next" type="button" aria-label="Next slot games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
             </div>
-            <div class="card-row">
+            <div class="card-row" id="slots-row">
               <div class="game-card slot" data-name="slot game"><span class="placeholder-art">[slot card]</span></div>
               <div class="game-card slot" data-name="slot game"><span class="placeholder-art">[slot card]</span></div>
               <div class="game-card slot" data-name="slot game"><span class="placeholder-art">[slot card]</span></div>
@@ -129,9 +145,17 @@
                 <span class="section-icon red">[35]</span>
                 <h2>Live Casino</h2>
               </div>
-              <button type="button" data-filter="live">View all <span>[36]</span></button>
+              <div class="section-actions" data-carousel-controls="live-casino-row">
+                <button class="view-all-button" type="button" data-filter="live">View all</button>
+                <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous live casino games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+                </button>
+                <button class="carousel-arrow carousel-next" type="button" aria-label="Next live casino games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
             </div>
-            <div class="card-row">
+            <div class="card-row" id="live-casino-row">
               <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
               <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
               <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
@@ -147,9 +171,17 @@
                 <span class="section-icon red">[37]</span>
                 <h2>Live Games</h2>
               </div>
-              <button type="button" data-filter="live">View all <span>[38]</span></button>
+              <div class="section-actions" data-carousel-controls="live-games-row">
+                <button class="view-all-button" type="button" data-filter="live">View all</button>
+                <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous live games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+                </button>
+                <button class="carousel-arrow carousel-next" type="button" aria-label="Next live games">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
             </div>
-            <div class="card-row">
+            <div class="card-row" id="live-games-row">
               <div class="game-card live" data-name="live games"><span class="placeholder-art">[live games card]</span></div>
               <div class="game-card live" data-name="live games"><span class="placeholder-art">[live games card]</span></div>
               <div class="game-card live" data-name="live games"><span class="placeholder-art">[live games card]</span></div>
@@ -231,6 +263,6 @@
       </section>
     </div>
 
-    <script src="script.js?v=auth-modal-1"></script>
+    <script src="script.js?v=carousel-controls-1"></script>
   </body>
 </html>

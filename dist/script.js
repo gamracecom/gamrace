@@ -4,8 +4,37 @@ const categories = [...document.querySelectorAll(".category")];
 const heroModes = [...document.querySelectorAll("[data-mode]")];
 const modeLabel = document.querySelector("#lobby-mode-label");
 const emptyState = document.querySelector("#empty-state");
+const carouselControls = [...document.querySelectorAll("[data-carousel-controls]")];
 let currentFilter = "all";
 let currentMode = "house";
+
+function updateCarouselState(controls) {
+  const row = document.querySelector(`#${controls.dataset.carouselControls}`);
+  if (!row) return;
+  const previous = controls.querySelector(".carousel-prev");
+  const next = controls.querySelector(".carousel-next");
+  const maxScroll = Math.max(0, row.scrollWidth - row.clientWidth);
+  previous.disabled = row.scrollLeft <= 2;
+  next.disabled = row.scrollLeft >= maxScroll - 2;
+}
+
+function updateAllCarouselStates() {
+  carouselControls.forEach(updateCarouselState);
+}
+
+carouselControls.forEach((controls) => {
+  const row = document.querySelector(`#${controls.dataset.carouselControls}`);
+  if (!row) return;
+  controls.querySelector(".carousel-prev").addEventListener("click", () => {
+    row.scrollBy({ left: -Math.max(180, row.clientWidth * .82), behavior: "smooth" });
+  });
+  controls.querySelector(".carousel-next").addEventListener("click", () => {
+    row.scrollBy({ left: Math.max(180, row.clientWidth * .82), behavior: "smooth" });
+  });
+  row.addEventListener("scroll", () => updateCarouselState(controls), { passive: true });
+});
+
+window.addEventListener("resize", updateAllCarouselStates);
 
 function modeAllowsSection(sectionName) {
   if (currentMode === "browse") return true;
@@ -31,6 +60,7 @@ function applyFilters() {
   });
 
   emptyState.hidden = totalVisible !== 0;
+  requestAnimationFrame(updateAllCarouselStates);
 }
 
 function setHeroMode(mode) {
@@ -159,3 +189,4 @@ newPassword.addEventListener("input", validatePasswordMatch);
 confirmPassword.addEventListener("input", validatePasswordMatch);
 
 applyFilters();
+requestAnimationFrame(updateAllCarouselStates);
