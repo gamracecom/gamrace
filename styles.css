@@ -148,6 +148,10 @@ body.modal-open { overflow: hidden; }
 .register-form .auth-input-wrap { min-height: 50px; }
 .auth-input-wrap:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(38, 211, 255, .1); }
 .auth-input-wrap input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-size: .92rem; }
+.auth-input-wrap input::-ms-reveal,
+.auth-input-wrap input::-ms-clear { display: none; }
+.auth-input-wrap input::-webkit-credentials-auto-fill-button,
+.auth-input-wrap input::-webkit-contacts-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
 .auth-input-wrap input::placeholder { color: #829bc0; }
 .password-toggle { width: 42px; min-width: 42px; height: 38px; display: grid; place-items: center; overflow: hidden; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .password-toggle img { width: 38px; height: 38px; object-fit: contain; mix-blend-mode: screen; pointer-events: none; }
