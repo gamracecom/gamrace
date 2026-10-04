@@ -10,7 +10,7 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=zero-balance-1" />
+    <link rel="stylesheet" href="styles.css?v=sign-in-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -41,7 +41,7 @@
               <button class="utility" type="button">Wallet</button>
             </div>
             <div class="auth-actions">
-              <button class="auth login" type="button">Login</button>
+              <button class="auth login" type="button">Sign In</button>
               <button class="auth register" type="button">Register</button>
             </div>
           </div>
@@ -205,7 +205,7 @@
 
     <div class="auth-overlay" id="auth-modal" hidden>
       <section class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title">
-        <button class="auth-close" type="button" aria-label="Close login and registration">×</button>
+        <button class="auth-close" type="button" aria-label="Close sign in and registration">×</button>
 
         <aside class="auth-art" aria-label="GamRace racing artwork">
           <a class="auth-art-brand" href="#top" aria-label="GamRace home">
@@ -221,54 +221,54 @@
         <div class="auth-panel">
           <h2 class="sr-only" id="auth-dialog-title">GamRace account access</h2>
           <div class="auth-tabs" role="tablist" aria-label="Account access">
-            <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true" aria-controls="login-panel" data-auth-switch="login">Login</button>
+            <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true" aria-controls="login-panel" data-auth-switch="login">Sign In</button>
             <button class="auth-tab" id="register-tab" type="button" role="tab" aria-selected="false" aria-controls="register-panel" data-auth-switch="register">Sign Up</button>
           </div>
 
           <form class="auth-form" id="login-panel" data-auth-panel="login" aria-labelledby="login-tab">
             <label class="auth-field">
-              <span>Email or Username</span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[39]</span><input type="text" name="login" placeholder="Enter email or username..." autocomplete="username" required /></span>
+              <span>Username*</span>
+              <span class="auth-input-wrap"><input type="text" name="login" placeholder="Enter username..." autocomplete="username" required /></span>
             </label>
             <label class="auth-field">
-              <span class="auth-label-row"><span>Password</span><a href="#forgot-password">Forgot password?</a></span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[40]</span><input type="password" name="password" placeholder="Enter password..." autocomplete="current-password" required /><button class="password-toggle" type="button" aria-label="Show password">[41]</button></span>
+              <span class="auth-label-row"><span>Password*</span><a href="#forgot-password">Forgot password?</a></span>
+              <span class="auth-input-wrap"><input type="password" name="password" placeholder="Enter password..." autocomplete="current-password" required /><button class="password-toggle" type="button" aria-label="Show password"><img src="assets/auth/password-eye.png" alt="" aria-hidden="true" /></button></span>
             </label>
-            <button class="auth-submit" type="submit">Login</button>
+            <button class="auth-submit" type="submit">Sign In</button>
             <div class="auth-divider"><span>Or</span></div>
             <button class="google-auth" type="button" aria-label="Continue with Google"><img src="assets/auth/google-g.png" alt="Google" /></button>
           </form>
 
           <form class="auth-form register-form" id="register-panel" data-auth-panel="register" aria-labelledby="register-tab" hidden>
             <label class="auth-field">
-              <span>Username</span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[42]</span><input type="text" name="username" placeholder="Enter username..." autocomplete="username" required /></span>
+              <span>Username*</span>
+              <span class="auth-input-wrap"><input type="text" name="username" placeholder="Enter username..." autocomplete="username" required /></span>
             </label>
             <label class="auth-field">
-              <span>Email</span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[43]</span><input type="email" name="email" placeholder="Enter email..." autocomplete="email" required /></span>
+              <span>Email*</span>
+              <span class="auth-input-wrap"><input type="email" name="email" placeholder="Enter email..." autocomplete="email" required /></span>
             </label>
             <label class="auth-field">
-              <span>Password</span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[44]</span><input type="password" name="new-password" placeholder="Enter password..." autocomplete="new-password" required /><button class="password-toggle" type="button" aria-label="Show password">[45]</button></span>
+              <span>Password*</span>
+              <span class="auth-input-wrap"><input type="password" name="new-password" placeholder="Enter password..." autocomplete="new-password" required /><button class="password-toggle" type="button" aria-label="Show password"><img src="assets/auth/password-eye.png" alt="" aria-hidden="true" /></button></span>
             </label>
             <label class="auth-field">
-              <span>Confirm Password</span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[46]</span><input type="password" name="confirm-password" placeholder="Confirm password..." autocomplete="new-password" required /><button class="password-toggle" type="button" aria-label="Show confirm password">[47]</button></span>
+              <span>Confirm Password*</span>
+              <span class="auth-input-wrap"><input type="password" name="confirm-password" placeholder="Confirm password..." autocomplete="new-password" required /><button class="password-toggle" type="button" aria-label="Show confirm password"><img src="assets/auth/password-eye.png" alt="" aria-hidden="true" /></button></span>
             </label>
             <label class="auth-field">
               <span>Referral Code - Optional</span>
-              <span class="auth-input-wrap"><span aria-hidden="true">[48]</span><input type="text" name="referral" placeholder="Enter referral code..." /></span>
+              <span class="auth-input-wrap"><input type="text" name="referral" placeholder="Enter referral code..." /></span>
             </label>
             <button class="auth-submit" type="submit">Sign Up</button>
             <div class="auth-divider"><span>Or</span></div>
             <button class="google-auth" type="button" aria-label="Continue with Google"><img src="assets/auth/google-g.png" alt="Google" /></button>
-            <p class="auth-switch-copy">Already have an account? <button type="button" data-auth-switch="login">Login</button></p>
+            <p class="auth-switch-copy">Already have an account? <button type="button" data-auth-switch="login">Sign In</button></p>
           </form>
         </div>
       </section>
     </div>
 
-    <script src="script.js?v=zero-balance-1"></script>
+    <script src="script.js?v=sign-in-1"></script>
   </body>
 </html>
