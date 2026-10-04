@@ -17,8 +17,6 @@
 
   const TILE_COUNT = 25;
   const HOUSE_FACTOR = 0.99;
-  const STARTING_BALANCE = 1250;
-  const BALANCE_KEY = "gamrace-balance-v1";
   const board = document.querySelector("#mines-board");
   const actionButton = document.querySelector("#mines-action");
   const autoActionButton = document.querySelector("#auto-action");
@@ -38,17 +36,16 @@
   const autoProgress = document.querySelector("#auto-progress");
   const autoProfit = document.querySelector("#auto-profit");
 
-  let balance = readBalance();
+  let balance = 0;
   let activeRound = null;
   let currentMode = "manual";
   let autoplayRunning = false;
   let stopAutoplayRequested = false;
   const selectedAutoTiles = new Set();
 
-  function readBalance() {
-    const value = Number.parseFloat(localStorage.getItem(BALANCE_KEY));
-    return Number.isFinite(value) && value >= 0 ? value : STARTING_BALANCE;
-  }
+  // Remove balances created by the earlier local prototype. Real balances must
+  // come from the account backend; until then every visitor remains at zero.
+  localStorage.removeItem("gamrace-balance-v1");
 
   function money(value) {
     const absolute = Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -90,9 +87,8 @@
     return Math.max(1, HOUSE_FACTOR / survivalProbability);
   }
 
-  function setBalance(nextBalance) {
-    balance = Math.max(0, Math.round(nextBalance * 100) / 100);
-    localStorage.setItem(BALANCE_KEY, String(balance));
+  function renderBalance() {
+    balance = 0;
     headerBalance.innerHTML = `${money(balance)} <span>[18]</span>`;
   }
 
@@ -127,7 +123,7 @@
   function updateAutoSelectionDisplay() {
     const maximum = maxAutoSelections();
     autoSelectedCount.textContent = `${selectedAutoTiles.size} / ${maximum}`;
-    if (!autoplayRunning) autoActionButton.disabled = selectedAutoTiles.size === 0;
+    if (!autoplayRunning) autoActionButton.disabled = selectedAutoTiles.size === 0 || balance <= 0 || cleanAmount(autoBetInput) <= 0;
   }
 
   function buildBoard() {
@@ -174,7 +170,7 @@
 
   function startRound({ amount, mines, automated = false }) {
     if (activeRound && !activeRound.finished) return false;
-    if (!Number.isFinite(amount) || amount < 0 || amount > balance) {
+    if (!Number.isFinite(amount) || amount <= 0 || amount > balance) {
       flashInvalid(automated ? autoBetInput.closest(".bet-input-shell") : betInput.closest(".bet-input-shell"));
       return false;
     }
@@ -187,7 +183,6 @@
       finished: false,
       automated,
     };
-    setBalance(balance - amount);
     result.hidden = true;
     buildBoard();
     updateRoundSummary();
@@ -230,7 +225,7 @@
     activeRound.revealed.add(index);
     tile.classList.add("revealed", "is-gem");
     addTileArt(tile, "gem");
-    actionButton.disabled = false;
+    actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
     updateRoundSummary();
     if (!activeRound.automated && activeRound.revealed.size === TILE_COUNT - activeRound.mines) cashOut();
     return true;
@@ -262,7 +257,7 @@
 
   function finishManualControls() {
     actionButton.textContent = "Bet";
-    actionButton.disabled = false;
+    actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
     mineSelect.disabled = false;
     betInput.disabled = false;
   }
@@ -282,7 +277,6 @@
     const multiplier = calculateMultiplier(activeRound.mines, activeRound.revealed.size);
     const payout = Math.round(activeRound.amount * multiplier * 100) / 100;
     activeRound.finished = true;
-    setBalance(balance + payout);
     revealRemainingMines();
     resultMultiplier.textContent = `${multiplier.toFixed(2)}×`;
     resultPayout.textContent = money(payout);
@@ -295,7 +289,7 @@
     activeRound = null;
     result.hidden = true;
     actionButton.textContent = "Bet";
-    actionButton.disabled = false;
+    actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
     mineSelect.disabled = false;
     betInput.disabled = false;
     buildBoard();
@@ -308,6 +302,14 @@
     const next = action === "half" ? current / 2 : current * 2;
     input.value = Math.max(0, Math.min(balance, Math.round(next * 100) / 100)).toFixed(2);
     if (input === betInput) updateRoundSummary();
+    updateWagerAvailability();
+  }
+
+  function updateWagerAvailability() {
+    if (!activeRound || activeRound.finished) {
+      actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
+    }
+    updateAutoSelectionDisplay();
   }
 
   function lockAutoControls(locked) {
@@ -330,7 +332,7 @@
       flashInvalid(board);
       return;
     }
-    if (amount > balance) {
+    if (amount <= 0 || amount > balance) {
       flashInvalid(autoBetInput.closest(".bet-input-shell"));
       return;
     }
@@ -340,12 +342,9 @@
     lockAutoControls(true);
     autoActionButton.disabled = false;
     autoActionButton.textContent = "Stop Autoplay";
-    let totalProfit = 0;
-
     for (let round = 1; round <= rounds && !stopAutoplayRequested; round += 1) {
       if (amount > balance) break;
       if (round > 1) resetForNewRound();
-      const balanceBeforeRound = balance;
       if (!startRound({ amount, mines, automated: true })) break;
       autoProgress.textContent = `${round} / ${rounds}`;
 
@@ -356,8 +355,7 @@
       }
 
       if (!activeRound.finished && activeRound.revealed.size === selectedTiles.length) cashOut();
-      totalProfit += balance - balanceBeforeRound;
-      autoProfit.textContent = `${totalProfit > 0 ? "+" : ""}${money(totalProfit)}`;
+      autoProfit.textContent = money(0);
       await delay(420);
     }
 
@@ -371,9 +369,10 @@
   buildMineOptions(mineSelect);
   buildMineOptions(autoMineSelect);
   buildBoard();
-  setBalance(balance);
+  renderBalance();
   updateRoundSummary();
   updateAutoSelectionDisplay();
+  updateWagerAvailability();
 
   actionButton.addEventListener("click", () => {
     if (activeRound && !activeRound.finished) {
@@ -395,7 +394,11 @@
 
   document.querySelectorAll("[data-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(betInput, button.dataset.betAction)));
   document.querySelectorAll("[data-auto-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(autoBetInput, button.dataset.autoBetAction)));
-  betInput.addEventListener("input", updateRoundSummary);
+  betInput.addEventListener("input", () => {
+    updateRoundSummary();
+    updateWagerAvailability();
+  });
+  autoBetInput.addEventListener("input", updateWagerAvailability);
   mineSelect.addEventListener("change", updateRoundSummary);
   autoMineSelect.addEventListener("change", () => {
     trimAutoSelections();

@@ -1,3 +1,6 @@
+// Remove the retired prototype balance so returning browsers never retain local funds.
+localStorage.removeItem("gamrace-balance-v1");
+
 const search = document.querySelector("#game-search");
 const sections = [...document.querySelectorAll(".game-section")];
 const categories = [...document.querySelectorAll(".category")];

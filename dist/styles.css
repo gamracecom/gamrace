@@ -262,13 +262,6 @@ body.modal-open { overflow: hidden; }
 .game-blank-state { min-height: calc(100dvh - 76px); }
 .game-blank-state[hidden], .mines-game[hidden] { display: none; }
 .mines-game { width: 100%; }
-.mines-title-row { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.mines-title-row > div { display: flex; align-items: center; gap: 12px; }
-.mines-title-row img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(38, 211, 255, .42)); }
-.mines-title-row p { margin: 0 0 2px; color: var(--cyan); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.mines-title-row h1 { margin: 0; font-size: 1.45rem; letter-spacing: -.035em; }
-.game-back { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #173c55; border-radius: 9px; background: #091925; color: #bfefff; font-size: 1.7rem; line-height: 1; }
-.game-back:hover { border-color: #18aeda; background: #0d2635; }
 
 .mines-stage { display: grid; grid-template-columns: minmax(310px, 390px) minmax(520px, 1fr); grid-template-rows: minmax(630px, auto) 64px; overflow: hidden; border: 1px solid #17394f; border-radius: 13px; background: #07131d; box-shadow: 0 20px 55px rgba(0, 0, 0, .32), inset 0 1px rgba(255, 255, 255, .025); }
 .mines-controls { min-width: 0; padding: 28px; border-right: 1px solid #1a3445; background: linear-gradient(155deg, #0b1b27, #07131c 72%); }
@@ -370,9 +363,6 @@ body.modal-open { overflow: hidden; }
 
 @media (max-width: 560px) {
   .game-main { padding-top: 162px; }
-  .mines-title-row { min-height: 58px; }
-  .mines-title-row img { width: 34px; height: 34px; }
-  .mines-title-row h1 { font-size: 1.2rem; }
   .mines-board-panel { min-height: auto; padding: 18px 12px 25px; }
   .mines-board { gap: 7px; }
   .mine-tile { border-radius: 8px; box-shadow: 0 5px 0 #07141d; }
@@ -392,10 +382,6 @@ body.modal-open { overflow: hidden; }
 
 /* Compact Mines layout */
 .mines-game { width: min(100%, 1240px); margin-inline: auto; }
-.mines-title-row { min-height: 52px; gap: 14px; }
-.mines-title-row img { width: 34px; height: 34px; }
-.mines-title-row h1 { font-size: 1.25rem; }
-.game-back { width: 30px; height: 30px; border-radius: 8px; font-size: 1.5rem; }
 .mines-stage { grid-template-columns: minmax(280px, 330px) minmax(480px, 1fr); grid-template-rows: minmax(520px, auto) 52px; border-radius: 12px; box-shadow: 0 18px 46px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .025); }
 .mines-controls { padding: 20px; }
 .mines-mode-tab { min-height: 42px; border-radius: 7px; font-size: .82rem; }
@@ -441,7 +427,6 @@ body.modal-open { overflow: hidden; }
 }
 
 @media (max-width: 560px) {
-  .mines-title-row { min-height: 52px; }
   .mines-board-panel { min-height: auto; padding: 16px 12px 22px; }
   .mines-mode-tab { min-height: 40px; }
   .mines-control-stack { gap: 13px; margin-top: 16px; }
