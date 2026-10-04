@@ -27,14 +27,8 @@
   const autoRoundInput = document.querySelector("#auto-round-count");
   const autoSelectedCount = document.querySelector("#auto-selected-count");
   const headerBalance = document.querySelector("#header-balance");
-  const multiplierText = document.querySelector("#current-multiplier");
-  const nextMultiplierText = document.querySelector("#next-multiplier");
-  const profitText = document.querySelector("#current-profit");
   const result = document.querySelector("#mines-result");
-  const resultMultiplier = document.querySelector("#result-multiplier");
   const resultPayout = document.querySelector("#result-payout");
-  const autoProgress = document.querySelector("#auto-progress");
-  const autoProfit = document.querySelector("#auto-profit");
 
   let balance = 0;
   let activeRound = null;
@@ -185,8 +179,8 @@
     };
     result.hidden = true;
     buildBoard();
-    updateRoundSummary();
-    actionButton.textContent = "Cash Out";
+    updateBetDisplay();
+    updateCashoutButton();
     actionButton.disabled = true;
     mineSelect.disabled = true;
     betInput.disabled = true;
@@ -226,21 +220,25 @@
     tile.classList.add("revealed", "is-gem");
     addTileArt(tile, "gem");
     actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
-    updateRoundSummary();
+    updateCashoutButton();
     if (!activeRound.automated && activeRound.revealed.size === TILE_COUNT - activeRound.mines) cashOut();
     return true;
   }
 
-  function updateRoundSummary() {
-    const picks = activeRound?.revealed.size || 0;
-    const mines = activeRound?.mines || Number(mineSelect.value);
-    const amount = activeRound?.amount ?? cleanAmount(betInput);
-    const multiplier = calculateMultiplier(mines, picks);
-    const next = picks < TILE_COUNT - mines ? calculateMultiplier(mines, picks + 1) : multiplier;
-    multiplierText.textContent = `${multiplier.toFixed(2)}×`;
-    nextMultiplierText.textContent = `${next.toFixed(2)}×`;
-    profitText.textContent = money(Math.max(0, amount * multiplier - amount));
-    document.querySelector("#bet-usd-value").textContent = money(amount);
+  function updateBetDisplay() {
+    document.querySelector("#bet-usd-value").textContent = money(activeRound?.amount ?? cleanAmount(betInput));
+  }
+
+  function updateCashoutButton() {
+    if (!activeRound || activeRound.finished) {
+      actionButton.textContent = "Bet";
+      return;
+    }
+    const picks = activeRound.revealed.size;
+    const amount = picks > 0
+      ? Math.round(activeRound.amount * calculateMultiplier(activeRound.mines, picks) * 100) / 100
+      : 0;
+    actionButton.textContent = `Cashout ${money(amount)}`;
   }
 
   function revealRemainingMines(explodedIndex = -1) {
@@ -265,11 +263,10 @@
   function endLoss(explodedIndex) {
     activeRound.finished = true;
     revealRemainingMines(explodedIndex);
-    resultMultiplier.textContent = "0.00×";
     resultPayout.textContent = money(0);
     result.hidden = false;
     finishManualControls();
-    updateRoundSummary();
+    updateBetDisplay();
   }
 
   function cashOut() {
@@ -278,7 +275,6 @@
     const payout = Math.round(activeRound.amount * multiplier * 100) / 100;
     activeRound.finished = true;
     revealRemainingMines();
-    resultMultiplier.textContent = `${multiplier.toFixed(2)}×`;
     resultPayout.textContent = money(payout);
     result.hidden = false;
     finishManualControls();
@@ -293,7 +289,7 @@
     mineSelect.disabled = false;
     betInput.disabled = false;
     buildBoard();
-    updateRoundSummary();
+    updateBetDisplay();
     updateAutoSelectionDisplay();
   }
 
@@ -301,7 +297,7 @@
     const current = cleanAmount(input);
     const next = action === "half" ? current / 2 : current * 2;
     input.value = Math.max(0, Math.min(balance, Math.round(next * 100) / 100)).toFixed(2);
-    if (input === betInput) updateRoundSummary();
+    if (input === betInput) updateBetDisplay();
     updateWagerAvailability();
   }
 
@@ -346,8 +342,6 @@
       if (amount > balance) break;
       if (round > 1) resetForNewRound();
       if (!startRound({ amount, mines, automated: true })) break;
-      autoProgress.textContent = `${round} / ${rounds}`;
-
       for (const index of shuffle(selectedTiles)) {
         await delay(260);
         if (activeRound.finished) break;
@@ -355,7 +349,6 @@
       }
 
       if (!activeRound.finished && activeRound.revealed.size === selectedTiles.length) cashOut();
-      autoProfit.textContent = money(0);
       await delay(420);
     }
 
@@ -370,7 +363,7 @@
   buildMineOptions(autoMineSelect);
   buildBoard();
   renderBalance();
-  updateRoundSummary();
+  updateBetDisplay();
   updateAutoSelectionDisplay();
   updateWagerAvailability();
 
@@ -395,18 +388,14 @@
   document.querySelectorAll("[data-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(betInput, button.dataset.betAction)));
   document.querySelectorAll("[data-auto-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(autoBetInput, button.dataset.autoBetAction)));
   betInput.addEventListener("input", () => {
-    updateRoundSummary();
+    updateBetDisplay();
     updateWagerAvailability();
   });
   autoBetInput.addEventListener("input", updateWagerAvailability);
-  mineSelect.addEventListener("change", updateRoundSummary);
   autoMineSelect.addEventListener("change", () => {
     trimAutoSelections();
     buildBoard();
     updateAutoSelectionDisplay();
-  });
-  autoRoundInput.addEventListener("input", () => {
-    autoProgress.textContent = `0 / ${Math.min(100, Math.max(1, Number.parseInt(autoRoundInput.value, 10) || 1))}`;
   });
 
   document.querySelectorAll("[data-mines-mode]").forEach((tab) => {
