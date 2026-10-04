@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=mines-2" />
+    <link rel="stylesheet" href="styles.css?v=zero-balance-1" />
   </head>
   <body class="game-page">
     <div class="app-shell">
@@ -32,7 +32,7 @@
             </a>
             <div class="account-actions">
               <button class="utility rewards" type="button"><span>[17]</span>Rewards</button>
-              <button class="utility balance" id="header-balance" type="button" aria-label="Balance">$1,250.00 <span>[18]</span></button>
+              <button class="utility balance" id="header-balance" type="button" aria-label="Balance">$0.00 <span>[18]</span></button>
               <button class="utility" type="button">Wallet</button>
             </div>
             <div class="auth-actions">
@@ -43,15 +43,7 @@
         </header>
 
         <div class="game-rail">
-          <section class="mines-game" id="mines-game" hidden aria-labelledby="mines-title">
-            <div class="mines-title-row">
-              <div>
-                <a class="game-back" href="index.html#originals" aria-label="Back to GamRace Originals">‹</a>
-                <img src="assets/games/mines/gem.png" alt="" aria-hidden="true" />
-                <div><p>GamRace Originals</p><h1 id="mines-title">Mines</h1></div>
-              </div>
-            </div>
-
+          <section class="mines-game" id="mines-game" hidden aria-label="Mines">
             <div class="mines-stage">
               <section class="mines-controls" aria-label="Mines controls">
                 <div class="mines-mode-tabs" role="tablist" aria-label="Game mode">
@@ -61,8 +53,8 @@
 
                 <div class="mines-control-stack" data-mode-panel="manual">
                   <label class="mines-field">
-                    <span><strong>Bet Amount</strong><small id="bet-usd-value">$1.00</small></span>
-                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="bet-amount" type="number" min="0" step="0.01" inputmode="decimal" value="1.00" aria-label="Bet amount" /><button type="button" data-bet-action="half">½</button><button type="button" data-bet-action="double">2×</button></span>
+                    <span><strong>Bet Amount</strong><small id="bet-usd-value">$0.00</small></span>
+                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Bet amount" /><button type="button" data-bet-action="half">½</button><button type="button" data-bet-action="double">2×</button></span>
                   </label>
                   <label class="mines-field">
                     <span><strong>Mines</strong><small>1–24</small></span>
@@ -73,13 +65,13 @@
                     <div><span>Next tile</span><strong id="next-multiplier">1.00×</strong></div>
                     <div><span>Profit</span><strong id="current-profit">$0.00</strong></div>
                   </div>
-                  <button class="mines-primary-button" id="mines-action" type="button">Bet</button>
+                  <button class="mines-primary-button" id="mines-action" type="button" disabled>Bet</button>
                 </div>
 
                 <div class="mines-control-stack" data-mode-panel="auto" hidden>
                   <label class="mines-field">
                     <span><strong>Bet Amount</strong><small>Per round</small></span>
-                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="auto-bet-amount" type="number" min="0" step="0.01" inputmode="decimal" value="1.00" aria-label="Automatic bet amount" /><button type="button" data-auto-bet-action="half">½</button><button type="button" data-auto-bet-action="double">2×</button></span>
+                    <span class="bet-input-shell"><span class="bet-currency">$</span><input id="auto-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Automatic bet amount" /><button type="button" data-auto-bet-action="half">½</button><button type="button" data-auto-bet-action="double">2×</button></span>
                   </label>
                   <label class="mines-field"><span><strong>Mines</strong><small>1–24</small></span><span class="select-shell"><select id="auto-mine-count" aria-label="Automatic number of mines"></select><span aria-hidden="true">⌄</span></span></label>
                   <div class="auto-selection-summary"><span>Selected Tiles</span><strong id="auto-selected-count">0 / 22</strong></div>
@@ -130,6 +122,6 @@
         </div>
       </main>
     </div>
-    <script src="mines.js?v=mines-2" defer></script>
+    <script src="mines.js?v=zero-balance-1" defer></script>
   </body>
 </html>
