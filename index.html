@@ -10,18 +10,22 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=navigation-icons-1" />
+    <link rel="stylesheet" href="styles.css?v=mobile-navigation-2" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Primary navigation">
+        <div class="mobile-menu-header">
+          <strong>Menu</strong>
+          <button class="mobile-menu-close" type="button" aria-label="Close menu">×</button>
+        </div>
         <nav class="primary-nav">
-          <a class="nav-link active" href="#top"><span>[2]</span>Home</a>
+          <a class="nav-link active" href="#top" data-mobile-menu-action="house"><span>[2]</span>Home</a>
           <a class="nav-link" href="#originals"><span>[3]</span>Originals</a>
           <a class="nav-link" href="#slots"><span>[4]</span>Casino</a>
           <a class="nav-link" href="#live"><span>[5]</span>Live Casino</a>
           <a class="nav-link" href="#promotions"><span>[6]</span>Promotions</a>
-          <a class="nav-link" href="#rewards"><img class="nav-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" />Rewards</a>
+          <a class="nav-link" href="#rewards" data-mobile-menu-action="rewards"><img class="nav-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" />Rewards</a>
           <a class="nav-link" href="#vip"><span>[8]</span>VIP</a>
           <a class="nav-link" href="#affiliates"><span>[9]</span>Affiliates</a>
         </nav>
@@ -36,7 +40,7 @@
               <img class="brand-icon" src="assets/brand/gamrace-icon.png" alt="" aria-hidden="true" />
             </a>
             <div class="account-actions">
-              <button class="utility rewards" type="button"><img class="utility-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" />Rewards</button>
+              <button class="utility rewards" type="button" aria-label="Rewards"><img class="utility-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" /></button>
               <button class="utility balance" type="button" aria-label="Balance">$0.00 <span>[18]</span></button>
               <button class="utility" type="button">Wallet</button>
             </div>
@@ -200,6 +204,7 @@
         <p class="empty-state" id="empty-state" hidden>No games match your search.</p>
         <div class="lobby-breathing-room" aria-hidden="true"></div>
         </div>
+        <section class="mobile-destination" id="mobile-destination" hidden></section>
       </main>
     </div>
 
@@ -280,7 +285,7 @@
     </div>
 
     <script src="script.js?v=mobile-tabbar-1"></script>
-    <script src="mobile-nav.js?v=mobile-tabbar-1"></script>
+    <script src="mobile-nav.js?v=mobile-navigation-2"></script>
     <script type="module" src="firebase-auth.js?v=custom-auth-domain-1"></script>
   </body>
 </html>
