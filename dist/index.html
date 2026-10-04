@@ -10,7 +10,7 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=password-eye-2" />
+    <link rel="stylesheet" href="styles.css?v=mobile-tabbar-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -203,6 +203,15 @@
       </main>
     </div>
 
+    <nav class="mobile-tabbar" aria-label="Mobile navigation">
+      <button class="mobile-tab-action" type="button" data-mobile-action="menu" aria-expanded="false"><span aria-hidden="true">[51]</span><strong>Menu</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="search"><span aria-hidden="true">[52]</span><strong>Search</strong></button>
+      <button class="mobile-tab-action active" type="button" data-mobile-action="house" aria-pressed="true"><span aria-hidden="true">[53]</span><strong>House</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="player" aria-pressed="false"><span aria-hidden="true">[54]</span><strong>Player</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="rewards"><span aria-hidden="true">[55]</span><strong>Rewards</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="chat"><span aria-hidden="true">[56]</span><strong>Chat</strong></button>
+    </nav>
+
     <div class="auth-overlay" id="auth-modal" hidden>
       <section class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title">
         <button class="auth-close" type="button" aria-label="Close sign in and registration">×</button>
@@ -270,7 +279,8 @@
       </section>
     </div>
 
-    <script src="script.js?v=google-auth-1"></script>
+    <script src="script.js?v=mobile-tabbar-1"></script>
+    <script src="mobile-nav.js?v=mobile-tabbar-1"></script>
     <script type="module" src="firebase-auth.js?v=custom-auth-domain-1"></script>
   </body>
 </html>

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=mines-controls-2" />
+    <link rel="stylesheet" href="styles.css?v=mobile-tabbar-1" />
   </head>
   <body class="game-page">
     <div class="app-shell">
@@ -116,7 +116,16 @@
         </div>
       </main>
     </div>
+    <nav class="mobile-tabbar" aria-label="Mobile navigation">
+      <button class="mobile-tab-action" type="button" data-mobile-action="menu" aria-expanded="false"><span aria-hidden="true">[51]</span><strong>Menu</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="search"><span aria-hidden="true">[52]</span><strong>Search</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="house" aria-pressed="false"><span aria-hidden="true">[53]</span><strong>House</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="player" aria-pressed="false"><span aria-hidden="true">[54]</span><strong>Player</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="rewards"><span aria-hidden="true">[55]</span><strong>Rewards</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="chat"><span aria-hidden="true">[56]</span><strong>Chat</strong></button>
+    </nav>
     <script src="mines.js?v=mines-controls-2" defer></script>
+    <script src="mobile-nav.js?v=mobile-tabbar-1" defer></script>
     <script type="module" src="firebase-auth.js?v=custom-auth-domain-1"></script>
   </body>
 </html>
