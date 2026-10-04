@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=zero-balance-1" />
+    <link rel="stylesheet" href="styles.css?v=mines-controls-2" />
   </head>
   <body class="game-page">
     <div class="app-shell">
@@ -60,11 +60,6 @@
                     <span><strong>Mines</strong><small>1–24</small></span>
                     <span class="select-shell"><select id="mine-count" aria-label="Number of mines"></select><span aria-hidden="true">⌄</span></span>
                   </label>
-                  <div class="round-summary" id="round-summary" aria-live="polite">
-                    <div><span>Multiplier</span><strong id="current-multiplier">1.00×</strong></div>
-                    <div><span>Next tile</span><strong id="next-multiplier">1.00×</strong></div>
-                    <div><span>Profit</span><strong id="current-profit">$0.00</strong></div>
-                  </div>
                   <button class="mines-primary-button" id="mines-action" type="button" disabled>Bet</button>
                 </div>
 
@@ -79,14 +74,13 @@
                     <span><strong>Number of Bets</strong><small>1–100</small></span>
                     <span class="bet-input-shell single-input"><input id="auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic bets" /></span>
                   </label>
-                  <div class="round-summary auto-summary" aria-live="polite"><div><span>Rounds</span><strong id="auto-progress">0 / 10</strong></div><div><span>Profit</span><strong id="auto-profit">$0.00</strong></div></div>
                   <button class="mines-primary-button" id="auto-action" type="button" disabled>Start Autoplay</button>
                 </div>
               </section>
 
               <section class="mines-board-panel" aria-label="Mines board">
                 <div class="mines-board" id="mines-board" role="grid" aria-label="Five by five Mines board"></div>
-                <div class="mines-result" id="mines-result" hidden aria-live="assertive"><strong id="result-multiplier">0.00×</strong><span id="result-payout">$0.00</span></div>
+                <div class="mines-result" id="mines-result" hidden aria-live="assertive"><span id="result-payout">$0.00</span></div>
               </section>
 
               <footer class="mines-stage-footer">
@@ -122,6 +116,6 @@
         </div>
       </main>
     </div>
-    <script src="mines.js?v=zero-balance-1" defer></script>
+    <script src="mines.js?v=mines-controls-2" defer></script>
   </body>
 </html>
