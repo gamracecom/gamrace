@@ -149,7 +149,8 @@ body.modal-open { overflow: hidden; }
 .auth-input-wrap:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(38, 211, 255, .1); }
 .auth-input-wrap input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-size: .92rem; }
 .auth-input-wrap input::placeholder { color: #829bc0; }
-.password-toggle { min-width: 42px; min-height: 38px; border: 0; background: transparent; color: #bcd4ff; cursor: pointer; font-size: .68rem; }
+.password-toggle { width: 42px; min-width: 42px; height: 38px; display: grid; place-items: center; overflow: hidden; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.password-toggle img { width: 38px; height: 38px; object-fit: contain; mix-blend-mode: screen; pointer-events: none; }
 .auth-submit { min-height: 56px; border: 0; border-radius: 9px; background: linear-gradient(180deg, #22e0f7, #06bce9); color: #00121c; cursor: pointer; font-size: 1rem; font-weight: 900; box-shadow: 0 0 18px rgba(0, 205, 255, .26); }
 .register-form .auth-submit { min-height: 52px; margin-top: 2px; }
 .auth-divider { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; color: #bfd0ee; font-weight: 700; }
