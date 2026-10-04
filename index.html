@@ -265,10 +265,12 @@
             <button class="google-auth" type="button" aria-label="Continue with Google"><img src="assets/auth/google-g.png" alt="Google" /></button>
             <p class="auth-switch-copy">Already have an account? <button type="button" data-auth-switch="login">Sign In</button></p>
           </form>
+          <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
         </div>
       </section>
     </div>
 
-    <script src="script.js?v=sign-in-1"></script>
+    <script src="script.js?v=google-auth-1"></script>
+    <script type="module" src="firebase-auth.js?v=google-auth-1"></script>
   </body>
 </html>

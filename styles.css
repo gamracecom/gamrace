@@ -161,6 +161,10 @@ body.modal-open { overflow: hidden; }
 .auth-divider::before, .auth-divider::after { content: ""; height: 1px; background: #3f5e7a; }
 .google-auth { width: 132px; height: 58px; display: grid; place-items: center; justify-self: center; border: 1px solid #4b6a8b; border-radius: 9px; background: #142a46; cursor: pointer; }
 .google-auth img { width: 34px; height: 34px; object-fit: contain; }
+.google-auth:disabled { cursor: wait; opacity: .62; }
+.auth-status { min-height: 1.35em; margin: 12px 0 0; color: #9fc7e7; font-size: .82rem; line-height: 1.35; text-align: center; }
+.auth-status:empty { display: none; }
+.auth-status[data-state="error"] { color: #ff9eac; }
 .auth-switch-copy { margin: -2px 0 0; color: #a9bbd7; text-align: center; }
 .auth-switch-copy button { border: 0; padding: 0; background: transparent; color: var(--cyan); cursor: pointer; text-decoration: underline; }
 @media (max-width: 1180px) {
