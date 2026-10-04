@@ -9,7 +9,7 @@ import {
 
 const firebaseConfig = {
   apiKey: "AIzaSyBS3pib3PsHnSJGaQqBc--S99qI7sqhDuU",
-  authDomain: "gamrace.firebaseapp.com",
+  authDomain: "gamrace.com",
   projectId: "gamrace",
   storageBucket: "gamrace.firebasestorage.app",
   messagingSenderId: "576202313103",
