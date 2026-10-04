@@ -189,8 +189,27 @@ function closeAuth() {
   document.body.classList.remove("modal-open");
 }
 
-document.querySelector(".auth.login").addEventListener("click", () => openAuth("login"));
-document.querySelector(".auth.register").addEventListener("click", () => openAuth("register"));
+const headerSignIn = document.querySelector(".auth.login");
+const headerRegister = document.querySelector(".auth.register");
+
+headerSignIn.addEventListener("click", () => {
+  if (document.body.dataset.authenticated !== "true") openAuth("login");
+});
+headerRegister.addEventListener("click", () => {
+  if (document.body.dataset.authenticated === "true") {
+    window.dispatchEvent(new CustomEvent("gamrace-auth-signout"));
+    return;
+  }
+  openAuth("register");
+});
+
+const requestedAuthMode = new URL(window.location.href).searchParams.get("auth");
+if (requestedAuthMode === "login" || requestedAuthMode === "register") {
+  openAuth(requestedAuthMode);
+  const cleanUrl = new URL(window.location.href);
+  cleanUrl.searchParams.delete("auth");
+  history.replaceState(null, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+}
 
 authModal.querySelectorAll("[data-auth-switch]").forEach((button) => {
   button.addEventListener("click", () => selectAuthMode(button.dataset.authSwitch));
