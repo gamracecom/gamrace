@@ -83,7 +83,8 @@
 
   function renderBalance() {
     balance = 0;
-    headerBalance.innerHTML = `${money(balance)} <span>[18]</span>`;
+    const balanceValue = headerBalance.querySelector(".balance-value");
+    if (balanceValue) balanceValue.textContent = money(balance);
   }
 
   function flashInvalid(element) {
