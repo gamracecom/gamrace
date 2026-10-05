@@ -39,7 +39,7 @@ a { color: inherit; text-decoration: none; }
 .nav-link span { min-width: 26px; color: #dce9f2; font-size: .74rem; }
 .nav-link .nav-icon { width: 26px; height: 26px; flex: 0 0 26px; object-fit: contain; opacity: .94; transform: scale(var(--nav-icon-scale, 1)); transform-origin: center; }
 .nav-icon-home { --nav-icon-scale: 1.54; }
-.nav-icon-house, .nav-icon-player { --nav-icon-scale: 1.43; }
+.nav-icon-house, .nav-icon-player { --nav-icon-scale: 1; }
 .nav-icon-slots { --nav-icon-scale: 1.31; }
 .nav-icon-live-games { --nav-icon-scale: 1.12; }
 .nav-icon-providers { --nav-icon-scale: 1.21; }
@@ -101,7 +101,7 @@ body[data-authenticated="true"] .auth-actions { display: none; }
 .section-icon { color: var(--cyan); font-size: .7rem; }
 .section-icon.coral, .section-icon.red { color: #ff4059; }
 .section-icon-img { width: 28px; height: 28px; flex: 0 0 28px; object-fit: contain; transform: scale(var(--section-icon-scale, 1.25)); transform-origin: center; }
-.section-icon-mode { --section-icon-scale: 1.44; }
+.section-icon-mode { --section-icon-scale: 1; }
 .section-icon-slots { --section-icon-scale: 1.37; }
 .section-icon-live-games { --section-icon-scale: 1.16; }
 .section-icon-providers { --section-icon-scale: 1.25; }
@@ -303,7 +303,7 @@ body.modal-open { overflow: hidden; }
   .mobile-tab-icon { width: 25px; height: 24px; object-fit: contain; opacity: .96; transition: filter .16s ease; }
   .mobile-tab-action[data-mobile-action="menu"] .mobile-tab-icon { width: 29px; }
   .mobile-tab-action[data-mobile-action="house"] .mobile-tab-icon,
-  .mobile-tab-action[data-mobile-action="player"] .mobile-tab-icon { width: 48px; }
+  .mobile-tab-action[data-mobile-action="player"] .mobile-tab-icon { width: 25px; }
   .mobile-tab-action > strong { max-width: 100%; overflow: hidden; font-size: .62rem; font-weight: 650; line-height: 1.1; text-overflow: ellipsis; }
   .mobile-tab-action.active,
   .mobile-tab-action[aria-expanded="true"] { color: var(--cyan); background: transparent; }
