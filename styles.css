@@ -46,7 +46,7 @@ a { color: inherit; text-decoration: none; }
   transform-origin: center;
 }
 .nav-icon-home { --nav-icon-scale: 1.361; --nav-icon-y: -1.31px; }
-.nav-icon-house, .nav-icon-player { --nav-icon-scale: .933; }
+.nav-icon-house, .nav-icon-player { --nav-icon-scale: 1.2; }
 .nav-icon-slots { --nav-icon-scale: 1.158; --nav-icon-x: -.94px; --nav-icon-y: -.3px; }
 .nav-icon-live-games { --nav-icon-scale: .987; --nav-icon-x: -.36px; }
 .nav-icon-providers { --nav-icon-scale: 1.063; --nav-icon-y: -.25px; }
@@ -113,7 +113,7 @@ body[data-authenticated="true"] .auth-actions { display: none; }
   transform: translate(var(--section-icon-x, 0), var(--section-icon-y, 0)) scale(var(--section-icon-scale, 1));
   transform-origin: center;
 }
-.section-icon-mode, .section-icon-mode[data-mode="player"] { --section-icon-scale: .933; --section-icon-x: 0; --section-icon-y: 0; }
+.section-icon-mode, .section-icon-mode[data-mode="player"] { --section-icon-scale: 1.2; --section-icon-x: 0; --section-icon-y: 0; }
 .section-icon-slots { --section-icon-scale: 1.158; --section-icon-x: -1.01px; --section-icon-y: -.32px; }
 .section-icon-live-games { --section-icon-scale: .987; --section-icon-x: -.39px; }
 .section-icon-providers { --section-icon-scale: 1.063; --section-icon-y: -.27px; }
@@ -322,7 +322,7 @@ body.modal-open { overflow: hidden; }
   .mobile-tab-action[data-mobile-action="menu"] .mobile-tab-icon { --mobile-icon-scale: .974; --mobile-icon-x: .05px; }
   .mobile-tab-action[data-mobile-action="search"] .mobile-tab-icon { --mobile-icon-scale: .804; --mobile-icon-x: -.02px; --mobile-icon-y: .17px; }
   .mobile-tab-action[data-mobile-action="house"] .mobile-tab-icon,
-  .mobile-tab-action[data-mobile-action="player"] .mobile-tab-icon { --mobile-icon-scale: .933; }
+  .mobile-tab-action[data-mobile-action="player"] .mobile-tab-icon { --mobile-icon-scale: 1.2; }
   .mobile-tab-action[data-mobile-action="rewards"] .mobile-tab-icon { --mobile-icon-scale: .786; --mobile-icon-y: .27px; }
   .mobile-tab-action[data-mobile-action="chat"] .mobile-tab-icon { --mobile-icon-scale: .789; --mobile-icon-x: -.04px; --mobile-icon-y: -.02px; }
   .mobile-tab-action > strong { max-width: 100%; overflow: hidden; font-size: .62rem; font-weight: 650; line-height: 1.1; text-overflow: ellipsis; }
