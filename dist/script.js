@@ -51,8 +51,7 @@ window.addEventListener("resize", updateAllCarouselStates);
 
 function modeAllowsSection(sectionName) {
   if (currentMode === "browse") return true;
-  if (sectionName === "original") return true;
-  return currentMode === "house" ? sectionName === "slot" : sectionName === "live" || sectionName === "provider";
+  return ["original", "slot", "live", "provider"].includes(sectionName);
 }
 
 function applyFilters() {
