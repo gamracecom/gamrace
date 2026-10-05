@@ -103,6 +103,7 @@ function setHeroMode(mode) {
 
   modeLabel.textContent = mode === "house" ? "Play the House" : "Play the Player";
   modeIcon.src = mode === "house" ? "assets/icons/navigation/house-mode.png" : "assets/icons/navigation/player-mode.png";
+  modeIcon.dataset.mode = mode;
   applyFilters();
   restoreViewport(viewport);
 }
@@ -125,6 +126,7 @@ function setBrowseFilter(filter) {
   });
   modeLabel.textContent = selectedPlayMode === "house" ? "Play the House" : "Play the Player";
   modeIcon.src = selectedPlayMode === "house" ? "assets/icons/navigation/house-mode.png" : "assets/icons/navigation/player-mode.png";
+  modeIcon.dataset.mode = selectedPlayMode;
   applyFilters();
   restoreViewport(viewport);
 }
