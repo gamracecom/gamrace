@@ -24,6 +24,7 @@ const authStatus = document.querySelector("#auth-status");
 const authModal = document.querySelector("#auth-modal");
 const headerSignIn = document.querySelector(".auth.login");
 const headerRegister = document.querySelector(".auth.register");
+const profileButton = document.querySelector(".profile-action");
 
 provider.setCustomParameters({ prompt: "select_account" });
 auth.useDeviceLanguage();
@@ -51,9 +52,10 @@ function signedInLabel(user) {
 function renderUser(user) {
   const signedIn = Boolean(user);
   document.body.dataset.authenticated = String(signedIn);
-  headerSignIn.textContent = signedIn ? signedInLabel(user) : "Sign In";
-  headerSignIn.setAttribute("aria-label", signedIn ? "Signed in account" : "Sign in");
-  headerRegister.textContent = signedIn ? "Sign Out" : "Register";
+  headerSignIn.textContent = "Sign In";
+  headerSignIn.setAttribute("aria-label", "Sign in");
+  headerRegister.textContent = "Sign Up";
+  profileButton?.setAttribute("aria-label", signedIn ? `Profile for ${signedInLabel(user)}` : "Profile");
 
   if (signedIn) {
     if (authModal) authModal.hidden = true;

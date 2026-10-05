@@ -10,9 +10,9 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=mobile-navigation-2" />
+    <link rel="stylesheet" href="styles.css?v=auth-header-1" />
   </head>
-  <body>
+  <body data-authenticated="false">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Primary navigation">
         <div class="mobile-menu-header">
@@ -40,14 +40,14 @@
               <img class="brand-icon" src="assets/brand/gamrace-icon.png" alt="" aria-hidden="true" />
             </a>
             <div class="account-actions">
-              <button class="utility rewards" type="button" aria-label="Rewards"><img class="utility-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" /></button>
-              <button class="utility balance" type="button" aria-label="Balance">$0.00 <span>[18]</span></button>
-              <button class="utility" type="button">Wallet</button>
+              <button class="utility balance" type="button" aria-label="Balance"><span class="utility-placeholder" aria-hidden="true">[18]</span><span class="balance-value">$0.00</span></button>
+              <button class="utility wallet" type="button"><span class="utility-placeholder" aria-hidden="true">[19]</span><span class="utility-label">Wallet</span></button>
             </div>
             <div class="auth-actions">
               <button class="auth login" type="button">Sign In</button>
-              <button class="auth register" type="button">Register</button>
+              <button class="auth register" type="button">Sign Up</button>
             </div>
+            <button class="profile-action" type="button" aria-label="Profile"><span aria-hidden="true">[20]</span><span class="profile-label">Profile</span></button>
           </div>
         </header>
 
@@ -286,6 +286,6 @@
 
     <script src="script.js?v=mobile-tabbar-1"></script>
     <script src="mobile-nav.js?v=mobile-navigation-2"></script>
-    <script type="module" src="firebase-auth.js?v=custom-auth-domain-1"></script>
+    <script type="module" src="firebase-auth.js?v=auth-header-1"></script>
   </body>
 </html>
