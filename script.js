@@ -11,6 +11,7 @@ const emptyState = document.querySelector("#empty-state");
 const carouselControls = [...document.querySelectorAll("[data-carousel-controls]")];
 let currentFilter = "all";
 let currentMode = "house";
+let selectedPlayMode = "house";
 
 function captureViewport() {
   return { left: window.scrollX, top: window.scrollY };
@@ -71,6 +72,11 @@ function applyFilters() {
     totalVisible += visibleInSection;
   });
 
+  const emptyMessages = {
+    favorite: "You haven't added any favorite games yet.",
+    exclusive: "No exclusive games are available yet.",
+  };
+  emptyState.textContent = emptyMessages[currentFilter] || "No games match your search.";
   emptyState.hidden = totalVisible !== 0;
   requestAnimationFrame(updateAllCarouselStates);
 }
@@ -78,6 +84,7 @@ function applyFilters() {
 function setHeroMode(mode) {
   const viewport = captureViewport();
   currentMode = mode;
+  selectedPlayMode = mode;
   currentFilter = "all";
   sections.forEach((section) => section.classList.remove("expanded"));
   document.querySelectorAll(".view-all-button").forEach((button) => button.setAttribute("aria-pressed", "false"));
@@ -112,10 +119,12 @@ function setBrowseFilter(filter) {
     item.setAttribute("aria-pressed", String(selected));
   });
   heroModes.forEach((banner) => {
-    banner.classList.remove("active");
-    banner.setAttribute("aria-pressed", "false");
+    const selected = banner.dataset.mode === selectedPlayMode;
+    banner.classList.toggle("active", selected);
+    banner.setAttribute("aria-pressed", String(selected));
   });
-  modeLabel.textContent = filter === "original" ? "GamRace Originals" : "Browse Games";
+  modeLabel.textContent = selectedPlayMode === "house" ? "Play the House" : "Play the Player";
+  modeIcon.src = selectedPlayMode === "house" ? "assets/icons/navigation/house.png" : "assets/icons/navigation/player.png";
   applyFilters();
   restoreViewport(viewport);
 }
@@ -125,7 +134,13 @@ heroModes.forEach((banner) => {
 });
 
 categories.forEach((button) => {
-  button.addEventListener("click", () => setBrowseFilter(button.dataset.filter));
+  button.addEventListener("click", () => {
+    if (button.dataset.filter === "all") {
+      setHeroMode(selectedPlayMode);
+      return;
+    }
+    setBrowseFilter(button.dataset.filter);
+  });
 });
 
 document.querySelectorAll(".view-all-button").forEach((button) => {

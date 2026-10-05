@@ -10,7 +10,7 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=visual-icons-1" />
+    <link rel="stylesheet" href="styles.css?v=lobby-tabs-1" />
   </head>
   <body data-authenticated="false">
     <div class="app-shell">
@@ -73,6 +73,16 @@
             <span class="versus-mark" aria-hidden="true">VS</span>
           </button>
         </section>
+
+        <nav class="lobby-category-nav" aria-label="Browse games">
+          <button class="category active" type="button" data-filter="all" aria-pressed="true">Lobby</button>
+          <button class="category" type="button" data-filter="favorite" aria-pressed="false">Favorites</button>
+          <button class="category" type="button" data-filter="live" aria-pressed="false">Live Games</button>
+          <button class="category" type="button" data-filter="slot" aria-pressed="false">Slots</button>
+          <button class="category" type="button" data-filter="original" aria-pressed="false">Originals</button>
+          <button class="category" type="button" data-filter="exclusive" aria-pressed="false">Exclusive</button>
+          <button class="category" type="button" data-filter="provider" aria-pressed="false">Providers</button>
+        </nav>
 
         <label class="search-box">
           <img class="search-icon" src="assets/icons/navigation/search.png" alt="" aria-hidden="true" />
@@ -275,7 +285,7 @@
       </section>
     </div>
 
-    <script src="script.js?v=mode-sections-1"></script>
+    <script src="script.js?v=lobby-tabs-1"></script>
     <script src="mobile-nav.js?v=navigation-icons-1"></script>
     <script type="module" src="firebase-auth.js?v=auth-header-1"></script>
   </body>

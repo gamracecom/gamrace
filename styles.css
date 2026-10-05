@@ -84,12 +84,14 @@ body[data-authenticated="true"] .auth-actions { display: none; }
 .hero-copy > span { display: block; margin-top: 8px; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .18em; }
 .versus-mark { position: absolute; z-index: 3; left: 66%; top: 49%; transform: translate(-50%, -50%) skew(-7deg); color: #dff8ff; font-size: clamp(2.4rem, 4vw, 4.8rem); font-style: italic; font-weight: 950; letter-spacing: -.12em; text-shadow: 0 0 8px #fff, 0 0 22px #25bfff, 0 0 44px #008cff; }
 
-.category-strip { display: flex; gap: 8px; padding: 18px 0 10px; overflow-x: auto; scrollbar-width: none; }
-.category-strip::-webkit-scrollbar { display: none; }
-.category { flex: 0 0 auto; min-height: 36px; padding: 0 17px; border: 1px solid #203a4b; border-radius: 999px; background: linear-gradient(180deg, #10222f, #091722); color: #d7e1e9; cursor: pointer; font-size: .76rem; }
-.category span { margin-right: 8px; color: #cad9e4; font-size: .65rem; }
-.category:hover, .category.active { border-color: #159dce; background: #0d2738; color: #fff; }
-.search-box { display: flex; align-items: center; gap: 12px; min-height: 46px; margin-top: 14px; padding: 0 17px; border: 1px solid #21445f; border-radius: 10px; background: linear-gradient(90deg, #0c1a27, #081723); color: #b8d0df; box-shadow: inset 0 1px rgba(255, 255, 255, .02); }
+.lobby-category-nav { display: flex; align-items: center; gap: 7px; margin-top: 16px; padding: 5px; overflow-x: auto; border: 1px solid #142f42; border-radius: 12px; background: linear-gradient(180deg, rgba(11, 29, 42, .92), rgba(5, 18, 28, .96)); box-shadow: inset 0 1px rgba(255, 255, 255, .025), 0 10px 24px rgba(0, 0, 0, .16); scrollbar-width: none; }
+.lobby-category-nav::-webkit-scrollbar { display: none; }
+.category { position: relative; flex: 0 0 auto; min-height: 40px; padding: 0 18px; overflow: hidden; border: 0; border-radius: 8px; background: transparent; color: #90a7b8; cursor: pointer; font-size: .84rem; font-weight: 700; letter-spacing: .005em; transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
+.category::after { position: absolute; right: 16px; bottom: 3px; left: 16px; height: 2px; border-radius: 999px; background: linear-gradient(90deg, #0098f7, #36d8ff); box-shadow: 0 0 10px rgba(30, 191, 255, .62); content: ""; opacity: 0; transform: scaleX(.35); transition: opacity .18s ease, transform .18s ease; }
+.category:hover { background: rgba(13, 54, 80, .48); color: #d9edf8; }
+.category.active { background: linear-gradient(180deg, rgba(8, 76, 117, .72), rgba(6, 48, 75, .64)); color: #fff; box-shadow: inset 0 0 0 1px rgba(63, 199, 255, .22), 0 6px 15px rgba(0, 111, 179, .12); }
+.category.active::after { opacity: 1; transform: scaleX(1); }
+.search-box { display: flex; align-items: center; gap: 12px; min-height: 46px; margin-top: 10px; padding: 0 17px; border: 1px solid #21445f; border-radius: 10px; background: linear-gradient(90deg, #0c1a27, #081723); color: #b8d0df; box-shadow: inset 0 1px rgba(255, 255, 255, .02); }
 .search-icon { width: 21px; height: 21px; flex: 0 0 auto; object-fit: contain; opacity: .78; }
 .search-box input { width: 100%; border: 0; outline: 0; background: transparent; color: #eaf6fc; font-size: .89rem; }
 .search-box input::placeholder { color: #7790a4; }
@@ -265,6 +267,9 @@ body.modal-open { overflow: hidden; }
   .hero-house { background-position: 48% center; }
   .hero-player { background-position: 54% center; }
   .versus-mark { display: none; }
+  .lobby-category-nav { gap: 4px; margin-top: 12px; padding: 4px; border-radius: 10px; }
+  .category { min-height: 38px; padding: 0 14px; font-size: .78rem; }
+  .category::after { right: 12px; left: 12px; }
   .section-heading > div { align-items: center; flex-wrap: wrap; gap: 4px 8px; }
   .section-heading p { flex-basis: calc(100% - 34px); margin-left: 34px; }
   .section-heading { gap: 8px; }
@@ -280,7 +285,7 @@ body.modal-open { overflow: hidden; }
   .mobile-destination:not([hidden]) { min-height: calc(100dvh - 110px - var(--mobile-tabbar-height)); display: block; background: var(--bg); }
   body.mobile-empty-page .lobby-rail { display: none; }
   body.mobile-search-page .hero-grid,
-  body.mobile-search-page .category-strip,
+  body.mobile-search-page .lobby-category-nav,
   body.mobile-search-page #game-sections,
   body.mobile-search-page #empty-state,
   body.mobile-search-page .lobby-breathing-room { display: none !important; }
