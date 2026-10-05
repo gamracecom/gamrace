@@ -102,7 +102,7 @@ function setHeroMode(mode) {
   });
 
   modeLabel.textContent = mode === "house" ? "Play the House" : "Play the Player";
-  modeIcon.src = mode === "house" ? "assets/icons/navigation/house.png" : "assets/icons/navigation/player.png";
+  modeIcon.src = mode === "house" ? "assets/icons/navigation/house-mode.png" : "assets/icons/navigation/player-mode.png";
   applyFilters();
   restoreViewport(viewport);
 }
@@ -124,7 +124,7 @@ function setBrowseFilter(filter) {
     banner.setAttribute("aria-pressed", String(selected));
   });
   modeLabel.textContent = selectedPlayMode === "house" ? "Play the House" : "Play the Player";
-  modeIcon.src = selectedPlayMode === "house" ? "assets/icons/navigation/house.png" : "assets/icons/navigation/player.png";
+  modeIcon.src = selectedPlayMode === "house" ? "assets/icons/navigation/house-mode.png" : "assets/icons/navigation/player-mode.png";
   applyFilters();
   restoreViewport(viewport);
 }
