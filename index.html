@@ -6,11 +6,11 @@
     <meta name="theme-color" content="#03111b" />
     <meta
       name="description"
-      content="GamRace — originals, slots, live casino and live games in one fast gaming lobby."
+      content="GamRace — originals, slots, live games and providers in one fast gaming lobby."
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=auth-header-1" />
+    <link rel="stylesheet" href="styles.css?v=navigation-icons-1" />
   </head>
   <body data-authenticated="false">
     <div class="app-shell">
@@ -20,14 +20,16 @@
           <button class="mobile-menu-close" type="button" aria-label="Close menu">×</button>
         </div>
         <nav class="primary-nav">
-          <a class="nav-link active" href="#top" data-mobile-menu-action="house"><span>[2]</span>Home</a>
-          <a class="nav-link" href="#originals"><span>[3]</span>Originals</a>
-          <a class="nav-link" href="#slots"><span>[4]</span>Casino</a>
-          <a class="nav-link" href="#live"><span>[5]</span>Live Casino</a>
-          <a class="nav-link" href="#promotions"><span>[6]</span>Promotions</a>
+          <a class="nav-link active" href="#top"><img class="nav-icon nav-icon-home" src="assets/icons/navigation/home.png" alt="" aria-hidden="true" />Home</a>
+          <a class="nav-link" href="#house" data-mobile-menu-action="house"><img class="nav-icon nav-icon-house" src="assets/icons/navigation/house.png" alt="" aria-hidden="true" />House</a>
+          <a class="nav-link" href="#player" data-mobile-menu-action="player"><img class="nav-icon nav-icon-player" src="assets/icons/navigation/player.png" alt="" aria-hidden="true" />Player</a>
+          <a class="nav-link" href="#slots"><img class="nav-icon nav-icon-slots" src="assets/icons/navigation/slots.png" alt="" aria-hidden="true" />Slots</a>
+          <a class="nav-link" href="#live-games"><img class="nav-icon nav-icon-live-games" src="assets/icons/navigation/live-games.png" alt="" aria-hidden="true" />Live Games</a>
+          <a class="nav-link" href="#providers"><img class="nav-icon nav-icon-providers" src="assets/icons/navigation/providers.png" alt="" aria-hidden="true" />Providers</a>
+          <a class="nav-link" href="#promotions"><img class="nav-icon nav-icon-promotions" src="assets/icons/navigation/promotions.png" alt="" aria-hidden="true" />Promotions</a>
           <a class="nav-link" href="#rewards" data-mobile-menu-action="rewards"><img class="nav-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" />Rewards</a>
-          <a class="nav-link" href="#vip"><span>[8]</span>VIP</a>
-          <a class="nav-link" href="#affiliates"><span>[9]</span>Affiliates</a>
+          <a class="nav-link" href="#vip"><img class="nav-icon nav-icon-vip" src="assets/icons/navigation/vip.png" alt="" aria-hidden="true" />VIP</a>
+          <a class="nav-link" href="#affiliates"><img class="nav-icon nav-icon-affiliates" src="assets/icons/navigation/affiliates.png" alt="" aria-hidden="true" />Affiliates</a>
         </nav>
 
       </aside>
@@ -72,17 +74,6 @@
           </button>
         </section>
 
-        <nav class="category-strip" aria-label="Game categories">
-          <button class="category active" type="button" data-filter="all"><span>[22]</span>All Games</button>
-          <button class="category" type="button" data-filter="original"><span>[23]</span>GamRace Originals</button>
-          <button class="category" type="button" data-filter="slot"><span>[24]</span>Slots</button>
-          <button class="category" type="button" data-filter="live"><span>[25]</span>Live Casino</button>
-          <button class="category" type="button" data-filter="live"><span>[26]</span>Game Shows</button>
-          <button class="category" type="button" data-filter="slot"><span>[27]</span>Table Games</button>
-          <button class="category" type="button" data-filter="all"><span>[28]</span>New Releases</button>
-          <button class="category" type="button" data-filter="all"><span>[29]</span>Providers</button>
-        </nav>
-
         <label class="search-box">
           <img class="search-icon" src="assets/icons/navigation/search.png" alt="" aria-hidden="true" />
           <span class="sr-only">Search games</span>
@@ -93,7 +84,7 @@
           <section class="game-section" id="originals" data-section="original">
             <div class="section-heading">
               <div>
-                <span class="section-icon cyan">[31]</span>
+                <img class="section-icon-img" id="lobby-mode-icon" src="assets/icons/navigation/house.png" alt="" aria-hidden="true" />
                 <h2>GamRace Originals</h2>
                 <p class="lobby-mode-label" id="lobby-mode-label">Play the House</p>
               </div>
@@ -126,7 +117,7 @@
           <section class="game-section" id="slots" data-section="slot">
             <div class="section-heading">
               <div>
-                <span class="section-icon coral">[33]</span>
+                <img class="section-icon-img" src="assets/icons/navigation/slots.png" alt="" aria-hidden="true" />
                 <h2>Slots</h2>
               </div>
               <div class="section-actions" data-carousel-controls="slots-row">
@@ -149,36 +140,10 @@
             </div>
           </section>
 
-          <section class="game-section" id="live" data-section="live">
-            <div class="section-heading">
-              <div>
-                <span class="section-icon red">[35]</span>
-                <h2>Live Casino</h2>
-              </div>
-              <div class="section-actions" data-carousel-controls="live-casino-row">
-                <button class="view-all-button" type="button" data-filter="live">View all</button>
-                <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous live casino games">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
-                </button>
-                <button class="carousel-arrow carousel-next" type="button" aria-label="Next live casino games">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
-                </button>
-              </div>
-            </div>
-            <div class="card-row" id="live-casino-row">
-              <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
-              <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
-              <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
-              <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
-              <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
-              <div class="game-card live" data-name="live casino game"><span class="placeholder-art">[live card]</span></div>
-            </div>
-          </section>
-
           <section class="game-section" id="live-games" data-section="live">
             <div class="section-heading">
               <div>
-                <span class="section-icon red">[37]</span>
+                <img class="section-icon-img" src="assets/icons/navigation/live-games.png" alt="" aria-hidden="true" />
                 <h2>Live Games</h2>
               </div>
               <div class="section-actions" data-carousel-controls="live-games-row">
@@ -198,6 +163,32 @@
               <div class="game-card live" data-name="live games"><span class="placeholder-art">[live games card]</span></div>
               <div class="game-card live" data-name="live games"><span class="placeholder-art">[live games card]</span></div>
               <div class="game-card live" data-name="live games"><span class="placeholder-art">[live games card]</span></div>
+            </div>
+          </section>
+
+          <section class="game-section" id="providers" data-section="provider">
+            <div class="section-heading">
+              <div>
+                <img class="section-icon-img" src="assets/icons/navigation/providers.png" alt="" aria-hidden="true" />
+                <h2>Providers</h2>
+              </div>
+              <div class="section-actions" data-carousel-controls="providers-row">
+                <button class="view-all-button" type="button" data-filter="provider">View all</button>
+                <button class="carousel-arrow carousel-prev" type="button" aria-label="Previous providers">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+                </button>
+                <button class="carousel-arrow carousel-next" type="button" aria-label="Next providers">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
+            </div>
+            <div class="card-row" id="providers-row">
+              <div class="game-card provider" data-name="provider"><span class="placeholder-art">[provider card]</span></div>
+              <div class="game-card provider" data-name="provider"><span class="placeholder-art">[provider card]</span></div>
+              <div class="game-card provider" data-name="provider"><span class="placeholder-art">[provider card]</span></div>
+              <div class="game-card provider" data-name="provider"><span class="placeholder-art">[provider card]</span></div>
+              <div class="game-card provider" data-name="provider"><span class="placeholder-art">[provider card]</span></div>
+              <div class="game-card provider" data-name="provider"><span class="placeholder-art">[provider card]</span></div>
             </div>
           </section>
         </div>
@@ -284,8 +275,8 @@
       </section>
     </div>
 
-    <script src="script.js?v=mobile-tabbar-1"></script>
-    <script src="mobile-nav.js?v=mobile-navigation-2"></script>
+    <script src="script.js?v=navigation-icons-1"></script>
+    <script src="mobile-nav.js?v=navigation-icons-1"></script>
     <script type="module" src="firebase-auth.js?v=auth-header-1"></script>
   </body>
 </html>

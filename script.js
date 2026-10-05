@@ -6,6 +6,7 @@ const sections = [...document.querySelectorAll(".game-section")];
 const categories = [...document.querySelectorAll(".category")];
 const heroModes = [...document.querySelectorAll("[data-mode]")];
 const modeLabel = document.querySelector("#lobby-mode-label");
+const modeIcon = document.querySelector("#lobby-mode-icon");
 const emptyState = document.querySelector("#empty-state");
 const carouselControls = [...document.querySelectorAll("[data-carousel-controls]")];
 let currentFilter = "all";
@@ -51,7 +52,7 @@ window.addEventListener("resize", updateAllCarouselStates);
 function modeAllowsSection(sectionName) {
   if (currentMode === "browse") return true;
   if (sectionName === "original") return true;
-  return currentMode === "house" ? sectionName === "slot" : sectionName === "live";
+  return currentMode === "house" ? sectionName === "slot" : sectionName === "live" || sectionName === "provider";
 }
 
 function applyFilters() {
@@ -95,6 +96,27 @@ function setHeroMode(mode) {
   });
 
   modeLabel.textContent = mode === "house" ? "Play the House" : "Play the Player";
+  modeIcon.src = mode === "house" ? "assets/icons/navigation/house.png" : "assets/icons/navigation/player.png";
+  applyFilters();
+  restoreViewport(viewport);
+}
+
+function setBrowseFilter(filter) {
+  const viewport = captureViewport();
+  currentMode = "browse";
+  currentFilter = filter;
+  sections.forEach((section) => section.classList.remove("expanded"));
+  document.querySelectorAll(".view-all-button").forEach((item) => item.setAttribute("aria-pressed", "false"));
+  categories.forEach((item) => {
+    const selected = item.dataset.filter === filter;
+    item.classList.toggle("active", selected);
+    item.setAttribute("aria-pressed", String(selected));
+  });
+  heroModes.forEach((banner) => {
+    banner.classList.remove("active");
+    banner.setAttribute("aria-pressed", "false");
+  });
+  modeLabel.textContent = filter === "original" ? "GamRace Originals" : "Browse Games";
   applyFilters();
   restoreViewport(viewport);
 }
@@ -104,32 +126,13 @@ heroModes.forEach((banner) => {
 });
 
 categories.forEach((button) => {
-  button.addEventListener("click", () => {
-    const viewport = captureViewport();
-    currentMode = "browse";
-    currentFilter = button.dataset.filter;
-    sections.forEach((section) => section.classList.remove("expanded"));
-    document.querySelectorAll(".view-all-button").forEach((item) => item.setAttribute("aria-pressed", "false"));
-    categories.forEach((item) => {
-      const selected = item === button;
-      item.classList.toggle("active", selected);
-      item.setAttribute("aria-pressed", String(selected));
-    });
-    heroModes.forEach((banner) => {
-      banner.classList.remove("active");
-      banner.setAttribute("aria-pressed", "false");
-    });
-    modeLabel.textContent = currentFilter === "original" ? "GamRace Originals" : "Browse Games";
-    applyFilters();
-    restoreViewport(viewport);
-  });
+  button.addEventListener("click", () => setBrowseFilter(button.dataset.filter));
 });
 
 document.querySelectorAll(".view-all-button").forEach((button) => {
   button.addEventListener("click", () => {
     const viewport = captureViewport();
-    const matchingCategory = categories.find((item) => item.dataset.filter === button.dataset.filter);
-    matchingCategory?.click();
+    setBrowseFilter(button.dataset.filter);
     const matchingSection = button.closest(".game-section");
     if (matchingSection) {
       matchingSection.classList.add("expanded");
@@ -148,10 +151,11 @@ document.querySelectorAll(".nav-link").forEach((link) => {
     const destination = link.getAttribute("href");
     document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
     link.classList.add("active");
-    if (destination === "#top") setHeroMode("house");
-    if (destination === "#originals") categories.find((item) => item.dataset.filter === "original")?.click();
-    if (destination === "#slots") categories.find((item) => item.dataset.filter === "slot")?.click();
-    if (destination === "#live") categories.find((item) => item.dataset.filter === "live")?.click();
+    if (destination === "#top" || destination === "#house") setHeroMode("house");
+    if (destination === "#player") setHeroMode("player");
+    if (destination === "#slots") setBrowseFilter("slot");
+    if (destination === "#live-games") setBrowseFilter("live");
+    if (destination === "#providers") setBrowseFilter("provider");
     restoreViewport(viewport);
   });
 });
@@ -245,5 +249,7 @@ function validatePasswordMatch() {
 newPassword.addEventListener("input", validatePasswordMatch);
 confirmPassword.addEventListener("input", validatePasswordMatch);
 
-applyFilters();
+const requestedFilter = new URL(window.location.href).searchParams.get("filter");
+if (["slot", "live", "provider"].includes(requestedFilter)) setBrowseFilter(requestedFilter);
+else applyFilters();
 requestAnimationFrame(updateAllCarouselStates);
