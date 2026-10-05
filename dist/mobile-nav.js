@@ -132,6 +132,11 @@
 
   function routeFromAddress({ focusSearch = true } = {}) {
     const url = new URL(window.location.href);
+    if (url.searchParams.has("filter") && isLobby) {
+      showLobby();
+      setActive("");
+      return;
+    }
     const legacyMode = url.searchParams.get("mode");
     const requested = url.searchParams.get("tab") || (legacyMode === "player" ? "player" : legacyMode === "house" ? "house" : url.searchParams.has("focus") ? "search" : "house");
     if (["house", "player", "search", "rewards", "chat"].includes(requested) && isLobby) renderRoute(requested, { focusSearch });
