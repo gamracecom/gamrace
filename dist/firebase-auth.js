@@ -95,22 +95,52 @@ function createProfileDialog() {
   overlay.innerHTML = `
     <section class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-dialog-title">
       <button class="profile-close" type="button" aria-label="Close profile">×</button>
-      <div class="profile-heading">
-        <span class="profile-kicker">YOUR PROFILE</span>
-        <h2 id="profile-dialog-title">Username</h2>
+      <div class="profile-shell">
+        <aside class="profile-sidebar">
+          <div class="profile-heading">
+            <span class="profile-kicker">ACCOUNT</span>
+            <h2 id="profile-dialog-title">Profile</h2>
+          </div>
+          <nav class="profile-tabs" aria-label="Profile sections">
+            <button class="profile-tab active" type="button" data-profile-section="overview" aria-selected="true">Overview</button>
+            <button class="profile-tab" type="button" data-profile-section="settings" aria-selected="false">Settings</button>
+          </nav>
+        </aside>
+        <div class="profile-content">
+          <section class="profile-section" data-profile-panel="overview">
+            <span class="profile-section-label">PROFILE</span>
+            <div class="profile-identity">
+              <span class="profile-avatar" aria-hidden="true"></span>
+              <div>
+                <strong class="profile-current-name"></strong>
+                <span class="profile-email"></span>
+              </div>
+            </div>
+          </section>
+          <section class="profile-section" data-profile-panel="settings" hidden>
+            <span class="profile-section-label">SETTINGS</span>
+            <h3>Username</h3>
+            <p class="settings-copy">Set the name other players will see.</p>
+            <form class="username-form">
+              <label class="auth-field" for="profile-username">Username</label>
+              <span class="auth-input-wrap"><input id="profile-username" name="username" type="text" minlength="3" maxlength="20" autocomplete="off" spellcheck="false" required /></span>
+              <p class="username-help">Your username can be changed once.</p>
+              <button class="auth-submit username-save" type="submit">Save username</button>
+              <p class="profile-status" role="status" aria-live="polite"></p>
+            </form>
+          </section>
+        </div>
       </div>
-      <form class="username-form">
-        <label class="auth-field" for="profile-username">Username</label>
-        <span class="auth-input-wrap"><input id="profile-username" name="username" type="text" minlength="3" maxlength="20" autocomplete="username" spellcheck="false" required /></span>
-        <p class="username-help">Your username is public and can be changed once.</p>
-        <button class="auth-submit username-save" type="submit">Save username</button>
-        <p class="profile-status" role="status" aria-live="polite"></p>
-      </form>
     </section>`;
   document.body.append(overlay);
   return {
     overlay,
     close: overlay.querySelector(".profile-close"),
+    tabs: [...overlay.querySelectorAll("[data-profile-section]")],
+    panels: [...overlay.querySelectorAll("[data-profile-panel]")],
+    currentName: overlay.querySelector(".profile-current-name"),
+    email: overlay.querySelector(".profile-email"),
+    avatar: overlay.querySelector(".profile-avatar"),
     form: overlay.querySelector(".username-form"),
     input: overlay.querySelector("#profile-username"),
     help: overlay.querySelector(".username-help"),
@@ -121,6 +151,17 @@ function createProfileDialog() {
 
 const profileDialog = createProfileDialog();
 
+function selectProfileSection(section) {
+  profileDialog.tabs.forEach((tab) => {
+    const selected = tab.dataset.profileSection === section;
+    tab.classList.toggle("active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+  });
+  profileDialog.panels.forEach((panel) => {
+    panel.hidden = panel.dataset.profilePanel !== section;
+  });
+}
+
 function setProfileStatus(message = "", state = "") {
   profileDialog.status.textContent = message;
   if (state) profileDialog.status.dataset.state = state;
@@ -130,21 +171,25 @@ function setProfileStatus(message = "", state = "") {
 function refreshProfileDialog() {
   if (!currentProfile) return;
   profileDialog.input.value = currentProfile.username;
+  profileDialog.currentName.textContent = currentProfile.username;
+  profileDialog.email.textContent = auth.currentUser?.email || "";
+  profileDialog.avatar.textContent = currentProfile.username.charAt(0).toUpperCase();
   profileDialog.input.disabled = currentProfile.usernameChanged || profileBusy;
   profileDialog.save.disabled = currentProfile.usernameChanged || profileBusy;
   profileDialog.save.hidden = currentProfile.usernameChanged;
   profileDialog.help.textContent = currentProfile.usernameChanged
-    ? "This username has already used its one allowed change."
-    : "Your username is public and can be changed once.";
+    ? "Your one username change has already been used."
+    : "Your username can be changed once.";
 }
 
 function openProfileDialog({ welcome = false } = {}) {
   if (!auth.currentUser || !currentProfile) return;
   setProfileStatus(welcome ? "A random username was created for you. Choose carefully—you can change it once." : "");
   refreshProfileDialog();
+  selectProfileSection(welcome ? "settings" : "overview");
   profileDialog.overlay.hidden = false;
   document.body.classList.add("modal-open");
-  if (!currentProfile.usernameChanged) {
+  if (welcome && !currentProfile.usernameChanged) {
     profileDialog.input.focus();
     profileDialog.input.select();
   } else {
@@ -258,7 +303,7 @@ function renderUser(user) {
 
   if (signedIn) {
     if (authModal) authModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    if (profileDialog.overlay.hidden) document.body.classList.remove("modal-open");
     setStatus();
   } else {
     currentProfile = null;
@@ -298,6 +343,13 @@ async function continueWithGoogle() {
 googleButtons.forEach((button) => button.addEventListener("click", continueWithGoogle));
 
 profileButton?.addEventListener("click", () => openProfileDialog());
+profileDialog.tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    selectProfileSection(tab.dataset.profileSection);
+    setProfileStatus();
+    if (tab.dataset.profileSection === "settings" && !currentProfile?.usernameChanged) profileDialog.input.focus();
+  });
+});
 profileDialog.close.addEventListener("click", closeProfileDialog);
 profileDialog.overlay.addEventListener("click", (event) => {
   if (event.target === profileDialog.overlay) closeProfileDialog();
@@ -310,7 +362,8 @@ profileDialog.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!auth.currentUser || !currentProfile || profileBusy) return;
 
-  const validationError = validateUsername(profileDialog.input.value);
+  const requestedUsername = profileDialog.input.value;
+  const validationError = validateUsername(requestedUsername);
   if (validationError) {
     setProfileStatus(validationError, "error");
     return;
@@ -320,7 +373,7 @@ profileDialog.form.addEventListener("submit", async (event) => {
   setProfileStatus("Checking username…");
   refreshProfileDialog();
   try {
-    currentProfile = await changeUsername(auth.currentUser, profileDialog.input.value);
+    currentProfile = await changeUsername(auth.currentUser, requestedUsername);
     renderUser(auth.currentUser);
     setProfileStatus(`Your username is now ${currentProfile.username}.`, "success");
   } catch (error) {
