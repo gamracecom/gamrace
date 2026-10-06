@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function usernamePath(key) {
+      return /databases/$(database)/documents/usernames/$(key);
+    }
+
+    function validUsername(data) {
+      return data.username is string
+        && data.username.size() >= 3
+        && data.username.size() <= 20
+        && data.username.matches('^[A-Za-z][A-Za-z0-9_]{2,19}$')
+        && data.usernameKey is string
+        && data.usernameKey == data.username.lower();
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'username', 'usernameKey', 'usernameChanged', 'createdAt', 'updatedAt'
+        ])
+        && validUsername(request.resource.data)
+        && request.resource.data.usernameChanged == false
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(usernamePath(request.resource.data.usernameKey)).data.uid == uid
+        && getAfter(usernamePath(request.resource.data.usernameKey)).data.username == request.resource.data.username;
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && resource.data.usernameChanged == false
+        && request.resource.data.usernameChanged == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'username', 'usernameKey', 'usernameChanged', 'updatedAt'
+        ])
+        && validUsername(request.resource.data)
+        && request.resource.data.usernameKey != resource.data.usernameKey
+        && request.resource.data.updatedAt == request.time
+        && getAfter(usernamePath(request.resource.data.usernameKey)).data.uid == uid
+        && getAfter(usernamePath(request.resource.data.usernameKey)).data.username == request.resource.data.username
+        && !existsAfter(usernamePath(resource.data.usernameKey));
+
+      allow delete: if false;
+    }
+
+    match /usernames/{key} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'username', 'usernameKey', 'createdAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.username is string
+        && request.resource.data.username.matches('^[A-Za-z][A-Za-z0-9_]{2,19}$')
+        && request.resource.data.usernameKey == key
+        && request.resource.data.usernameKey == request.resource.data.username.lower()
+        && request.resource.data.createdAt == request.time
+        && !exists(usernamePath(key))
+        && getAfter(userPath(request.auth.uid)).data.usernameKey == key
+        && getAfter(userPath(request.auth.uid)).data.username == request.resource.data.username;
+
+      allow update: if false;
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && getAfter(userPath(request.auth.uid)).data.usernameChanged == true
+        && getAfter(userPath(request.auth.uid)).data.usernameKey != key;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
