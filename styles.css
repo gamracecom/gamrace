@@ -226,16 +226,17 @@ body.modal-open { overflow: hidden; }
 .profile-email { display: block; margin-top: 5px; color: #8fa7b9; font-size: .82rem; }
 .rank-card { margin-top: 16px; padding: 18px; border: 1px solid #18394e; border-radius: 12px; background: #061621; }
 .rank-card-heading { display: grid; grid-template-columns: 68px minmax(0, 1fr); align-items: center; gap: 8px 15px; }
-.rank-badge { position: relative; width: 68px; height: 68px; display: grid; place-items: center; overflow: visible; border: 1px solid #1f5975; border-radius: 15px; background: #0a2230; }
+.rank-badge { position: relative; width: 68px; height: 68px; display: grid; grid-row: 1 / span 2; place-items: center; overflow: visible; border: 1px solid #1f5975; border-radius: 15px; background: #0a2230; }
 .rank-badge-image { position: absolute; inset: 5px; width: calc(100% - 10px); height: calc(100% - 10px); object-fit: contain; opacity: 0; }
 .rank-badge.has-image .rank-badge-image { opacity: 1; }
 .rank-badge.has-image .rank-badge-fallback { opacity: 0; }
 .rank-badge-fallback { color: #66ddff; font-size: 1.45rem; font-weight: 900; letter-spacing: -.05em; }
 .rank-badge-tier { position: absolute; right: -6px; bottom: -6px; min-width: 28px; height: 24px; display: grid; place-items: center; padding: 0 6px; border: 1px solid #2a6684; border-radius: 7px; background: #081824; color: #f4fbff; font-size: .72rem; font-weight: 900; }
 .rank-eyebrow { color: var(--cyan); font-size: .75rem; font-weight: 850; letter-spacing: .12em; }
+.rank-title-group { grid-column: 2; grid-row: 1; min-width: 0; }
 .rank-title-group h3 { margin: 4px 0 1px; color: #f5faff; font-size: 1.25rem; line-height: 1.2; }
 .rank-subtitle { margin: 0; color: #8fa7b9; font-size: .83rem; }
-.rank-tier-indicators { grid-column: 2; display: flex; gap: 5px; }
+.rank-tier-indicators { grid-column: 2; grid-row: 2; display: flex; gap: 5px; }
 .rank-tier-indicators span { width: 30px; height: 27px; display: grid; place-items: center; border: 1px solid #173b50; border-radius: 7px; background: #081924; color: #708797; font-size: .75rem; font-weight: 800; }
 .rank-tier-indicators span.active { border-color: #21a9d2; background: #0c2d3e; color: #f6fcff; }
 .rank-wager-line { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; margin-top: 20px; color: #8ea6b8; font-size: .78rem; }
