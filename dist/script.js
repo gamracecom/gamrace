@@ -8,6 +8,7 @@ const heroModes = [...document.querySelectorAll("[data-mode]")];
 const modeLabel = document.querySelector("#lobby-mode-label");
 const modeIcon = document.querySelector("#lobby-mode-icon");
 const emptyState = document.querySelector("#empty-state");
+const gameSections = document.querySelector("#game-sections");
 const carouselControls = [...document.querySelectorAll("[data-carousel-controls]")];
 let currentFilter = "all";
 let currentMode = "house";
@@ -36,6 +37,14 @@ function updateAllCarouselStates() {
   carouselControls.forEach(updateCarouselState);
 }
 
+function updateBrowseLayout() {
+  const isLobby = currentFilter === "all";
+  gameSections.classList.toggle("category-view", !isLobby);
+  carouselControls.forEach((controls) => {
+    controls.hidden = !isLobby;
+  });
+}
+
 carouselControls.forEach((controls) => {
   const row = document.querySelector(`#${controls.dataset.carouselControls}`);
   if (!row) return;
@@ -58,6 +67,8 @@ function modeAllowsSection(sectionName) {
 function applyFilters() {
   const query = search.value.trim().toLowerCase();
   let totalVisible = 0;
+
+  updateBrowseLayout();
 
   sections.forEach((section) => {
     let visibleInSection = 0;
@@ -266,6 +277,6 @@ newPassword.addEventListener("input", validatePasswordMatch);
 confirmPassword.addEventListener("input", validatePasswordMatch);
 
 const requestedFilter = new URL(window.location.href).searchParams.get("filter");
-if (["slot", "live", "provider"].includes(requestedFilter)) setBrowseFilter(requestedFilter);
+if (["favorite", "live", "slot", "original", "exclusive", "provider"].includes(requestedFilter)) setBrowseFilter(requestedFilter);
 else applyFilters();
 requestAnimationFrame(updateAllCarouselStates);
