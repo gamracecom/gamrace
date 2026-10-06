@@ -11,7 +11,7 @@
   --yellow: #ffca32;
   --icon-white-filter: brightness(0) saturate(100%) invert(100%);
   --icon-blue-filter: brightness(0) saturate(100%) invert(69%) sepia(83%) saturate(1351%) hue-rotate(158deg) brightness(105%) contrast(102%);
-  --sidebar: 214px;
+  --sidebar: 0px;
   --content-max: 1540px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -32,7 +32,7 @@ a { color: inherit; text-decoration: none; }
 .app-shell { min-height: 100vh; }
 .sidebar {
   position: fixed; inset: 64px auto 0 0; z-index: 10; width: var(--sidebar); padding: 18px 18px 16px;
-  display: flex; flex-direction: column; overflow-y: auto;
+  display: none; flex-direction: column; overflow-y: auto;
   border-right: 1px solid rgba(53, 112, 144, .12);
   background: linear-gradient(180deg, rgba(2, 12, 20, .99), rgba(3, 16, 25, .97));
 }
@@ -76,7 +76,8 @@ body[data-authenticated="true"] .auth-actions { display: none; }
 .auth { min-width: 98px; }
 .auth.register { border-color: #14baf1; background: linear-gradient(180deg, #47dcff, #0ab8f4); color: #00101a; box-shadow: 0 0 17px rgba(0, 185, 255, .28); }
 
-.hero-grid { min-height: clamp(240px, 17vw, 284px); display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; }
+.hero-grid { min-height: clamp(240px, 17vw, 284px); display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); gap: 10px; }
+.hero-feature-pair { min-width: 0; min-height: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .hero-feature-placeholder { min-width: 0; min-height: 100%; border: 1px solid rgba(74, 111, 135, .34); border-radius: 14px; background: transparent; }
 .hero-mode-stack { min-width: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .hero-card { position: relative; width: 100%; min-height: 0; padding: 0; overflow: hidden; border: 1px solid #0a9ce5; border-radius: 14px; background-color: #02101a; background-repeat: no-repeat; background-size: cover; color: inherit; cursor: pointer; font: inherit; text-align: left; appearance: none; box-shadow: inset 0 0 34px rgba(0, 143, 240, .08), 0 12px 28px rgba(0, 0, 0, .2); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
@@ -261,7 +262,7 @@ body.modal-open { overflow: hidden; }
 .profile-status[data-state="success"] { color: #69e0ff; }
 .username-save:disabled { cursor: wait; opacity: .62; }
 @media (max-width: 1180px) {
-  :root { --sidebar: 190px; }
+  :root { --sidebar: 0px; }
   .main-content { padding-inline: 18px; }
   .topbar { padding-right: 18px; padding-left: calc(var(--sidebar) + 18px); }
   .hero-grid { min-height: 230px; }
@@ -277,12 +278,13 @@ body.modal-open { overflow: hidden; }
   .primary-nav { display: flex; gap: 5px; margin: 0; }
   .nav-link { flex: 0 0 auto; min-height: 38px; padding: 0 11px; font-size: .78rem; }
   .nav-link:nth-child(n+6) { display: none; }
-  .main-content { margin-left: 0; padding: 124px 14px 0; }
+  .main-content { margin-left: 0; padding: 76px 14px 0; }
   .topbar { left: 0; padding-inline: 14px; }
   .utility, .auth { min-height: 38px; padding: 0 12px; }
   .auth { min-width: auto; }
   .hero-grid { min-height: 0; grid-template-columns: 1fr; }
-  .hero-feature-placeholder { min-height: 190px; }
+  .hero-feature-pair { min-height: 190px; }
+  .hero-feature-placeholder { min-height: 100%; }
   .hero-mode-stack { min-height: 148px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 1fr; }
   .hero-house { background-position: 46% center; }
   .hero-player { background-position: 49% center; }
@@ -327,7 +329,7 @@ body.modal-open { overflow: hidden; }
   .utility { gap: 5px; }
   .utility.balance { padding-inline: 7px; }
   .utility.wallet { padding-inline: 7px; }
-  .hero-feature-placeholder { min-height: 150px; }
+  .hero-feature-pair { min-height: 150px; gap: 8px; }
   .hero-mode-stack { min-height: 126px; gap: 8px; }
   .hero-copy { width: 62%; padding: 14px 0 12px 14px; }
   .hero-copy p { font-size: .68rem; }
