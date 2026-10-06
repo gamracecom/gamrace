@@ -14,6 +14,7 @@ import {
   runTransaction,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getPlayerRankStats } from "./player-rank-service.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBS3pib3PsHnSJGaQqBc--S99qI7sqhDuU",
@@ -116,6 +117,36 @@ function createProfileDialog() {
                 <span class="profile-email"></span>
               </div>
             </div>
+            <article class="rank-card" aria-labelledby="profile-rank-name">
+              <div class="rank-card-heading">
+                <div class="rank-badge" aria-hidden="true">
+                  <span class="rank-badge-fallback"></span>
+                  <img class="rank-badge-image" alt="" />
+                  <span class="rank-badge-tier"></span>
+                </div>
+                <div class="rank-title-group">
+                  <span class="rank-eyebrow">PLAYER RANK</span>
+                  <h3 id="profile-rank-name" class="rank-name"></h3>
+                  <p class="rank-subtitle"></p>
+                </div>
+                <div class="rank-tier-indicators" aria-label="Rank sub-level">
+                  <span data-rank-tier="I">I</span>
+                  <span data-rank-tier="II">II</span>
+                  <span data-rank-tier="III">III</span>
+                </div>
+              </div>
+              <div class="rank-wager-line">
+                <span>Lifetime weighted wager</span>
+                <strong class="rank-lifetime-wager"></strong>
+              </div>
+              <div class="rank-progress-copy">
+                <span class="rank-progress-values"></span>
+                <strong class="rank-next"></strong>
+              </div>
+              <div class="rank-progress-track" role="progressbar" aria-label="Progress to next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <span class="rank-progress-fill"></span>
+              </div>
+            </article>
           </section>
           <section class="profile-section" data-profile-panel="settings" hidden>
             <span class="profile-section-label">SETTINGS</span>
@@ -141,6 +172,18 @@ function createProfileDialog() {
     currentName: overlay.querySelector(".profile-current-name"),
     email: overlay.querySelector(".profile-email"),
     avatar: overlay.querySelector(".profile-avatar"),
+    rankBadge: overlay.querySelector(".rank-badge"),
+    rankBadgeImage: overlay.querySelector(".rank-badge-image"),
+    rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"),
+    rankBadgeTier: overlay.querySelector(".rank-badge-tier"),
+    rankName: overlay.querySelector(".rank-name"),
+    rankSubtitle: overlay.querySelector(".rank-subtitle"),
+    rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")],
+    rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"),
+    rankProgressValues: overlay.querySelector(".rank-progress-values"),
+    rankNext: overlay.querySelector(".rank-next"),
+    rankProgressTrack: overlay.querySelector(".rank-progress-track"),
+    rankProgressFill: overlay.querySelector(".rank-progress-fill"),
     form: overlay.querySelector(".username-form"),
     input: overlay.querySelector("#profile-username"),
     help: overlay.querySelector(".username-help"),
@@ -150,6 +193,52 @@ function createProfileDialog() {
 }
 
 const profileDialog = createProfileDialog();
+
+profileDialog.rankBadgeImage.addEventListener("load", () => {
+  profileDialog.rankBadge.classList.add("has-image");
+});
+profileDialog.rankBadgeImage.addEventListener("error", () => {
+  profileDialog.rankBadge.classList.remove("has-image");
+});
+
+function formatWager(value) {
+  const amount = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function renderRankCard(source) {
+  const stats = getPlayerRankStats(source);
+  const { rankDefinition, nextRank } = stats;
+
+  profileDialog.rankBadge.classList.remove("has-image");
+  profileDialog.rankBadgeImage.src = rankDefinition.badgePath;
+  profileDialog.rankBadgeFallback.textContent = rankDefinition.name === "Hall of Fame"
+    ? "HF"
+    : rankDefinition.name.charAt(0);
+  profileDialog.rankBadgeTier.textContent = rankDefinition.tier;
+  profileDialog.rankName.textContent = rankDefinition.label;
+  profileDialog.rankSubtitle.textContent = rankDefinition.subtitle;
+  profileDialog.rankLifetimeWager.textContent = formatWager(stats.lifetimeWeightedWager);
+  profileDialog.rankProgressValues.textContent = nextRank
+    ? `${formatWager(stats.lifetimeWeightedWager)} / ${formatWager(nextRank.threshold)}`
+    : `${formatWager(stats.lifetimeWeightedWager)} lifetime`;
+  profileDialog.rankNext.textContent = nextRank ? `Next: ${nextRank.label}` : "MAX RANK";
+  profileDialog.rankNext.classList.toggle("is-max", stats.isMaxRank);
+  profileDialog.rankProgressFill.style.width = `${stats.percentage}%`;
+  profileDialog.rankProgressTrack.setAttribute("aria-valuenow", String(Math.round(stats.percentage)));
+  profileDialog.rankProgressTrack.setAttribute(
+    "aria-valuetext",
+    nextRank ? `${stats.percentage.toFixed(1)}% to ${nextRank.label}` : "Maximum rank reached",
+  );
+  profileDialog.rankTierIndicators.forEach((indicator) => {
+    indicator.classList.toggle("active", indicator.dataset.rankTier === rankDefinition.tier);
+  });
+}
 
 function selectProfileSection(section) {
   profileDialog.tabs.forEach((tab) => {
@@ -174,6 +263,7 @@ function refreshProfileDialog() {
   profileDialog.currentName.textContent = currentProfile.username;
   profileDialog.email.textContent = auth.currentUser?.email || "";
   profileDialog.avatar.textContent = currentProfile.username.charAt(0).toUpperCase();
+  renderRankCard(currentProfile);
   profileDialog.input.disabled = currentProfile.usernameChanged || profileBusy;
   profileDialog.save.disabled = currentProfile.usernameChanged || profileBusy;
   profileDialog.save.hidden = currentProfile.usernameChanged;
