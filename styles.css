@@ -205,9 +205,9 @@ body.modal-open { overflow: hidden; }
 .auth-switch-copy button { border: 0; padding: 0; background: transparent; color: var(--cyan); cursor: pointer; text-decoration: underline; }
 .profile-overlay { position: fixed; z-index: 220; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 8, 15, .78); backdrop-filter: blur(8px); }
 .profile-overlay[hidden] { display: none; }
-.profile-modal { position: relative; width: min(760px, calc(100vw - 32px)); min-height: 470px; overflow: hidden; border: 1px solid #1678a6; border-radius: 16px; background: #071722; box-shadow: 0 28px 80px rgba(0, 0, 0, .72); }
+.profile-modal { position: relative; width: min(820px, calc(100vw - 32px)); height: min(660px, calc(100dvh - 40px)); min-height: min(580px, calc(100dvh - 40px)); overflow: hidden; border: 1px solid #1678a6; border-radius: 16px; background: #071722; box-shadow: 0 28px 80px rgba(0, 0, 0, .72); }
 .profile-close { position: absolute; top: 13px; right: 15px; width: 38px; height: 38px; border: 0; background: transparent; color: #a9c7e9; cursor: pointer; font-size: 1.9rem; line-height: 1; }
-.profile-shell { min-height: 470px; display: grid; grid-template-columns: 210px 1fr; }
+.profile-shell { height: 100%; min-height: 0; display: grid; grid-template-columns: 210px 1fr; }
 .profile-sidebar { padding: 32px 18px; border-right: 1px solid #173447; background: #05131d; }
 .profile-heading { margin: 0 12px 28px; }
 .profile-kicker { color: var(--cyan); font-size: .72rem; font-weight: 850; letter-spacing: .16em; }
@@ -215,7 +215,7 @@ body.modal-open { overflow: hidden; }
 .profile-tabs { display: grid; gap: 6px; }
 .profile-tab { min-height: 46px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: #9db1c1; cursor: pointer; font-size: .9rem; font-weight: 760; text-align: left; }
 .profile-tab.active { background: #0c2636; color: #f4fbff; }
-.profile-content { min-width: 0; padding: 58px 44px 36px; background: radial-gradient(circle at 92% 2%, rgba(20, 141, 196, .16), transparent 34%), #071722; }
+.profile-content { min-width: 0; overflow-y: auto; padding: 52px 40px 34px; background: radial-gradient(circle at 92% 2%, rgba(20, 141, 196, .16), transparent 34%), #071722; }
 .profile-section[hidden] { display: none; }
 .profile-section-label { color: var(--cyan); font-size: .72rem; font-weight: 850; letter-spacing: .14em; }
 .profile-section h3 { margin: 8px 0 5px; color: #f3f9ff; font-size: 1.45rem; }
@@ -224,6 +224,28 @@ body.modal-open { overflow: hidden; }
 .profile-avatar { width: 62px; height: 62px; display: grid; flex: 0 0 62px; place-items: center; border-radius: 50%; background: linear-gradient(145deg, #25dcff, #0879d4); color: #00121b; font-size: 1.6rem; font-weight: 950; }
 .profile-current-name { display: block; color: #f4fbff; font-size: 1.1rem; }
 .profile-email { display: block; margin-top: 5px; color: #8fa7b9; font-size: .82rem; }
+.rank-card { margin-top: 16px; padding: 18px; border: 1px solid #18394e; border-radius: 12px; background: #061621; }
+.rank-card-heading { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; align-items: center; gap: 15px; }
+.rank-badge { position: relative; width: 68px; height: 68px; display: grid; place-items: center; overflow: visible; border: 1px solid #1f5975; border-radius: 15px; background: #0a2230; }
+.rank-badge-image { position: absolute; inset: 5px; width: calc(100% - 10px); height: calc(100% - 10px); object-fit: contain; opacity: 0; }
+.rank-badge.has-image .rank-badge-image { opacity: 1; }
+.rank-badge.has-image .rank-badge-fallback { opacity: 0; }
+.rank-badge-fallback { color: #66ddff; font-size: 1.45rem; font-weight: 900; letter-spacing: -.05em; }
+.rank-badge-tier { position: absolute; right: -6px; bottom: -6px; min-width: 28px; height: 24px; display: grid; place-items: center; padding: 0 6px; border: 1px solid #2a6684; border-radius: 7px; background: #081824; color: #f4fbff; font-size: .72rem; font-weight: 900; }
+.rank-eyebrow { color: var(--cyan); font-size: .75rem; font-weight: 850; letter-spacing: .12em; }
+.rank-title-group h3 { margin: 4px 0 1px; color: #f5faff; font-size: 1.25rem; line-height: 1.2; }
+.rank-subtitle { margin: 0; color: #8fa7b9; font-size: .83rem; }
+.rank-tier-indicators { display: flex; gap: 5px; }
+.rank-tier-indicators span { width: 30px; height: 27px; display: grid; place-items: center; border: 1px solid #173b50; border-radius: 7px; background: #081924; color: #708797; font-size: .75rem; font-weight: 800; }
+.rank-tier-indicators span.active { border-color: #21a9d2; background: #0c2d3e; color: #f6fcff; }
+.rank-wager-line { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; margin-top: 20px; color: #8ea6b8; font-size: .78rem; }
+.rank-wager-line strong { color: #f3f9fc; font-size: .9rem; }
+.rank-progress-copy { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; font-size: .79rem; }
+.rank-progress-values { color: #d4e2eb; font-variant-numeric: tabular-nums; }
+.rank-next { color: #73ddf8; font-size: .76rem; }
+.rank-next.is-max { letter-spacing: .08em; }
+.rank-progress-track { height: 8px; margin-top: 9px; overflow: hidden; border: 1px solid #14384c; border-radius: 999px; background: #03101a; }
+.rank-progress-fill { width: 0; height: 100%; display: block; border-radius: inherit; background: #22caef; transition: width .25s ease; }
 .username-form { display: grid; gap: 14px; }
 .username-help { margin: -3px 0 4px; color: #9bb2c5; font-size: .8rem; line-height: 1.4; }
 .profile-status { min-height: 1.35em; margin: 0; color: #9fc7e7; font-size: .82rem; line-height: 1.35; text-align: center; }
@@ -376,14 +398,21 @@ body.modal-open { overflow: hidden; }
   .auth-submit, .register-form .auth-submit { min-height: 49px; }
   .google-auth { height: 52px; }
   .profile-overlay { padding: 8px; }
-  .profile-modal { width: calc(100vw - 16px); min-height: min(560px, calc(100dvh - 16px)); }
-  .profile-shell { min-height: min(560px, calc(100dvh - 16px)); grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .profile-modal { width: calc(100vw - 16px); height: calc(100dvh - 16px); min-height: 0; }
+  .profile-shell { min-height: 0; grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
   .profile-sidebar { padding: 22px 18px 12px; border-right: 0; border-bottom: 1px solid #173447; }
   .profile-heading { margin: 0 42px 18px 2px; }
   .profile-heading h2 { font-size: 1.5rem; }
   .profile-tabs { grid-template-columns: 1fr 1fr; }
   .profile-tab { text-align: center; }
-  .profile-content { padding: 28px 20px 24px; }
+  .profile-content { padding: 24px 16px; }
+  .profile-identity { margin-top: 16px; padding: 16px; }
+  .profile-avatar { width: 52px; height: 52px; flex-basis: 52px; font-size: 1.35rem; }
+  .rank-card { padding: 15px; }
+  .rank-card-heading { grid-template-columns: 58px minmax(0, 1fr); gap: 13px; }
+  .rank-badge { width: 58px; height: 58px; border-radius: 13px; }
+  .rank-tier-indicators { grid-column: 1 / -1; margin-left: 71px; }
+  .rank-wager-line, .rank-progress-copy { align-items: flex-start; }
 }
 
 @media (max-height: 800px) and (min-width: 561px) {
