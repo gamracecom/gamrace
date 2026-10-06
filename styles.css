@@ -225,7 +225,7 @@ body.modal-open { overflow: hidden; }
 .profile-current-name { display: block; color: #f4fbff; font-size: 1.1rem; }
 .profile-email { display: block; margin-top: 5px; color: #8fa7b9; font-size: .82rem; }
 .rank-card { margin-top: 16px; padding: 18px; border: 1px solid #18394e; border-radius: 12px; background: #061621; }
-.rank-card-heading { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; align-items: center; gap: 15px; }
+.rank-card-heading { display: grid; grid-template-columns: 68px minmax(0, 1fr); align-items: center; gap: 8px 15px; }
 .rank-badge { position: relative; width: 68px; height: 68px; display: grid; place-items: center; overflow: visible; border: 1px solid #1f5975; border-radius: 15px; background: #0a2230; }
 .rank-badge-image { position: absolute; inset: 5px; width: calc(100% - 10px); height: calc(100% - 10px); object-fit: contain; opacity: 0; }
 .rank-badge.has-image .rank-badge-image { opacity: 1; }
@@ -235,7 +235,7 @@ body.modal-open { overflow: hidden; }
 .rank-eyebrow { color: var(--cyan); font-size: .75rem; font-weight: 850; letter-spacing: .12em; }
 .rank-title-group h3 { margin: 4px 0 1px; color: #f5faff; font-size: 1.25rem; line-height: 1.2; }
 .rank-subtitle { margin: 0; color: #8fa7b9; font-size: .83rem; }
-.rank-tier-indicators { display: flex; gap: 5px; }
+.rank-tier-indicators { grid-column: 2; display: flex; gap: 5px; }
 .rank-tier-indicators span { width: 30px; height: 27px; display: grid; place-items: center; border: 1px solid #173b50; border-radius: 7px; background: #081924; color: #708797; font-size: .75rem; font-weight: 800; }
 .rank-tier-indicators span.active { border-color: #21a9d2; background: #0c2d3e; color: #f6fcff; }
 .rank-wager-line { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; margin-top: 20px; color: #8ea6b8; font-size: .78rem; }
@@ -411,7 +411,6 @@ body.modal-open { overflow: hidden; }
   .rank-card { padding: 15px; }
   .rank-card-heading { grid-template-columns: 58px minmax(0, 1fr); gap: 13px; }
   .rank-badge { width: 58px; height: 58px; border-radius: 13px; }
-  .rank-tier-indicators { grid-column: 1 / -1; margin-left: 71px; }
   .rank-wager-line, .rank-progress-copy { align-items: flex-start; }
 }
 
