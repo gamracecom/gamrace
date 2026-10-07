@@ -1,9 +1,9 @@
 export const DEFAULT_LIMITS = Object.freeze({
   minimumDepositUsdCents: 100,
   maximumDepositUsdCents: 10_000_000,
-  minimumWithdrawalUsdCents: 1_000,
-  maximumWithdrawalUsdCents: 10_000_000,
 });
+
+export const ASSET_SCALE = 100_000_000;
 
 export function sortObject(value) {
   if (Array.isArray(value)) return value.map(sortObject);
@@ -57,6 +57,35 @@ export function normalizeCurrency(value) {
   const currency = String(value || "").trim().toLowerCase();
   if (!/^[a-z0-9_-]{2,20}$/.test(currency)) throw new Error("Choose a valid currency");
   return currency;
+}
+
+export function parseAssetUnits(value, options = {}) {
+  const raw = String(value ?? "").trim();
+  if (!/^\d+(?:\.\d{1,8})?$/.test(raw)) throw new Error("Enter a valid amount with no more than 8 decimal places");
+  const [whole, fraction = ""] = raw.split(".");
+  const units = Number(whole) * ASSET_SCALE + Number(fraction.padEnd(8, "0"));
+  if (!Number.isSafeInteger(units) || units <= 0) throw new Error("Enter a valid amount");
+  const minimumUnits = options.minimumUnits ?? 1;
+  const maximumUnits = options.maximumUnits ?? Number.MAX_SAFE_INTEGER;
+  if (units < minimumUnits) throw new Error("The amount is below the minimum");
+  if (units > maximumUnits) throw new Error("The amount is above the maximum");
+  return units;
+}
+
+export function assetUnitsToString(value, trim = true) {
+  const units = Number(value || 0);
+  if (!Number.isSafeInteger(units) || units < 0) throw new Error("Invalid asset balance");
+  const whole = Math.floor(units / ASSET_SCALE);
+  const fraction = String(units % ASSET_SCALE).padStart(8, "0");
+  return trim ? `${whole}.${fraction}`.replace(/\.?0+$/, "") || "0" : `${whole}.${fraction}`;
+}
+
+export function providerAmountToUnits(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  const units = Math.floor((amount + Number.EPSILON) * ASSET_SCALE);
+  if (!Number.isSafeInteger(units)) throw new Error("Provider amount is too large");
+  return units;
 }
 
 export function normalizeAddress(value) {

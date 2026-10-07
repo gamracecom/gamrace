@@ -57,7 +57,8 @@ The IPN secret configured at NOWPayments must exactly match the encrypted
 - Firebase ID tokens are verified with Google's current public signing keys.
 - Requests from browsers are restricted to GamRace and the documented local
   development origins.
-- Money is stored as integer USD cents in D1.
+- Every supported coin is stored as its own exact eight-decimal integer balance
+  in D1. There is no automatic exchange between assets.
 - A deposit credits exactly once and only after a signed IPN is re-fetched from
   the live NOWPayments API and reports `finished`.
 - Duplicate deposit and withdrawal submissions are idempotent.
@@ -67,6 +68,28 @@ The IPN secret configured at NOWPayments must exactly match the encrypted
 - The ledger and database triggers, rather than browser code, perform every
   balance mutation.
 - Provider errors and server logs never include secret values.
+
+## Supported balances
+
+The approved wallet asset list is maintained in `worker/src/assets.js`. The
+current live set is:
+
+- USDT on Ethereum (`USDTERC20`)
+- USDT on Tron (`USDTTRC20`)
+- Bitcoin (`BTC`)
+- Ethereum (`ETH`)
+- USD Coin on Ethereum (`USDC`)
+- Solana (`SOL`)
+- TRON (`TRX`)
+- Litecoin (`LTC`)
+- Dogecoin (`DOGE`)
+- XRP (`XRP`, destination tag supported)
+- BNB on BNB Smart Chain (`BNBBSC`)
+
+A deposit credits only its matching asset balance. A withdrawal reserves and
+withdraws only that same selected asset; the application never converts one
+coin into another. The header can estimate the selected coin balance in USD
+for display, but that estimate does not change the stored coin amount.
 
 ## Withdrawals
 
@@ -96,6 +119,10 @@ Before giving users access:
 5. Confirm the NOWPayments destination wallets and allowlists.
 6. Keep wagering disabled until bets, outcomes and balance changes are handled
    by an authoritative server rather than browser JavaScript.
+
+The browser QR display vendors `qrcode-generator` 1.4.4 (MIT, Kazuhiko Arase)
+under `dist/vendor/qrcode.js`; address generation and payment state remain on
+the Worker and NOWPayments.
 
 The previous Firebase Functions implementation remains in the repository as a
 reference, but the site wallet now targets the Cloudflare Worker above and does

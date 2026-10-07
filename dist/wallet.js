@@ -11,10 +11,20 @@ const firebaseConfig = {
 };
 
 const WALLET_API_BASE_URL = "https://gamrace-wallet-api.gamracecom.workers.dev";
+const ICON_ROOT = "assets/icons/crypto";
+const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).has("wallet-preview");
+const PREVIEW_ASSETS = [
+  ["usdterc20", "USDT", "Tether", "Ethereum (ERC20)", "usdt"], ["usdttrc20", "USDT", "Tether", "Tron (TRC20)", "usdt"],
+  ["btc", "BTC", "Bitcoin", "Bitcoin", "btc"], ["eth", "ETH", "Ethereum", "Ethereum", "eth"],
+  ["usdc", "USDC", "USD Coin", "Ethereum (ERC20)", "usdc"], ["sol", "SOL", "Solana", "Solana", "sol"],
+  ["trx", "TRX", "TRON", "Tron", "trx"], ["ltc", "LTC", "Litecoin", "Litecoin", "ltc"],
+  ["doge", "DOGE", "Dogecoin", "Dogecoin", "doge"], ["xrp", "XRP", "XRP", "XRP Ledger", "xrp", true],
+  ["bnbbsc", "BNB", "BNB", "BNB Smart Chain (BEP20)", "bnb"],
+].map(([code, symbol, name, network, icon, requiresExtraId = false]) => ({ code, symbol, name, network, icon, requiresExtraId }));
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const walletButtons = [...document.querySelectorAll(".utility.wallet, .utility.balance")];
-const balanceValues = [...document.querySelectorAll(".balance-value")];
+const walletButtons = [...document.querySelectorAll(".utility.wallet")];
+const balanceButtons = [...document.querySelectorAll(".utility.balance")];
 
 let currentUser = null;
 let walletSnapshot = null;
@@ -23,63 +33,82 @@ let activeDepositId = null;
 let depositPollTimer = null;
 let busy = false;
 
+function iconUrl(assetOrCode) {
+  const icon = typeof assetOrCode === "object" ? assetOrCode?.icon : assetOrCode;
+  return `${ICON_ROOT}/${icon || "usdt"}.svg`;
+}
+
+function createAssetField(name, context) {
+  return `<div class="wallet-asset-control" data-asset-control="${context}">
+    <img src="${iconUrl("usdt")}" alt="" data-asset-icon />
+    <select name="${name}" aria-label="Currency" required></select>
+    <span class="wallet-asset-balance" data-asset-balance></span>
+    <span class="wallet-chevron" aria-hidden="true">⌄</span>
+  </div>`;
+}
+
 function createWalletDialog() {
   const overlay = document.createElement("div");
   overlay.className = "wallet-overlay";
   overlay.hidden = true;
   overlay.innerHTML = `
     <section class="wallet-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
-      <header class="wallet-heading">
-        <div>
-          <span class="wallet-eyebrow">GAMRACE WALLET</span>
-          <h2 id="wallet-title">Wallet</h2>
-        </div>
-        <div class="wallet-heading-balance"><span>Available balance</span><strong data-wallet-balance>$0.00</strong></div>
-        <button class="wallet-close" type="button" aria-label="Close wallet">×</button>
-      </header>
+      <h2 class="sr-only" id="wallet-title">GamRace Wallet</h2>
+      <button class="wallet-close" type="button" aria-label="Close wallet">×</button>
       <div class="wallet-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet-tab="deposit">Deposit</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="withdraw">Withdraw</button>
-        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="activity">Activity</button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy">Buy Crypto</button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="tip">Tip User</button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="vault">Vault</button>
       </div>
       <div class="wallet-body">
         <section class="wallet-panel" data-wallet-panel="deposit">
-          <div class="wallet-panel-copy">
-            <h3>Deposit crypto</h3>
-            <p>Choose the value to add and the cryptocurrency you want to send.</p>
-          </div>
-          <form class="wallet-form" data-wallet-form="deposit">
-            <label><span>Amount (USD)</span><span class="wallet-input-shell"><span>$</span><input name="amountUsd" type="number" min="1" max="100000" step="0.01" inputmode="decimal" placeholder="0.00" required /></span></label>
-            <label><span>Pay with</span><select name="payCurrency" required><option value="">Loading currencies…</option></select></label>
-            <button class="wallet-primary" type="submit">Create deposit</button>
+          <form class="wallet-stack" data-wallet-form="deposit">
+            <label><span>Currency</span>${createAssetField("payCurrency", "deposit")}</label>
+            <label><span>Network</span><div class="wallet-readonly-field" data-deposit-network>Tron (TRC20)</div></label>
+            <label><span>Deposit value (USD)</span><span class="wallet-input-shell"><span>$</span><input name="amountUsd" type="number" min="1" max="100000" step="0.01" inputmode="decimal" placeholder="0.00" required /></span></label>
+            <button class="wallet-primary" type="submit">Generate deposit address</button>
           </form>
           <div class="deposit-instructions" data-deposit-instructions hidden>
             <div class="deposit-state"><span>Status</span><strong data-deposit-status>Waiting for payment</strong></div>
             <div class="deposit-amount"><span>Send exactly</span><strong data-deposit-amount></strong></div>
-            <div class="deposit-address-row"><span>Deposit address</span><div><code data-deposit-address></code><button type="button" data-copy-address>Copy</button></div></div>
-            <div class="deposit-memo-row" data-deposit-memo-row hidden><span>Memo / tag</span><div><code data-deposit-memo></code><button type="button" data-copy-memo>Copy</button></div></div>
-            <p class="wallet-warning">Only send the selected currency on the displayed network. Sending another asset or network can permanently lose funds.</p>
+            <div class="deposit-address-row"><span data-deposit-address-label>Deposit address</span><div><code data-deposit-address></code><button type="button" data-copy-address aria-label="Copy deposit address">Copy</button></div></div>
+            <div class="deposit-memo-row" data-deposit-memo-row hidden><span>Memo / destination tag</span><div><code data-deposit-memo></code><button type="button" data-copy-memo aria-label="Copy memo">Copy</button></div></div>
+            <p class="wallet-network-warning" data-deposit-warning></p>
+            <div class="wallet-qr" data-deposit-qr aria-label="Deposit address QR code"></div>
           </div>
+          <button class="wallet-history-toggle" type="button" data-history-toggle>Transaction history</button>
         </section>
+
         <section class="wallet-panel" data-wallet-panel="withdraw" hidden>
-          <div class="wallet-panel-copy">
-            <h3>Withdraw crypto</h3>
-            <p>Withdrawals are checked before the payout is approved and sent.</p>
-          </div>
-          <form class="wallet-form" data-wallet-form="withdraw">
-            <label><span>Amount (USD)</span><span class="wallet-input-shell"><span>$</span><input name="amountUsd" type="number" min="10" max="100000" step="0.01" inputmode="decimal" placeholder="0.00" required /></span></label>
-            <label><span>Receive</span><select name="payoutCurrency" required><option value="">Loading currencies…</option></select></label>
-            <label class="wallet-wide-field"><span>Wallet address</span><input name="address" type="text" minlength="10" maxlength="256" autocomplete="off" spellcheck="false" placeholder="Paste the destination address" required /></label>
-            <label class="wallet-wide-field"><span>Memo / tag <small>only when required</small></span><input name="extraId" type="text" maxlength="128" autocomplete="off" spellcheck="false" placeholder="Optional" /></label>
-            <button class="wallet-primary wallet-wide-field" type="submit">Request withdrawal</button>
+          <form class="wallet-stack" data-wallet-form="withdraw">
+            <label><span>Balance</span>${createAssetField("payoutCurrency", "withdraw")}</label>
+            <label><span>Network</span><div class="wallet-readonly-field" data-withdraw-network>Tron (TRC20)</div></label>
+            <label><span data-withdraw-address-label>Wallet address</span><input name="address" type="text" minlength="10" maxlength="256" autocomplete="off" spellcheck="false" placeholder="Enter destination address" required /></label>
+            <label data-withdraw-memo-field hidden><span>Memo / destination tag</span><input name="extraId" type="text" maxlength="128" autocomplete="off" spellcheck="false" placeholder="Required for this currency" /></label>
+            <label><span>Amount <small data-withdraw-available></small></span><span class="wallet-input-shell wallet-coin-input"><img src="${iconUrl("usdt")}" alt="" data-withdraw-amount-icon /><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" required /></span></label>
+            <div class="wallet-percentages" aria-label="Quick withdrawal amounts">
+              <button type="button" data-withdraw-percent="0.25">25%</button><button type="button" data-withdraw-percent="0.5">50%</button><button type="button" data-withdraw-percent="0.75">75%</button><button type="button" data-withdraw-percent="1">MAX</button>
+            </div>
+            <p class="wallet-fee-note">Network and provider fees are confirmed during owner review before the payout is sent.</p>
+            <button class="wallet-primary" type="submit">Request withdrawal</button>
           </form>
-          <p class="wallet-warning">Always confirm the asset, network, address and memo. Cryptocurrency payouts cannot be reversed after they are sent.</p>
+          <button class="wallet-history-toggle" type="button" data-history-toggle>Transaction history</button>
         </section>
-        <section class="wallet-panel" data-wallet-panel="activity" hidden>
-          <div class="wallet-panel-copy">
-            <h3>Wallet activity</h3>
-            <p>Your latest deposits and withdrawals.</p>
-          </div>
+
+        <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="buy" hidden>
+          <span class="wallet-placeholder-icon" aria-hidden="true">＋</span><h3>Buy Crypto</h3><p>This section is reserved for the future card and bank purchase provider.</p>
+        </section>
+        <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="tip" hidden>
+          <span class="wallet-placeholder-icon" aria-hidden="true">↗</span><h3>Tip User</h3><p>This section is reserved for player-to-player tips.</p>
+        </section>
+        <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="vault" hidden>
+          <span class="wallet-placeholder-icon" aria-hidden="true">◇</span><h3>Vault</h3><p>This section is reserved for protected balances.</p>
+        </section>
+
+        <section class="wallet-history" data-wallet-history hidden>
+          <div class="wallet-history-heading"><h3>Transaction history</h3><button type="button" data-history-close aria-label="Close transaction history">×</button></div>
           <div class="wallet-activity" data-wallet-activity><p>No wallet activity yet.</p></div>
         </section>
         <p class="wallet-status" role="status" aria-live="polite"></p>
@@ -89,26 +118,50 @@ function createWalletDialog() {
   return {
     overlay,
     close: overlay.querySelector(".wallet-close"),
-    balance: overlay.querySelector("[data-wallet-balance]"),
     tabs: [...overlay.querySelectorAll("[data-wallet-tab]")],
     panels: [...overlay.querySelectorAll("[data-wallet-panel]")],
     depositForm: overlay.querySelector('[data-wallet-form="deposit"]'),
     withdrawalForm: overlay.querySelector('[data-wallet-form="withdraw"]'),
-    currencySelects: [...overlay.querySelectorAll("select")],
+    depositSelect: overlay.querySelector('[name="payCurrency"]'),
+    withdrawalSelect: overlay.querySelector('[name="payoutCurrency"]'),
+    depositNetwork: overlay.querySelector("[data-deposit-network]"),
+    withdrawalNetwork: overlay.querySelector("[data-withdraw-network]"),
+    withdrawalAvailable: overlay.querySelector("[data-withdraw-available]"),
+    withdrawalMemoField: overlay.querySelector("[data-withdraw-memo-field]"),
+    withdrawalAmountIcon: overlay.querySelector("[data-withdraw-amount-icon]"),
     instructions: overlay.querySelector("[data-deposit-instructions]"),
     depositStatus: overlay.querySelector("[data-deposit-status]"),
     depositAmount: overlay.querySelector("[data-deposit-amount]"),
     depositAddress: overlay.querySelector("[data-deposit-address]"),
+    depositAddressLabel: overlay.querySelector("[data-deposit-address-label]"),
     depositMemoRow: overlay.querySelector("[data-deposit-memo-row]"),
     depositMemo: overlay.querySelector("[data-deposit-memo]"),
+    depositWarning: overlay.querySelector("[data-deposit-warning]"),
+    depositQr: overlay.querySelector("[data-deposit-qr]"),
     copyAddress: overlay.querySelector("[data-copy-address]"),
     copyMemo: overlay.querySelector("[data-copy-memo]"),
+    history: overlay.querySelector("[data-wallet-history]"),
+    historyToggles: [...overlay.querySelectorAll("[data-history-toggle]")],
+    historyClose: overlay.querySelector("[data-history-close]"),
     activity: overlay.querySelector("[data-wallet-activity]"),
     status: overlay.querySelector(".wallet-status"),
   };
 }
 
 const dialog = createWalletDialog();
+
+function assetFor(code) {
+  return currencies.find((asset) => asset.code === code) || walletSnapshot?.balances?.find((asset) => asset.code === code) || currencies[0];
+}
+
+function balanceFor(code) {
+  return walletSnapshot?.balances?.find((balance) => balance.code === code) || { available: "0.00000000", held: "0.00000000" };
+}
+
+function cleanCryptoAmount(value) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : "0.00";
+}
 
 function money(cents) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(cents || 0) / 100);
@@ -127,55 +180,73 @@ function setBusy(nextBusy) {
   });
 }
 
-function updateBalance(wallet = walletSnapshot) {
-  const cents = Number(wallet?.availableUsdCents || 0);
-  dialog.balance.textContent = money(cents);
-  balanceValues.forEach((element) => { element.textContent = money(cents); });
-}
-
 async function api(path, options = {}) {
+  if (LOCAL_PREVIEW) {
+    if (path === "/currencies") return { currencies: PREVIEW_ASSETS };
+    if (path === "/wallet") return { wallet: walletSnapshot, activity: [] };
+    if (path === "/wallet/selection") {
+      walletSnapshot.selectedCurrency = JSON.parse(options.body).currency;
+      return { wallet: walletSnapshot };
+    }
+    throw new Error("Live financial actions are disabled in the local design preview");
+  }
   if (!currentUser) throw new Error("Sign in to use the wallet");
   const token = await currentUser.getIdToken();
   const response = await fetch(`${WALLET_API_BASE_URL}${path}`, {
     ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers || {}) },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || "The wallet service could not complete that request");
   return body;
 }
 
-function selectTab(name) {
-  dialog.tabs.forEach((tab) => {
-    const selected = tab.dataset.walletTab === name;
-    tab.classList.toggle("active", selected);
-    tab.setAttribute("aria-selected", String(selected));
+function ensureHeaderControls() {
+  balanceButtons.forEach((button) => {
+    let icon = button.querySelector(".balance-coin-icon");
+    if (!icon) {
+      icon = document.createElement("img");
+      icon.className = "balance-coin-icon";
+      icon.alt = "";
+      button.prepend(icon);
+    }
+    if (!button.querySelector(".balance-caret")) {
+      const caret = document.createElement("span");
+      caret.className = "balance-caret";
+      caret.textContent = "⌄";
+      caret.setAttribute("aria-hidden", "true");
+      button.append(caret);
+    }
   });
-  dialog.panels.forEach((panel) => { panel.hidden = panel.dataset.walletPanel !== name; });
-  setStatus();
+  walletButtons.forEach((button) => {
+    if (!button.querySelector(".wallet-button-icon")) {
+      const icon = document.createElement("span");
+      icon.className = "wallet-button-icon";
+      icon.setAttribute("aria-hidden", "true");
+      button.prepend(icon);
+    }
+  });
+}
+
+function updateHeader() {
+  const selectedCode = walletSnapshot?.selectedCurrency || "usdttrc20";
+  const asset = assetFor(selectedCode) || { icon: "usdt", symbol: "USDT" };
+  const balance = balanceFor(selectedCode);
+  balanceButtons.forEach((button) => {
+    const icon = button.querySelector(".balance-coin-icon");
+    const value = button.querySelector(".balance-value");
+    if (icon) { icon.src = iconUrl(asset); icon.alt = asset.symbol || ""; }
+    if (value) value.textContent = money(walletSnapshot?.selectedUsdCents || 0);
+    button.title = `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
+  });
 }
 
 function friendlyStatus(status) {
   const labels = {
-    waiting: "Waiting for payment",
-    confirming: "Confirming on the network",
-    confirmed: "Payment confirmed",
-    sending: "Processing deposit",
-    partially_paid: "Partially paid",
-    finished: "Deposit complete",
-    failed: "Payment failed",
-    refunded: "Payment refunded",
-    expired: "Payment expired",
-    pending_review: "Pending review",
-    verification_required: "Awaiting payout approval",
-    verification_failed: "Approval code expired",
-    processing: "Payout processing",
-    rejected: "Payout rejected",
-    cancelled: "Payout cancelled",
+    waiting: "Waiting for payment", confirming: "Confirming on the network", confirmed: "Payment confirmed",
+    sending: "Processing deposit", partially_paid: "Partially paid", finished: "Complete", failed: "Failed",
+    refunded: "Refunded", expired: "Expired", pending_review: "Pending review", processing: "Processing",
+    rejected: "Rejected", cancelled: "Cancelled",
   };
   return labels[String(status || "").toLowerCase()] || String(status || "Pending").replaceAll("_", " ");
 }
@@ -189,48 +260,96 @@ function renderActivity(items = []) {
     return;
   }
   items.forEach((item) => {
+    const asset = assetFor(item.currency) || { symbol: String(item.currency).toUpperCase(), icon: "usdt" };
     const row = document.createElement("article");
     row.className = "wallet-activity-row";
-    const icon = document.createElement("span");
-    icon.className = `wallet-activity-icon ${item.type}`;
-    icon.textContent = item.type === "deposit" ? "↓" : "↑";
+    const icon = document.createElement("img");
+    icon.className = "wallet-activity-icon";
+    icon.src = iconUrl(asset);
+    icon.alt = "";
     const copy = document.createElement("div");
     const title = document.createElement("strong");
     title.textContent = item.type === "deposit" ? "Deposit" : "Withdrawal";
     const detail = document.createElement("span");
-    detail.textContent = `${String(item.currency || "").toUpperCase()} · ${friendlyStatus(item.status)}`;
+    detail.textContent = `${asset.symbol} · ${friendlyStatus(item.status)}`;
     copy.append(title, detail);
     const amount = document.createElement("strong");
-    amount.textContent = `${item.type === "deposit" ? "+" : "−"}${money(item.amountUsdCents)}`;
+    amount.textContent = `${item.type === "deposit" ? "+" : "−"}${cleanCryptoAmount(item.amount)} ${asset.symbol}`;
     row.append(icon, copy, amount);
     dialog.activity.append(row);
   });
 }
 
+function fillAssetSelect(select, allowedAssets = currencies) {
+  const previous = select.value;
+  select.replaceChildren();
+  allowedAssets.forEach((asset) => {
+    const option = new Option(`${asset.name} (${asset.symbol}) · ${asset.network}`, asset.code);
+    select.append(option);
+  });
+  const desired = allowedAssets.some((asset) => asset.code === previous) ? previous : walletSnapshot?.selectedCurrency;
+  if (desired && [...select.options].some((option) => option.value === desired)) select.value = desired;
+}
+
+function updateAssetControl(context) {
+  const select = context === "deposit" ? dialog.depositSelect : dialog.withdrawalSelect;
+  const asset = assetFor(select.value);
+  if (!asset) return;
+  const control = dialog.overlay.querySelector(`[data-asset-control="${context}"]`);
+  control.querySelector("[data-asset-icon]").src = iconUrl(asset);
+  control.querySelector("[data-asset-balance]").textContent = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(asset.code).available)} ${asset.symbol}` : "";
+  if (context === "deposit") dialog.depositNetwork.textContent = asset.network;
+  else {
+    const available = balanceFor(asset.code).available;
+    dialog.withdrawalNetwork.textContent = asset.network;
+    dialog.withdrawalAvailable.textContent = `Available: ${cleanCryptoAmount(available)} ${asset.symbol}`;
+    dialog.withdrawalAmountIcon.src = iconUrl(asset);
+    dialog.withdrawalMemoField.hidden = !asset.requiresExtraId;
+    dialog.withdrawalMemoField.querySelector("input").required = Boolean(asset.requiresExtraId);
+  }
+}
+
+function refreshControls() {
+  fillAssetSelect(dialog.depositSelect, currencies);
+  const positiveBalances = currencies.filter((asset) => Number(balanceFor(asset.code).available) > 0);
+  const selectedAsset = assetFor(walletSnapshot?.selectedCurrency);
+  fillAssetSelect(dialog.withdrawalSelect, positiveBalances.length ? positiveBalances : (selectedAsset ? [selectedAsset] : currencies.slice(0, 1)));
+  updateAssetControl("deposit");
+  updateAssetControl("withdraw");
+  updateHeader();
+}
+
 async function loadWallet() {
   const result = await api("/wallet");
   walletSnapshot = result.wallet;
-  updateBalance();
   renderActivity(result.activity);
-}
-
-function fillCurrencies() {
-  dialog.currencySelects.forEach((select) => {
-    const previous = select.value;
-    select.replaceChildren(new Option("Choose currency", ""));
-    currencies.forEach((currency) => {
-      const network = currency.network ? ` · ${currency.network.toUpperCase()}` : "";
-      select.append(new Option(`${currency.code.toUpperCase()}${network}`, currency.code));
-    });
-    if ([...select.options].some((option) => option.value === previous)) select.value = previous;
-  });
+  if (currencies.length) refreshControls();
 }
 
 async function loadCurrencies() {
   if (currencies.length) return;
   const result = await api("/currencies");
   currencies = result.currencies || [];
-  fillCurrencies();
+  if (!currencies.length) throw new Error("No approved wallet currencies are available right now");
+  refreshControls();
+}
+
+async function selectWalletCurrency(currency) {
+  if (!currency || walletSnapshot?.selectedCurrency === currency) return;
+  const result = await api("/wallet/selection", { method: "POST", body: JSON.stringify({ currency }) });
+  walletSnapshot = result.wallet;
+  refreshControls();
+}
+
+function selectTab(name) {
+  dialog.tabs.forEach((tab) => {
+    const selected = tab.dataset.walletTab === name;
+    tab.classList.toggle("active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+  });
+  dialog.panels.forEach((panel) => { panel.hidden = panel.dataset.walletPanel !== name; });
+  dialog.history.hidden = true;
+  setStatus();
 }
 
 async function openWallet(defaultTab = "deposit") {
@@ -246,10 +365,9 @@ async function openWallet(defaultTab = "deposit") {
   setStatus("Loading wallet…");
   try {
     await Promise.all([loadWallet(), loadCurrencies()]);
+    refreshControls();
     setStatus();
-  } catch (error) {
-    setStatus(error.message, "error");
-  }
+  } catch (error) { setStatus(error.message, "error"); }
   dialog.close.focus();
 }
 
@@ -260,14 +378,30 @@ function closeWallet() {
   depositPollTimer = null;
 }
 
+function renderQr(value) {
+  dialog.depositQr.replaceChildren();
+  if (typeof window.qrcode !== "function") {
+    dialog.depositQr.textContent = "QR code unavailable";
+    return;
+  }
+  const qr = window.qrcode(0, "M");
+  qr.addData(value);
+  qr.make();
+  dialog.depositQr.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 1, scalable: true });
+}
+
 function renderDeposit(deposit) {
   activeDepositId = deposit.id;
+  const asset = assetFor(deposit.payCurrency) || { symbol: String(deposit.payCurrency).toUpperCase(), network: deposit.network || "selected" };
   dialog.instructions.hidden = false;
   dialog.depositStatus.textContent = friendlyStatus(deposit.status);
-  dialog.depositAmount.textContent = `${deposit.payAmount} ${String(deposit.payCurrency || "").toUpperCase()}`;
+  dialog.depositAmount.textContent = `${deposit.payAmount} ${asset.symbol}`;
   dialog.depositAddress.textContent = deposit.payAddress;
+  dialog.depositAddressLabel.textContent = `${asset.name || asset.symbol} (${asset.network || deposit.network}) address`;
   dialog.depositMemoRow.hidden = !deposit.payinExtraId;
   dialog.depositMemo.textContent = deposit.payinExtraId || "";
+  dialog.depositWarning.textContent = `Only send ${asset.symbol} on ${asset.network || deposit.network}. Using another coin or network can permanently lose funds.`;
+  renderQr(deposit.payAddress);
   if (deposit.credited || ["failed", "refunded", "expired"].includes(deposit.status)) {
     if (deposit.credited) loadWallet().catch(() => {});
     return;
@@ -293,40 +427,48 @@ async function copyText(value, button) {
   setTimeout(() => { button.textContent = original; }, 1200);
 }
 
-walletButtons.forEach((button) => {
-  button.addEventListener("click", () => openWallet(button.classList.contains("balance") ? "activity" : "deposit"));
-});
-
+ensureHeaderControls();
+walletButtons.forEach((button) => button.addEventListener("click", () => openWallet("deposit")));
+balanceButtons.forEach((button) => button.addEventListener("click", () => openWallet("withdraw")));
 dialog.close.addEventListener("click", closeWallet);
 dialog.overlay.addEventListener("click", (event) => { if (event.target === dialog.overlay) closeWallet(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !dialog.overlay.hidden) closeWallet(); });
 dialog.tabs.forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.walletTab)));
 dialog.copyAddress.addEventListener("click", () => copyText(dialog.depositAddress.textContent, dialog.copyAddress));
 dialog.copyMemo.addEventListener("click", () => copyText(dialog.depositMemo.textContent, dialog.copyMemo));
+dialog.historyToggles.forEach((button) => button.addEventListener("click", () => { dialog.history.hidden = false; }));
+dialog.historyClose.addEventListener("click", () => { dialog.history.hidden = true; });
+
+dialog.depositSelect.addEventListener("change", async () => {
+  updateAssetControl("deposit");
+  try { await selectWalletCurrency(dialog.depositSelect.value); } catch (error) { setStatus(error.message, "error"); }
+});
+dialog.withdrawalSelect.addEventListener("change", async () => {
+  updateAssetControl("withdraw");
+  try { await selectWalletCurrency(dialog.withdrawalSelect.value); } catch (error) { setStatus(error.message, "error"); }
+});
+
+dialog.overlay.querySelectorAll("[data-withdraw-percent]").forEach((button) => button.addEventListener("click", () => {
+  const available = Number(balanceFor(dialog.withdrawalSelect.value).available || 0);
+  const amount = Math.floor(available * Number(button.dataset.withdrawPercent) * 100000000) / 100000000;
+  dialog.withdrawalForm.elements.amount.value = amount ? amount.toFixed(8).replace(/0+$/, "").replace(/\.$/, "") : "";
+}));
 
 dialog.depositForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (busy) return;
   const data = new FormData(dialog.depositForm);
   setBusy(true);
-  setStatus("Creating a secure deposit address…");
+  setStatus("Creating a secure live deposit address…");
   try {
     const result = await api("/deposits", {
       method: "POST",
-      body: JSON.stringify({
-        requestId: crypto.randomUUID().replaceAll("-", ""),
-        amountUsd: data.get("amountUsd"),
-        payCurrency: data.get("payCurrency"),
-      }),
+      body: JSON.stringify({ requestId: crypto.randomUUID().replaceAll("-", ""), amountUsd: data.get("amountUsd"), payCurrency: data.get("payCurrency") }),
     });
     renderDeposit(result.deposit);
-    setStatus("Deposit address created.", "success");
-    dialog.depositForm.reset();
-  } catch (error) {
-    setStatus(error.message, "error");
-  } finally {
-    setBusy(false);
-  }
+    setStatus("Live deposit address created.", "success");
+  } catch (error) { setStatus(error.message, "error"); }
+  finally { setBusy(false); }
 });
 
 dialog.withdrawalForm.addEventListener("submit", async (event) => {
@@ -334,40 +476,47 @@ dialog.withdrawalForm.addEventListener("submit", async (event) => {
   if (busy) return;
   const data = new FormData(dialog.withdrawalForm);
   setBusy(true);
-  setStatus("Validating the destination and reserving funds…");
+  setStatus("Validating the destination and reserving this balance…");
   try {
     const result = await api("/withdrawals", {
       method: "POST",
       body: JSON.stringify({
-        requestId: crypto.randomUUID().replaceAll("-", ""),
-        amountUsd: data.get("amountUsd"),
-        payoutCurrency: data.get("payoutCurrency"),
-        address: data.get("address"),
-        extraId: data.get("extraId"),
+        requestId: crypto.randomUUID().replaceAll("-", ""), amount: data.get("amount"),
+        payoutCurrency: dialog.withdrawalSelect.value, address: data.get("address"), extraId: data.get("extraId"),
       }),
     });
     dialog.withdrawalForm.reset();
     setStatus(`Withdrawal ${friendlyStatus(result.withdrawal.status).toLowerCase()}.`, "success");
     await loadWallet();
-  } catch (error) {
-    setStatus(error.message, "error");
-  } finally {
-    setBusy(false);
-  }
+    refreshControls();
+  } catch (error) { setStatus(error.message, "error"); }
+  finally { setBusy(false); }
 });
 
-onAuthStateChanged(auth, async (user) => {
-  currentUser = user;
-  walletSnapshot = null;
-  activeDepositId = null;
-  if (!user) {
-    updateBalance({ availableUsdCents: 0 });
-    if (!dialog.overlay.hidden) closeWallet();
-    return;
-  }
-  try {
-    await loadWallet();
-  } catch {
-    updateBalance({ availableUsdCents: 0 });
-  }
-});
+if (LOCAL_PREVIEW) {
+  currentUser = { getIdToken: async () => "preview" };
+  currencies = PREVIEW_ASSETS;
+  walletSnapshot = {
+    selectedCurrency: "usdttrc20",
+    selectedUsdCents: 128450,
+    balances: PREVIEW_ASSETS.map((asset) => ({ ...asset, available: asset.code === "usdttrc20" ? "1284.50000000" : "0.00000000", held: "0.00000000" })),
+  };
+  renderActivity([]);
+  refreshControls();
+  openWallet("deposit");
+} else {
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    walletSnapshot = null;
+    activeDepositId = null;
+    if (!user) {
+      updateHeader();
+      if (!dialog.overlay.hidden) closeWallet();
+      return;
+    }
+    try {
+      await Promise.all([loadWallet(), loadCurrencies()]);
+      refreshControls();
+    } catch { updateHeader(); }
+  });
+}

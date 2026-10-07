@@ -3,10 +3,13 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 import {
   createIpnSignature,
+  assetUnitsToString,
   maskAddress,
   normalizeAddress,
   normalizeCurrency,
   normalizeRequestId,
+  parseAssetUnits,
+  providerAmountToUnits,
   parseUsdCents,
   paymentCanCredit,
   signaturesMatch,
@@ -40,4 +43,15 @@ test("only finished deposits are creditable", () => {
   assert.equal(paymentCanCredit("finished"), true);
   assert.equal(paymentCanCredit("confirmed"), false);
   assert.equal(maskAddress("TExampleWalletAddress123456"), "TExampl…123456");
+});
+
+test("asset balances use exact eight-decimal integer units", () => {
+  assert.equal(parseAssetUnits("1"), 100_000_000);
+  assert.equal(parseAssetUnits("0.00000001"), 1);
+  assert.equal(parseAssetUnits("12.34567890"), 1_234_567_890);
+  assert.equal(assetUnitsToString(1_234_567_890), "12.3456789");
+  assert.equal(assetUnitsToString(0, false), "0.00000000");
+  assert.throws(() => parseAssetUnits("0.000000001"), /8 decimal/);
+  assert.throws(() => parseAssetUnits("-1"), /valid amount/);
+  assert.equal(providerAmountToUnits("0.123456789"), 12_345_678);
 });

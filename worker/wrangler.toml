@@ -10,8 +10,6 @@ NOWPAYMENTS_API_BASE = "https://api.nowpayments.io/v1"
 PUBLIC_BASE_URL = "https://gamrace-wallet-api.gamracecom.workers.dev"
 MINIMUM_DEPOSIT_USD_CENTS = "100"
 MAXIMUM_DEPOSIT_USD_CENTS = "10000000"
-MINIMUM_WITHDRAWAL_USD_CENTS = "1000"
-MAXIMUM_WITHDRAWAL_USD_CENTS = "10000000"
 
 [[d1_databases]]
 binding = "DB"
