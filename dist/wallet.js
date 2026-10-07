@@ -10,7 +10,7 @@ const firebaseConfig = {
   appId: "1:576202313103:web:8e3153a6816b7bf8658ffa",
 };
 
-const WALLET_API_BASE_URL = "https://gamrace-wallet-api.junglebloxofficial.workers.dev";
+const WALLET_API_BASE_URL = "https://gamrace-wallet-api.gamracecom.workers.dev";
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const walletButtons = [...document.querySelectorAll(".utility.wallet, .utility.balance")];

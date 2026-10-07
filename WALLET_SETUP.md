@@ -8,13 +8,13 @@ IPN secret or account credentials.
 Production API base:
 
 ```text
-https://gamrace-wallet-api.junglebloxofficial.workers.dev
+https://gamrace-wallet-api.gamracecom.workers.dev
 ```
 
 Health check:
 
 ```text
-https://gamrace-wallet-api.junglebloxofficial.workers.dev/health
+https://gamrace-wallet-api.gamracecom.workers.dev/health
 ```
 
 The Worker always calls `https://api.nowpayments.io/v1`. There is no sandbox,
@@ -46,7 +46,7 @@ wrangler deploy
 In NOWPayments, configure the payment notification/IPN callback as:
 
 ```text
-https://gamrace-wallet-api.junglebloxofficial.workers.dev/ipn/deposit
+https://gamrace-wallet-api.gamracecom.workers.dev/ipn/deposit
 ```
 
 The IPN secret configured at NOWPayments must exactly match the encrypted
