@@ -1,0 +1,20 @@
+name = "gamrace-wallet-api"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT_ID = "gamrace"
+ALLOWED_ORIGINS = "https://gamrace.com,https://www.gamrace.com,http://localhost:4173,http://localhost:8080"
+NOWPAYMENTS_API_BASE = "https://api.nowpayments.io/v1"
+PUBLIC_BASE_URL = "https://gamrace-wallet-api.junglebloxofficial.workers.dev"
+MINIMUM_DEPOSIT_USD_CENTS = "100"
+MAXIMUM_DEPOSIT_USD_CENTS = "10000000"
+MINIMUM_WITHDRAWAL_USD_CENTS = "1000"
+MAXIMUM_WITHDRAWAL_USD_CENTS = "10000000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gamrace-wallet"
+database_id = "5533465d-5cab-4e15-bfb6-e7e1928493db"
+

@@ -1,0 +1,14 @@
+{
+  "name": "gamrace-wallet-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute gamrace-wallet --local --file schema.sql",
+    "db:remote": "wrangler d1 execute gamrace-wallet --remote --file schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.148.0"
+  }
+}

@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js functions/test/*.test.js",
-    "deploy:functions": "firebase deploy --only functions,firestore:rules"
+    "test": "node --test tests/*.test.js functions/test/*.test.js worker/test/*.test.js",
+    "deploy:functions": "firebase deploy --only functions,firestore:rules",
+    "deploy:wallet": "pnpm --dir worker deploy",
+    "wallet:db": "pnpm --dir worker db:remote"
   }
 }

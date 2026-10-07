@@ -10,7 +10,7 @@ const firebaseConfig = {
   appId: "1:576202313103:web:8e3153a6816b7bf8658ffa",
 };
 
-const FUNCTIONS_BASE_URL = "https://europe-west2-gamrace.cloudfunctions.net/walletApi";
+const WALLET_API_BASE_URL = "https://gamrace-wallet-api.junglebloxofficial.workers.dev";
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const walletButtons = [...document.querySelectorAll(".utility.wallet, .utility.balance")];
@@ -136,7 +136,7 @@ function updateBalance(wallet = walletSnapshot) {
 async function api(path, options = {}) {
   if (!currentUser) throw new Error("Sign in to use the wallet");
   const token = await currentUser.getIdToken();
-  const response = await fetch(`${FUNCTIONS_BASE_URL}${path}`, {
+  const response = await fetch(`${WALLET_API_BASE_URL}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,

@@ -3,6 +3,8 @@ node_modules/
 .cache/
 outputs/
 work/
+.wrangler/
+worker/.wrangler/
 
 # Environment secrets
 .env
