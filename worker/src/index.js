@@ -360,10 +360,10 @@ async function currentMinimumDepositUsdCents(env, payCurrency) {
 }
 
 async function handleCreateDeposit(request, env, user) {
-  await enforceCooldown(env, user.sub, "deposit", 3);
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
   const payCurrency = requireWalletAsset(normalizeCurrency(body.payCurrency)).code;
+  await enforceCooldown(env, user.sub, `deposit:${payCurrency}`, 3);
   const minimumUsdCents = await currentMinimumDepositUsdCents(env, payCurrency);
   const amountUsdCents = body.amountUsd == null || body.amountUsd === ""
     ? minimumUsdCents

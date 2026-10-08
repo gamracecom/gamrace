@@ -33,6 +33,9 @@ let activeDepositId = null;
 let activeDepositCurrency = null;
 let depositPollTimer = null;
 const depositRequestIds = new Map();
+const depositCache = new Map();
+const depositLoadPromises = new Map();
+let preloadGeneration = 0;
 let busy = false;
 
 function iconUrl(assetOrCode) {
@@ -200,8 +203,45 @@ async function api(path, options = {}) {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers || {}) },
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || "The wallet service could not complete that request");
+  if (!response.ok) {
+    const error = new Error(body.error || "The wallet service could not complete that request");
+    error.status = response.status;
+    throw error;
+  }
   return body;
+}
+
+function requestStorageKey(currency) {
+  return currentUser?.uid ? `gamrace:deposit-request:${currentUser.uid}:${currency}` : "";
+}
+
+function storedDepositRequestId(currency) {
+  if (depositRequestIds.has(currency)) return depositRequestIds.get(currency);
+  const key = requestStorageKey(currency);
+  if (!key) return null;
+  try {
+    const value = localStorage.getItem(key);
+    if (value) depositRequestIds.set(currency, value);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function saveDepositRequestId(currency, requestId) {
+  depositRequestIds.set(currency, requestId);
+  const key = requestStorageKey(currency);
+  if (!key) return;
+  try { localStorage.setItem(key, requestId); } catch { /* Storage can be unavailable in privacy mode. */ }
+}
+
+function forgetDepositRequestId(currency, requestId) {
+  if (depositRequestIds.get(currency) === requestId) depositRequestIds.delete(currency);
+  const key = requestStorageKey(currency);
+  if (!key) return;
+  try {
+    if (localStorage.getItem(key) === requestId) localStorage.removeItem(key);
+  } catch { /* Storage can be unavailable in privacy mode. */ }
 }
 
 function ensureHeaderControls() {
@@ -398,6 +438,35 @@ function setDepositLoading(asset) {
   dialog.depositRetry.hidden = true;
 }
 
+async function getOrCreateDepositAddress(currency, force = false) {
+  const asset = assetFor(currency);
+  const userUid = currentUser?.uid || "preview";
+  if (!asset) throw new Error("That deposit currency is not available");
+  if (!force && depositCache.has(asset.code)) return depositCache.get(asset.code);
+  if (!force && depositLoadPromises.has(asset.code)) return depositLoadPromises.get(asset.code);
+
+  let requestId = storedDepositRequestId(asset.code);
+  if (!requestId || force) {
+    requestId = crypto.randomUUID().replaceAll("-", "");
+    saveDepositRequestId(asset.code, requestId);
+  }
+
+  const load = api("/deposits", {
+    method: "POST",
+    body: JSON.stringify({ requestId, payCurrency: asset.code }),
+  }).then((result) => {
+    if ((currentUser?.uid || "preview") === userUid) depositCache.set(asset.code, result.deposit);
+    return result.deposit;
+  }).catch((error) => {
+    forgetDepositRequestId(asset.code, requestId);
+    throw error;
+  }).finally(() => {
+    if (depositLoadPromises.get(asset.code) === load) depositLoadPromises.delete(asset.code);
+  });
+  depositLoadPromises.set(asset.code, load);
+  return load;
+}
+
 async function ensureDepositAddress(currency, force = false) {
   const asset = assetFor(currency);
   if (!asset || dialog.overlay.hidden) return;
@@ -408,19 +477,10 @@ async function ensureDepositAddress(currency, force = false) {
   depositPollTimer = null;
   activeDepositId = null;
   setDepositLoading(asset);
-  let requestId = depositRequestIds.get(asset.code);
-  if (!requestId || force) {
-    requestId = crypto.randomUUID().replaceAll("-", "");
-    depositRequestIds.set(asset.code, requestId);
-  }
   try {
-    const result = await api("/deposits", {
-      method: "POST",
-      body: JSON.stringify({ requestId, payCurrency: asset.code }),
-    });
-    renderDeposit(result.deposit);
+    const deposit = await getOrCreateDepositAddress(asset.code, force);
+    if (!dialog.overlay.hidden && dialog.depositSelect.value === asset.code) renderDeposit(deposit);
   } catch (error) {
-    if (depositRequestIds.get(asset.code) === requestId) depositRequestIds.delete(asset.code);
     dialog.depositQr.classList.add("wallet-qr-loading");
     dialog.depositQr.innerHTML = "<span>Address unavailable</span>";
     dialog.depositWarning.textContent = "The address could not be loaded. Please retry in a moment.";
@@ -429,6 +489,27 @@ async function ensureDepositAddress(currency, force = false) {
   } finally {
     setBusy(false);
   }
+}
+
+async function preloadDepositAddresses(generation = preloadGeneration) {
+  const preferred = walletSnapshot?.selectedCurrency;
+  const queue = [...currencies].sort((left, right) => Number(right.code === preferred) - Number(left.code === preferred));
+  const worker = async () => {
+    while (queue.length && generation === preloadGeneration && currentUser) {
+      const asset = queue.shift();
+      try {
+        await getOrCreateDepositAddress(asset.code);
+      } catch (error) {
+        // A short retry handles temporary provider throttling while permanent
+        // configuration errors remain available through the manual retry button.
+        if ([429, 502, 503].includes(Number(error.status)) && generation === preloadGeneration) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          try { await getOrCreateDepositAddress(asset.code, true); } catch { /* Leave this asset retryable in the UI. */ }
+        }
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);
 }
 
 function renderQr(value) {
@@ -445,6 +526,7 @@ function renderQr(value) {
 }
 
 function renderDeposit(deposit) {
+  depositCache.set(deposit.payCurrency, deposit);
   activeDepositId = deposit.id;
   activeDepositCurrency = deposit.payCurrency;
   const asset = assetFor(deposit.payCurrency) || { symbol: String(deposit.payCurrency).toUpperCase(), network: deposit.network || "selected" };
@@ -561,11 +643,15 @@ if (LOCAL_PREVIEW) {
   openWallet("deposit");
 } else {
   onAuthStateChanged(auth, async (user) => {
+    preloadGeneration += 1;
+    const generation = preloadGeneration;
     currentUser = user;
     walletSnapshot = null;
     activeDepositId = null;
     activeDepositCurrency = null;
     depositRequestIds.clear();
+    depositCache.clear();
+    depositLoadPromises.clear();
     if (!user) {
       updateHeader();
       if (!dialog.overlay.hidden) closeWallet();
@@ -574,6 +660,7 @@ if (LOCAL_PREVIEW) {
     try {
       await Promise.all([loadWallet(), loadCurrencies()]);
       refreshControls();
+      void preloadDepositAddresses(generation);
     } catch { updateHeader(); }
   });
 }
