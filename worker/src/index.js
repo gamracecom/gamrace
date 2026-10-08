@@ -274,7 +274,15 @@ async function handleGetWallet(request, env, user) {
 }
 
 function normalizeProviderCurrencies(body) {
-  const source = Array.isArray(body?.currencies) ? body.currencies : Array.isArray(body) ? body : [];
+  // NOWPayments' merchant-specific endpoint returns `selectedCurrencies`,
+  // while the general currency endpoints return `currencies` (or an array).
+  const source = Array.isArray(body?.selectedCurrencies)
+    ? body.selectedCurrencies
+    : Array.isArray(body?.currencies)
+      ? body.currencies
+      : Array.isArray(body)
+        ? body
+        : [];
   return source.map((entry) => {
     if (typeof entry === "string") return { code: entry.toLowerCase(), name: entry.toUpperCase(), network: null, requiresExtraId: false };
     return {
