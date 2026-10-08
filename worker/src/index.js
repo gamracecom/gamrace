@@ -326,10 +326,13 @@ async function handleCreateDeposit(request, env, user) {
   await enforceCooldown(env, user.sub, "deposit", 3);
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
-  const amountUsdCents = parseUsdCents(body.amountUsd, {
-    minimumUsdCents: envNumber(env, "MINIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.minimumDepositUsdCents),
-    maximumUsdCents: envNumber(env, "MAXIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.maximumDepositUsdCents),
-  });
+  const minimumUsdCents = envNumber(env, "MINIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.minimumDepositUsdCents);
+  const amountUsdCents = body.amountUsd == null || body.amountUsd === ""
+    ? minimumUsdCents
+    : parseUsdCents(body.amountUsd, {
+      minimumUsdCents,
+      maximumUsdCents: envNumber(env, "MAXIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.maximumDepositUsdCents),
+    });
   const payCurrency = requireWalletAsset(normalizeCurrency(body.payCurrency)).code;
   await ensureWalletPreference(env, user.sub);
 
