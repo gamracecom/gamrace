@@ -64,8 +64,8 @@ function createWalletDialog() {
       <div class="wallet-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet-tab="deposit">Deposit</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="withdraw">Withdraw</button>
-        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy">Buy Crypto</button>
-        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="tip">Tip User</button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy"><span class="wallet-tab-desktop">Buy Crypto</span><span class="wallet-tab-mobile">Buy</span></button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="tip"><span class="wallet-tab-desktop">Tip User</span><span class="wallet-tab-mobile">Tip</span></button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="vault">Vault</button>
       </div>
       <div class="wallet-body">
@@ -79,6 +79,7 @@ function createWalletDialog() {
             <div class="deposit-memo-row" data-deposit-memo-row hidden><span>Memo / destination tag</span><div><code data-deposit-memo></code><button type="button" data-copy-memo aria-label="Copy memo">Copy</button></div></div>
             <p class="wallet-network-warning" data-deposit-warning>Loading a secure live deposit address…</p>
             <div class="wallet-qr wallet-qr-loading" data-deposit-qr aria-label="Deposit address QR code"><span>Preparing QR…</span></div>
+            <button class="wallet-retry" type="button" data-deposit-retry hidden>Retry address</button>
           </div>
           <button class="wallet-history-toggle" type="button" data-open-transactions>Transaction history</button>
         </section>
@@ -133,6 +134,7 @@ function createWalletDialog() {
     depositMemo: overlay.querySelector("[data-deposit-memo]"),
     depositWarning: overlay.querySelector("[data-deposit-warning]"),
     depositQr: overlay.querySelector("[data-deposit-qr]"),
+    depositRetry: overlay.querySelector("[data-deposit-retry]"),
     copyAddress: overlay.querySelector("[data-copy-address]"),
     copyMemo: overlay.querySelector("[data-copy-memo]"),
     transactionLinks: [...overlay.querySelectorAll("[data-open-transactions]")],
@@ -393,6 +395,7 @@ function setDepositLoading(asset) {
   dialog.depositWarning.textContent = "Creating a live address for the selected network…";
   dialog.depositQr.classList.add("wallet-qr-loading");
   dialog.depositQr.innerHTML = "<span>Preparing QR…</span>";
+  dialog.depositRetry.hidden = true;
 }
 
 async function ensureDepositAddress(currency, force = false) {
@@ -416,6 +419,13 @@ async function ensureDepositAddress(currency, force = false) {
       body: JSON.stringify({ requestId, payCurrency: asset.code }),
     });
     renderDeposit(result.deposit);
+  } catch (error) {
+    if (depositRequestIds.get(asset.code) === requestId) depositRequestIds.delete(asset.code);
+    dialog.depositQr.classList.add("wallet-qr-loading");
+    dialog.depositQr.innerHTML = "<span>Address unavailable</span>";
+    dialog.depositWarning.textContent = "The address could not be loaded. Please retry in a moment.";
+    dialog.depositRetry.hidden = false;
+    throw error;
   } finally {
     setBusy(false);
   }
@@ -445,6 +455,7 @@ function renderDeposit(deposit) {
   const minimumDepositUsd = Math.max(0, Number(deposit.requestedUsdCents || 100)) / 100;
   dialog.depositWarning.textContent = `Minimum deposit: $${minimumDepositUsd.toFixed(2)} USD equivalent. Only send ${asset.symbol} on ${asset.network || deposit.network}. Using another coin or network can permanently lose funds.`;
   renderQr(deposit.payAddress);
+  dialog.depositRetry.hidden = true;
   if (deposit.credited || ["failed", "refunded", "expired"].includes(deposit.status)) {
     if (deposit.credited) loadWallet().catch(() => {});
     return;
@@ -490,6 +501,9 @@ dialog.overlay.addEventListener("click", (event) => {
 });
 dialog.copyAddress.addEventListener("click", () => copyText(dialog.depositAddress.textContent, dialog.copyAddress));
 dialog.copyMemo.addEventListener("click", () => copyText(dialog.depositMemo.textContent, dialog.copyMemo));
+dialog.depositRetry.addEventListener("click", () => {
+  ensureDepositAddress(dialog.depositSelect.value, true).catch((error) => setStatus(error.message, "error"));
+});
 dialog.transactionLinks.forEach((button) => button.addEventListener("click", () => {
   closeWallet();
   window.dispatchEvent(new CustomEvent("gamrace:open-transactions"));

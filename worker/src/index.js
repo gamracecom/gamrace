@@ -159,7 +159,12 @@ async function nowPayments(env, path, options = {}) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    console.error("NOWPayments request failed", { path, status: response.status, code: body?.code || body?.status });
+    console.error("NOWPayments request failed", {
+      path,
+      status: response.status,
+      code: body?.code || body?.status,
+      message: String(body?.message || body?.error || "").slice(0, 200),
+    });
     throw httpError(response.status >= 500 ? 502 : 400, "The payment service could not complete that request", "PROVIDER_ERROR");
   }
   return body;
@@ -322,18 +327,50 @@ async function existingDepositForRequest(env, uid, requestId) {
   return env.DB.prepare("SELECT * FROM crypto_deposits WHERE uid = ? AND request_id = ?").bind(uid, requestId).first();
 }
 
+async function currentMinimumDepositUsdCents(env, payCurrency) {
+  const configuredFloor = envNumber(env, "MINIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.minimumDepositUsdCents);
+  try {
+    const minimum = await nowPayments(env, "/min-amount", {
+      query: {
+        currency_from: payCurrency,
+        currency_to: payCurrency,
+        fiat_equivalent: "usd",
+      },
+    });
+    let minimumUsd = Number(minimum.fiat_equivalent || minimum.min_amount_fiat || 0);
+    if (!(minimumUsd > 0) && Number(minimum.min_amount) > 0) {
+      const estimate = await nowPayments(env, "/estimate", {
+        query: {
+          amount: minimum.min_amount,
+          currency_from: payCurrency,
+          currency_to: "usd",
+        },
+      });
+      minimumUsd = Number(estimate.estimated_amount || 0);
+    }
+    if (minimumUsd > 0) {
+      // Keep a small buffer so a quote does not fall below a changing network minimum
+      // between checking the limit and creating the payment address.
+      return Math.max(configuredFloor, Math.ceil(minimumUsd * 1.05 * 100));
+    }
+  } catch (error) {
+    console.error("Could not resolve dynamic deposit minimum", { payCurrency, code: error?.code || "unknown" });
+  }
+  return Math.max(configuredFloor, 500);
+}
+
 async function handleCreateDeposit(request, env, user) {
   await enforceCooldown(env, user.sub, "deposit", 3);
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
-  const minimumUsdCents = envNumber(env, "MINIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.minimumDepositUsdCents);
+  const payCurrency = requireWalletAsset(normalizeCurrency(body.payCurrency)).code;
+  const minimumUsdCents = await currentMinimumDepositUsdCents(env, payCurrency);
   const amountUsdCents = body.amountUsd == null || body.amountUsd === ""
     ? minimumUsdCents
     : parseUsdCents(body.amountUsd, {
       minimumUsdCents,
       maximumUsdCents: envNumber(env, "MAXIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.maximumDepositUsdCents),
     });
-  const payCurrency = requireWalletAsset(normalizeCurrency(body.payCurrency)).code;
   await ensureWalletPreference(env, user.sub);
 
   const existing = await existingDepositForRequest(env, user.sub, requestId);
