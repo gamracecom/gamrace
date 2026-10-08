@@ -296,6 +296,7 @@ body.modal-open { overflow: hidden; }
 .wallet-primary:disabled, .wallet-form input:disabled, .wallet-form select:disabled { cursor: wait; opacity: .62; }
 .wallet-warning { margin: 18px 0 0; color: #8299aa; font-size: .74rem; line-height: 1.5; }
 .deposit-instructions { display: grid; gap: 15px; margin-top: 22px; padding: 20px; border: 1px solid #1b3d50; border-radius: 10px; background: #081a25; }
+.deposit-instructions[hidden] { display: none; }
 .deposit-state, .deposit-amount { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .deposit-state span, .deposit-amount span, .deposit-address-row > span, .deposit-memo-row > span { color: #8098a8; font-size: .76rem; }
 .deposit-state strong { color: #64d9ff; font-size: .82rem; }
