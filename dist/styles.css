@@ -522,7 +522,7 @@ body.modal-open { overflow: hidden; }
 .mines-field small { color: #879dad; font-size: .7rem; }
 .bet-input-shell, .select-shell { min-height: 58px; display: flex; align-items: center; overflow: hidden; border: 1px solid transparent; border-radius: 9px; background: #122331; color: #fff; }
 .bet-input-shell:focus-within, .select-shell:focus-within { border-color: #1fbee9; box-shadow: 0 0 0 2px rgba(38, 211, 255, .08); }
-.bet-currency { width: 26px; height: 26px; display: grid; place-items: center; margin-left: 14px; border-radius: 50%; background: #20ae5d; color: #fff; font-size: .75rem; font-weight: 900; }
+.bet-currency { min-width: 42px; height: 26px; display: grid; place-items: center; margin-left: 12px; padding: 0 7px; border-radius: 999px; background: #0d779f; color: #fff; font-size: .62rem; font-weight: 900; letter-spacing: .02em; }
 .bet-input-shell input { min-width: 0; flex: 1; height: 56px; padding: 0 12px; border: 0; outline: 0; background: transparent; color: #fff; font-weight: 750; }
 .bet-input-shell button { width: 48px; height: 44px; margin-right: 7px; border: 0; border-radius: 8px; background: #203545; color: #d7e4ed; cursor: pointer; font-weight: 750; }
 .bet-input-shell button:hover { background: #29485e; color: #fff; }
@@ -540,6 +540,8 @@ body.modal-open { overflow: hidden; }
 .mines-status[data-tone="active"] { color: #a9ddee; }
 .mines-status[data-tone="success"] { color: #64e8a0; }
 .mines-status[data-tone="error"] { color: #ff8391; }
+.mines-balance-message { margin: 16px 2px 0; padding: 10px 12px; border: 1px solid rgba(255, 109, 125, .32); border-radius: 7px; background: rgba(87, 20, 32, .22); color: #ff9baa; font-size: .71rem; font-weight: 680; line-height: 1.4; }
+.mines-balance-message[hidden] { display: none; }
 
 .mines-board-panel { position: relative; min-width: 0; display: grid; place-items: center; padding: clamp(30px, 4vw, 62px); background: radial-gradient(circle at center, rgba(10, 52, 75, .34), transparent 66%), #050e16; }
 .mines-board { width: min(100%, 650px); display: grid; grid-template-columns: repeat(5, minmax(60px, 1fr)); gap: clamp(9px, 1vw, 14px); }
@@ -693,6 +695,19 @@ body.modal-open { overflow: hidden; }
 /* GamRace multi-asset wallet */
 .balance-coin-icon { width: 22px; height: 22px; flex: 0 0 22px; object-fit: contain; }
 .balance-caret { margin-left: 2px; color: #8aa0af; font-size: .9rem; transform: translateY(-1px); }
+.balance-control { position: relative; }
+.balance-menu { width: 330px; max-height: min(480px, calc(100vh - 100px)); overflow-y: auto; position: absolute; z-index: 180; top: calc(100% + 9px); left: 50%; padding: 7px; border: 1px solid #1b3b4f; border-radius: 10px; background: #07151f; box-shadow: 0 22px 60px rgba(0, 0, 0, .64); transform: translateX(-50%); }
+.balance-menu[hidden] { display: none; }
+.balance-option { width: 100%; min-height: 52px; display: grid; grid-template-columns: 25px minmax(0, 1fr) 18px; align-items: center; gap: 10px; padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: #dce9ef; cursor: pointer; text-align: left; }
+.balance-option:hover { background: #0d2532; }
+.balance-option.selected { background: #0c3042; color: #fff; }
+.balance-option > img { width: 23px; height: 23px; object-fit: contain; }
+.balance-option > span { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.balance-option strong { min-width: 0; display: grid; gap: 2px; font-size: .78rem; }
+.balance-option strong small { overflow: hidden; color: #7f96a5; font-size: .62rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.balance-option em { color: #d8e8ef; font-size: .7rem; font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.balance-option > i { color: transparent; font-size: .76rem; font-style: normal; }
+.balance-option.selected > i { color: #4bd2ff; }
 .wallet-button-icon { width: 19px; height: 17px; display: inline-block; border: 1.8px solid currentColor; border-radius: 3px; position: relative; }
 .wallet-button-icon::after { width: 7px; height: 5px; border: 1.6px solid currentColor; border-radius: 2px; position: absolute; right: -4px; top: 4px; background: inherit; content: ""; }
 .utility.wallet { border-color: #087ebe; background: #087ac0; color: #fff; }
@@ -785,6 +800,8 @@ body.modal-open { overflow: hidden; }
 .transaction-status:empty { display: none; }
 
 @media (max-width: 680px) {
+  .balance-menu { width: min(350px, calc(100vw - 20px)); max-height: calc(100dvh - 92px); position: fixed; top: 72px; right: 10px; left: auto; transform: none; }
+  .balance-option { min-height: 54px; }
   .wallet-overlay { padding: 0; align-items: end; }
   .wallet-modal { width: 100vw; max-height: calc(100dvh - 6px); border-right: 0; border-bottom: 0; border-left: 0; border-radius: 16px 16px 0 0; }
   .wallet-close { top: 8px; right: 7px; width: 36px; height: 36px; }

@@ -26,11 +26,13 @@
   const autoMineSelect = document.querySelector("#auto-mine-count");
   const autoRoundInput = document.querySelector("#auto-round-count");
   const autoSelectedCount = document.querySelector("#auto-selected-count");
-  const headerBalance = document.querySelector("#header-balance");
   const result = document.querySelector("#mines-result");
   const resultPayout = document.querySelector("#result-payout");
+  const balanceMessage = document.querySelector("#mines-balance-message");
 
   let balance = 0;
+  let selectedCurrency = "";
+  let selectedSymbol = "COIN";
   let activeRound = null;
   let currentMode = "manual";
   let autoplayRunning = false;
@@ -42,13 +44,13 @@
   localStorage.removeItem("gamrace-balance-v1");
 
   function money(value) {
-    const absolute = Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return `${value < 0 ? "-" : ""}$${absolute}`;
+    const absolute = Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+    return `${value < 0 ? "-" : ""}${absolute} ${selectedSymbol}`;
   }
 
   function cleanAmount(input) {
     const value = Number.parseFloat(input.value);
-    return Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : 0;
+    return Number.isFinite(value) ? Math.max(0, Math.round(value * 100000000) / 100000000) : 0;
   }
 
   function secureRandomInt(max) {
@@ -82,9 +84,28 @@
   }
 
   function renderBalance() {
-    balance = 0;
-    const balanceValue = headerBalance.querySelector(".balance-value");
-    if (balanceValue) balanceValue.textContent = money(balance);
+    document.querySelectorAll(".bet-currency").forEach((label) => { label.textContent = selectedSymbol; });
+    updateBetDisplay();
+  }
+
+  function setBalanceMessage(message = "") {
+    balanceMessage.textContent = message;
+    balanceMessage.hidden = !message;
+  }
+
+  function showInsufficientBalance() {
+    setBalanceMessage(`Insufficient ${selectedSymbol} balance. Deposit funds or select another coin above.`);
+  }
+
+  function applyWalletSelection(detail) {
+    if (!detail?.asset || !detail?.balance) return;
+    selectedCurrency = detail.currency;
+    selectedSymbol = detail.asset.symbol || selectedCurrency.toUpperCase();
+    balance = Math.max(0, Number(detail.balance.available || 0));
+    renderBalance();
+    if (balance <= 0) showInsufficientBalance();
+    else setBalanceMessage();
+    updateWagerAvailability();
   }
 
   function flashInvalid(element) {
@@ -118,7 +139,7 @@
   function updateAutoSelectionDisplay() {
     const maximum = maxAutoSelections();
     autoSelectedCount.textContent = `${selectedAutoTiles.size} / ${maximum}`;
-    if (!autoplayRunning) autoActionButton.disabled = selectedAutoTiles.size === 0 || balance <= 0 || cleanAmount(autoBetInput) <= 0;
+    if (!autoplayRunning) autoActionButton.disabled = selectedAutoTiles.size === 0 || cleanAmount(autoBetInput) <= 0;
   }
 
   function buildBoard() {
@@ -166,9 +187,12 @@
   function startRound({ amount, mines, automated = false }) {
     if (activeRound && !activeRound.finished) return false;
     if (!Number.isFinite(amount) || amount <= 0 || amount > balance) {
+      if (amount > balance) showInsufficientBalance();
+      else setBalanceMessage("Enter a bet amount greater than zero.");
       flashInvalid(automated ? autoBetInput.closest(".bet-input-shell") : betInput.closest(".bet-input-shell"));
       return false;
     }
+    setBalanceMessage();
 
     activeRound = {
       amount,
@@ -220,7 +244,7 @@
     activeRound.revealed.add(index);
     tile.classList.add("revealed", "is-gem");
     addTileArt(tile, "gem");
-    actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
+    actionButton.disabled = cleanAmount(betInput) <= 0;
     updateCashoutButton();
     if (!activeRound.automated && activeRound.revealed.size === TILE_COUNT - activeRound.mines) cashOut();
     return true;
@@ -256,7 +280,7 @@
 
   function finishManualControls() {
     actionButton.textContent = "Bet";
-    actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
+    actionButton.disabled = cleanAmount(betInput) <= 0;
     mineSelect.disabled = false;
     betInput.disabled = false;
   }
@@ -286,7 +310,7 @@
     activeRound = null;
     result.hidden = true;
     actionButton.textContent = "Bet";
-    actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
+    actionButton.disabled = cleanAmount(betInput) <= 0;
     mineSelect.disabled = false;
     betInput.disabled = false;
     buildBoard();
@@ -297,14 +321,14 @@
   function adjustBet(input, action) {
     const current = cleanAmount(input);
     const next = action === "half" ? current / 2 : current * 2;
-    input.value = Math.max(0, Math.min(balance, Math.round(next * 100) / 100)).toFixed(2);
+    input.value = Math.max(0, Math.min(balance, Math.round(next * 100000000) / 100000000)).toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
     if (input === betInput) updateBetDisplay();
     updateWagerAvailability();
   }
 
   function updateWagerAvailability() {
     if (!activeRound || activeRound.finished) {
-      actionButton.disabled = balance <= 0 || cleanAmount(betInput) <= 0;
+      actionButton.disabled = cleanAmount(betInput) <= 0;
     }
     updateAutoSelectionDisplay();
   }
@@ -330,6 +354,8 @@
       return;
     }
     if (amount <= 0 || amount > balance) {
+      if (amount > balance) showInsufficientBalance();
+      else setBalanceMessage("Enter an automatic bet amount greater than zero.");
       flashInvalid(autoBetInput.closest(".bet-input-shell"));
       return;
     }
@@ -367,6 +393,9 @@
   updateBetDisplay();
   updateAutoSelectionDisplay();
   updateWagerAvailability();
+
+  window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
+  if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
 
   actionButton.addEventListener("click", () => {
     if (activeRound && !activeRound.finished) {

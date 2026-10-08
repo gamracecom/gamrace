@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=wallet-mobile-1" />
+    <link rel="stylesheet" href="styles.css?v=wallet-balances-1" />
   </head>
   <body class="game-page" data-authenticated="false">
     <div class="app-shell">
@@ -83,6 +83,7 @@
                   </label>
                   <button class="mines-primary-button" id="auto-action" type="button" disabled>Start Autoplay</button>
                 </div>
+                <p class="mines-balance-message" id="mines-balance-message" role="status" aria-live="polite" hidden></p>
               </section>
 
               <section class="mines-board-panel" aria-label="Mines board">
@@ -131,10 +132,10 @@
       <button class="mobile-tab-action" type="button" data-mobile-action="rewards"><img class="mobile-tab-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" /><strong>Rewards</strong></button>
       <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" aria-hidden="true" /><strong>Chat</strong></button>
     </nav>
-    <script src="mines.js?v=mines-controls-2" defer></script>
+    <script src="mines.js?v=wallet-balances-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=wallet-transactions-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=wallet-preload-1"></script>
+    <script type="module" src="wallet.js?v=wallet-balances-1"></script>
   </body>
 </html>

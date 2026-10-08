@@ -402,6 +402,7 @@ async function handleCreateDeposit(request, env, user) {
         price_amount: amountUsdCents / 100,
         price_currency: "usd",
         pay_currency: payCurrency,
+        payout_currency: payCurrency,
         order_id: orderId,
         order_description: "GamRace wallet deposit",
         ipn_callback_url: `${String(env.PUBLIC_BASE_URL).replace(/\/$/, "")}/ipn/deposit`,

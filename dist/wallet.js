@@ -260,6 +260,20 @@ function ensureHeaderControls() {
       caret.setAttribute("aria-hidden", "true");
       button.append(caret);
     }
+    if (!button.parentElement?.classList.contains("balance-control")) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "balance-control";
+      button.before(wrapper);
+      wrapper.append(button);
+      const menu = document.createElement("div");
+      menu.className = "balance-menu";
+      menu.hidden = true;
+      menu.setAttribute("role", "listbox");
+      menu.setAttribute("aria-label", "Choose balance");
+      wrapper.append(menu);
+      button.setAttribute("aria-haspopup", "listbox");
+      button.setAttribute("aria-expanded", "false");
+    }
   });
   walletButtons.forEach((button) => {
     if (!button.querySelector(".wallet-button-icon")) {
@@ -268,6 +282,54 @@ function ensureHeaderControls() {
       icon.setAttribute("aria-hidden", "true");
       button.prepend(icon);
     }
+  });
+}
+
+function closeBalanceMenus(exceptButton = null) {
+  balanceButtons.forEach((button) => {
+    if (button === exceptButton) return;
+    const menu = button.parentElement?.querySelector(".balance-menu");
+    if (menu) menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function walletSelectionDetail() {
+  const currency = walletSnapshot?.selectedCurrency;
+  const asset = assetFor(currency);
+  if (!currency || !asset) return null;
+  return { currency, asset: { ...asset }, balance: { ...balanceFor(currency) } };
+}
+
+function broadcastWalletSelection() {
+  const detail = walletSelectionDetail();
+  if (!detail) return;
+  window.gamraceWalletSelection = detail;
+  window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed", { detail }));
+}
+
+function updateBalanceMenus() {
+  balanceButtons.forEach((button) => {
+    const menu = button.parentElement?.querySelector(".balance-menu");
+    if (!menu) return;
+    menu.replaceChildren();
+    currencies.forEach((asset) => {
+      const balance = balanceFor(asset.code);
+      const selected = walletSnapshot?.selectedCurrency === asset.code;
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "balance-option";
+      option.classList.toggle("selected", selected);
+      option.dataset.currency = asset.code;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(selected));
+      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${cleanCryptoAmount(balance.available)} ${asset.symbol}</em></span><i aria-hidden="true">✓</i>`;
+      option.addEventListener("click", async () => {
+        closeBalanceMenus();
+        try { await selectWalletCurrency(asset.code); } catch (error) { setStatus(error.message, "error"); }
+      });
+      menu.append(option);
+    });
   });
 }
 
@@ -282,6 +344,8 @@ function updateHeader() {
     if (value) value.textContent = money(walletSnapshot?.selectedUsdCents || 0);
     button.title = `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
   });
+  updateBalanceMenus();
+  broadcastWalletSelection();
 }
 
 function friendlyStatus(status) {
@@ -565,10 +629,27 @@ async function copyText(value, button) {
 
 ensureHeaderControls();
 walletButtons.forEach((button) => button.addEventListener("click", () => openWallet("deposit")));
-balanceButtons.forEach((button) => button.addEventListener("click", () => openWallet("withdraw")));
+balanceButtons.forEach((button) => button.addEventListener("click", () => {
+  if (!currentUser) {
+    const signIn = document.querySelector(".auth.login");
+    if (signIn) signIn.click();
+    return;
+  }
+  const menu = button.parentElement?.querySelector(".balance-menu");
+  if (!menu) return;
+  const willOpen = menu.hidden;
+  closeBalanceMenus(willOpen ? button : null);
+  menu.hidden = !willOpen;
+  button.setAttribute("aria-expanded", String(willOpen));
+}));
 dialog.close.addEventListener("click", closeWallet);
 dialog.overlay.addEventListener("click", (event) => { if (event.target === dialog.overlay) closeWallet(); });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !dialog.overlay.hidden) closeWallet(); });
+document.addEventListener("click", (event) => { if (!event.target.closest(".balance-control")) closeBalanceMenus(); });
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  closeBalanceMenus();
+  if (!dialog.overlay.hidden) closeWallet();
+});
 dialog.tabs.forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.walletTab)));
 dialog.overlay.querySelectorAll("[data-asset-trigger]").forEach((trigger) => trigger.addEventListener("click", () => {
   const control = trigger.closest(".wallet-asset-control");

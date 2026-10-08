@@ -3,6 +3,10 @@ main = "src/index.js"
 compatibility_date = "2026-10-01"
 workers_dev = true
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [vars]
 FIREBASE_PROJECT_ID = "gamrace"
 ALLOWED_ORIGINS = "https://gamrace.com,https://www.gamrace.com,http://localhost:4173,http://localhost:8080"
