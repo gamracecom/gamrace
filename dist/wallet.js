@@ -531,6 +531,13 @@ async function getOrCreateDepositAddress(currency, force = false) {
   return load;
 }
 
+async function loadSavedDepositAddresses() {
+  const result = await api("/deposit-addresses");
+  (result.deposits || []).forEach((deposit) => {
+    if (deposit?.payCurrency && deposit?.payAddress) depositCache.set(deposit.payCurrency, deposit);
+  });
+}
+
 async function ensureDepositAddress(currency, force = false) {
   const asset = assetFor(currency);
   if (!asset || dialog.overlay.hidden) return;
@@ -557,23 +564,24 @@ async function ensureDepositAddress(currency, force = false) {
 
 async function preloadDepositAddresses(generation = preloadGeneration) {
   const preferred = walletSnapshot?.selectedCurrency;
-  const queue = [...currencies].sort((left, right) => Number(right.code === preferred) - Number(left.code === preferred));
-  const worker = async () => {
-    while (queue.length && generation === preloadGeneration && currentUser) {
-      const asset = queue.shift();
-      try {
-        await getOrCreateDepositAddress(asset.code);
-      } catch (error) {
-        // A short retry handles temporary provider throttling while permanent
-        // configuration errors remain available through the manual retry button.
-        if ([429, 502, 503].includes(Number(error.status)) && generation === preloadGeneration) {
-          await new Promise((resolve) => setTimeout(resolve, 1200));
-          try { await getOrCreateDepositAddress(asset.code, true); } catch { /* Leave this asset retryable in the UI. */ }
-        }
+  const queue = [...currencies]
+    .filter((asset) => !depositCache.has(asset.code))
+    .sort((left, right) => Number(right.code === preferred) - Number(left.code === preferred));
+  // Provider payment creation is deliberately sequential. A burst of eleven
+  // requests caused rate/minimum races and left some currencies unavailable;
+  // saved addresses still render immediately from the server-side cache.
+  while (queue.length && generation === preloadGeneration && currentUser) {
+    const asset = queue.shift();
+    try {
+      await getOrCreateDepositAddress(asset.code);
+    } catch (error) {
+      if ([429, 502, 503].includes(Number(error.status)) && generation === preloadGeneration) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        try { await getOrCreateDepositAddress(asset.code, true); } catch { /* Leave this asset retryable in the UI. */ }
       }
     }
-  };
-  await Promise.all([worker(), worker()]);
+    if (queue.length) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
 function renderQr(value) {
@@ -739,7 +747,7 @@ if (LOCAL_PREVIEW) {
       return;
     }
     try {
-      await Promise.all([loadWallet(), loadCurrencies()]);
+      await Promise.all([loadWallet(), loadCurrencies(), loadSavedDepositAddresses()]);
       refreshControls();
       void preloadDepositAddresses(generation);
     } catch { updateHeader(); }

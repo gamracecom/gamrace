@@ -234,6 +234,7 @@ CREATE TABLE IF NOT EXISTS crypto_deposits (
 );
 
 CREATE INDEX IF NOT EXISTS crypto_deposits_uid_created_idx ON crypto_deposits(uid, created_at DESC);
+CREATE INDEX IF NOT EXISTS crypto_deposits_address_currency_idx ON crypto_deposits(pay_address, pay_currency);
 
 CREATE TABLE IF NOT EXISTS crypto_withdrawals (
   id TEXT PRIMARY KEY,

@@ -159,13 +159,17 @@ async function nowPayments(env, path, options = {}) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
+    const providerMessage = String(body?.message || body?.error || "").slice(0, 200);
     console.error("NOWPayments request failed", {
       path,
       status: response.status,
       code: body?.code || body?.status,
-      message: String(body?.message || body?.error || "").slice(0, 200),
+      message: providerMessage,
     });
-    throw httpError(response.status >= 500 ? 502 : 400, "The payment service could not complete that request", "PROVIDER_ERROR");
+    const error = httpError(response.status >= 500 ? 502 : 400, "The payment service could not complete that request", "PROVIDER_ERROR");
+    error.providerMessage = providerMessage;
+    error.providerStatus = response.status;
+    throw error;
   }
   return body;
 }
@@ -327,6 +331,55 @@ async function existingDepositForRequest(env, uid, requestId) {
   return env.DB.prepare("SELECT * FROM crypto_deposits WHERE uid = ? AND request_id = ?").bind(uid, requestId).first();
 }
 
+async function existingDepositForCurrency(env, uid, payCurrency) {
+  return env.DB.prepare(`
+    SELECT * FROM crypto_deposits
+    WHERE uid = ? AND pay_currency = ? AND pay_address <> ''
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(uid, payCurrency).first();
+}
+
+async function handleDepositAddresses(request, env, user) {
+  const result = await env.DB.prepare(`
+    SELECT * FROM crypto_deposits AS deposit
+    WHERE deposit.uid = ? AND deposit.pay_address <> ''
+      AND deposit.created_at = (
+        SELECT MAX(candidate.created_at) FROM crypto_deposits AS candidate
+        WHERE candidate.uid = deposit.uid AND candidate.pay_currency = deposit.pay_currency
+      )
+    ORDER BY deposit.created_at DESC
+  `).bind(user.sub).all();
+  return json(request, env, 200, { deposits: (result.results || []).map(depositResponse) });
+}
+
+function isProviderMinimumError(error) {
+  return error?.code === "PROVIDER_ERROR" && /(?:less than|below).*(?:minimum|minimal)|(?:minimum|minimal).*amount/i.test(error?.providerMessage || "");
+}
+
+async function createProviderDeposit(env, body, initialUsdCents, maximumUsdCents) {
+  let amountUsdCents = initialUsdCents;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const payment = await nowPayments(env, "/payment", {
+        method: "POST",
+        body: { ...body, price_amount: amountUsdCents / 100 },
+      });
+      return { payment, amountUsdCents };
+    } catch (error) {
+      if (!isProviderMinimumError(error) || attempt === 7) throw error;
+      const nextAmountUsdCents = Math.min(maximumUsdCents, Math.max(amountUsdCents + 100, amountUsdCents * 2));
+      if (nextAmountUsdCents <= amountUsdCents) throw error;
+      console.warn("Retrying deposit address above live provider minimum", {
+        payCurrency: body.pay_currency,
+        previousUsdCents: amountUsdCents,
+        nextUsdCents: nextAmountUsdCents,
+      });
+      amountUsdCents = nextAmountUsdCents;
+    }
+  }
+  throw httpError(502, "The payment service could not create a deposit address");
+}
+
 async function currentMinimumDepositUsdCents(env, payCurrency) {
   const configuredFloor = envNumber(env, "MINIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.minimumDepositUsdCents);
   try {
@@ -363,15 +416,23 @@ async function handleCreateDeposit(request, env, user) {
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
   const payCurrency = requireWalletAsset(normalizeCurrency(body.payCurrency)).code;
+  await ensureWalletPreference(env, user.sub);
+
+  // NOWPayments' iGaming flow expects the generated address to be saved and
+  // associated with the player. Returning it before rate limits or provider
+  // calls makes the address instant, stable across devices, and retry-safe.
+  const savedAddress = await existingDepositForCurrency(env, user.sub, payCurrency);
+  if (savedAddress) return json(request, env, 200, { deposit: depositResponse(savedAddress) });
+
   await enforceCooldown(env, user.sub, `deposit:${payCurrency}`, 3);
   const minimumUsdCents = await currentMinimumDepositUsdCents(env, payCurrency);
+  const maximumUsdCents = envNumber(env, "MAXIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.maximumDepositUsdCents);
   const amountUsdCents = body.amountUsd == null || body.amountUsd === ""
     ? minimumUsdCents
     : parseUsdCents(body.amountUsd, {
       minimumUsdCents,
-      maximumUsdCents: envNumber(env, "MAXIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.maximumDepositUsdCents),
+      maximumUsdCents,
     });
-  await ensureWalletPreference(env, user.sub);
 
   const existing = await existingDepositForRequest(env, user.sub, requestId);
   if (existing) return json(request, env, 200, { deposit: depositResponse(existing) });
@@ -396,18 +457,15 @@ async function handleCreateDeposit(request, env, user) {
   try {
     if (!env.PUBLIC_BASE_URL) throw httpError(503, "Wallet callback URL has not been configured");
     const orderId = `GRD-${requestId}`.slice(0, 64);
-    const payment = await nowPayments(env, "/payment", {
-      method: "POST",
-      body: {
-        price_amount: amountUsdCents / 100,
+    const created = await createProviderDeposit(env, {
         price_currency: "usd",
         pay_currency: payCurrency,
-        payout_currency: payCurrency,
         order_id: orderId,
         order_description: "GamRace wallet deposit",
         ipn_callback_url: `${String(env.PUBLIC_BASE_URL).replace(/\/$/, "")}/ipn/deposit`,
-      },
-    });
+      }, amountUsdCents, maximumUsdCents);
+    const { payment } = created;
+    const acceptedUsdCents = created.amountUsdCents;
     if (!payment.payment_id || !payment.pay_address || !payment.pay_amount) throw httpError(502, "The payment service returned incomplete deposit details");
     const paymentId = String(payment.payment_id);
     const status = String(payment.payment_status || payment.status || "waiting").toLowerCase();
@@ -424,7 +482,7 @@ async function handleCreateDeposit(request, env, user) {
         requestId,
         orderId,
         status,
-        amountUsdCents,
+        acceptedUsdCents,
         String(payment.pay_amount),
         String(payment.pay_currency || payCurrency).toLowerCase(),
         String(payment.pay_address),
@@ -439,8 +497,10 @@ async function handleCreateDeposit(request, env, user) {
         timestamp,
       ),
       env.DB.prepare(`
-        UPDATE crypto_deposit_requests SET status = 'created', payment_id = ?, updated_at = ? WHERE id = ?
-      `).bind(paymentId, timestamp, requestKey),
+        UPDATE crypto_deposit_requests
+        SET status = 'created', payment_id = ?, requested_usd_cents = ?, updated_at = ?
+        WHERE id = ?
+      `).bind(paymentId, acceptedUsdCents, timestamp, requestKey),
     ]);
     const deposit = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
     return json(request, env, 201, { deposit: depositResponse(deposit) });
@@ -452,16 +512,69 @@ async function handleCreateDeposit(request, env, user) {
   }
 }
 
+async function adoptRepeatedDeposit(env, payment) {
+  const paymentId = String(payment?.payment_id || payment?.id || "");
+  const parentPaymentId = String(payment?.parent_payment_id || "");
+  const payCurrency = normalizeCurrency(payment?.pay_currency || "");
+  const payAddress = String(payment?.pay_address || "").trim();
+  let parent = null;
+  if (parentPaymentId) {
+    parent = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(parentPaymentId).first();
+  }
+  if (!parent && payAddress) {
+    parent = await env.DB.prepare(`
+      SELECT * FROM crypto_deposits
+      WHERE pay_address = ? AND pay_currency = ?
+      ORDER BY created_at ASC LIMIT 1
+    `).bind(payAddress, payCurrency).first();
+  }
+  if (!parent) return null;
+
+  const status = String(payment.payment_status || payment.status || "waiting").toLowerCase();
+  const timestamp = now();
+  const receivedAmount = String(payment.actually_paid || payment.amount_received || "0");
+  const requestedUsdCents = Math.max(1, Math.round(Number(payment.price_amount || 0) * 100) || Number(parent.requested_usd_cents));
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO crypto_deposits(
+      payment_id, uid, request_id, order_id, status, requested_usd_cents,
+      pay_amount, pay_currency, pay_address, payin_extra_id, network, expires_at,
+      actually_paid, credit_units, credited, provider_created_at, provider_updated_at, created_at, updated_at
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+  `).bind(
+    paymentId,
+    parent.uid,
+    `repeat_${paymentId}`.slice(0, 80),
+    `GRR-${paymentId}`.slice(0, 64),
+    status,
+    requestedUsdCents,
+    String(payment.pay_amount || receivedAmount || parent.pay_amount),
+    payCurrency,
+    payAddress || parent.pay_address,
+    payment.payin_extra_id || parent.payin_extra_id || null,
+    payment.network || parent.network || null,
+    payment.expiration_estimate_date || payment.valid_until || null,
+    receivedAmount,
+    status === "finished" ? providerAmountToUnits(receivedAmount) : 0,
+    payment.created_at || null,
+    payment.updated_at || null,
+    timestamp,
+    timestamp,
+  ).run();
+  return env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
+}
+
 async function applyProviderPayment(env, payment) {
   const paymentId = String(payment?.payment_id || payment?.id || "");
   if (!paymentId) throw httpError(400, "Payment identifier is missing");
-  const deposit = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
+  let deposit = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
+  if (!deposit) deposit = await adoptRepeatedDeposit(env, payment);
   if (!deposit) throw httpError(404, "Deposit not found");
-  if (payment.order_id && payment.order_id !== deposit.order_id) throw httpError(409, "Payment reference mismatch");
+  const repeated = deposit.request_id.startsWith("repeat_");
+  if (!repeated && payment.order_id && payment.order_id !== deposit.order_id) throw httpError(409, "Payment reference mismatch");
   const providerCurrency = normalizeCurrency(payment.pay_currency || deposit.pay_currency);
   if (providerCurrency !== deposit.pay_currency) throw httpError(409, "Payment currency mismatch");
   const providerPriceCents = Math.round(Number(payment.price_amount || 0) * 100);
-  if (providerPriceCents && providerPriceCents !== Number(deposit.requested_usd_cents)) throw httpError(409, "Payment amount mismatch");
+  if (!repeated && providerPriceCents && providerPriceCents !== Number(deposit.requested_usd_cents)) throw httpError(409, "Payment amount mismatch");
   const status = String(payment.payment_status || payment.status || deposit.status).toLowerCase();
   const timestamp = now();
   await env.DB.prepare(`
@@ -626,6 +739,7 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/currencies") return handleCurrencies(request, env);
+  if (request.method === "GET" && path === "/deposit-addresses") return handleDepositAddresses(request, env, user);
   if (request.method === "POST" && path === "/deposits") return handleCreateDeposit(request, env, user);
   const depositMatch = path.match(/^\/deposits\/([A-Za-z0-9_-]+)$/);
   if (request.method === "GET" && depositMatch) return handleGetDeposit(request, env, user, depositMatch[1]);
