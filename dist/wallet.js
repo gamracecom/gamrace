@@ -193,6 +193,7 @@ async function api(path, options = {}) {
       const payCurrency = JSON.parse(options.body).payCurrency;
       return { deposit: {
         id: `preview-${payCurrency}`, status: "waiting", payCurrency,
+        requestedUsdCents: 100,
         payAddress: payCurrency === "xrp" ? "rGamRacePreviewAddress123456789" : "0xGamRacePreviewAddress1234567890",
         payinExtraId: payCurrency === "xrp" ? "248091" : "", network: assetFor(payCurrency)?.network,
       } };
@@ -485,7 +486,8 @@ function renderDeposit(deposit) {
   dialog.depositAddressLabel.textContent = `${asset.name || asset.symbol} (${asset.network || deposit.network}) address`;
   dialog.depositMemoRow.hidden = !deposit.payinExtraId;
   dialog.depositMemo.textContent = deposit.payinExtraId || "";
-  dialog.depositWarning.textContent = `Only send ${asset.symbol} on ${asset.network || deposit.network}. Deposits must meet NOWPayments' current network minimum. Using another coin or network can permanently lose funds.`;
+  const minimumDepositUsd = Math.max(0, Number(deposit.requestedUsdCents || 100)) / 100;
+  dialog.depositWarning.textContent = `Minimum deposit: $${minimumDepositUsd.toFixed(2)} USD equivalent. Only send ${asset.symbol} on ${asset.network || deposit.network}. Using another coin or network can permanently lose funds.`;
   renderQr(deposit.payAddress);
   if (deposit.credited || ["failed", "refunded", "expired"].includes(deposit.status)) {
     if (deposit.credited) loadWallet().catch(() => {});

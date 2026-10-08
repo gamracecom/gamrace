@@ -160,7 +160,7 @@ async function nowPayments(env, path, options = {}) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     console.error("NOWPayments request failed", { path, status: response.status, code: body?.code || body?.status });
-    throw httpError(response.status >= 500 ? 502 : 400, "NOWPayments could not complete that request", "PROVIDER_ERROR");
+    throw httpError(response.status >= 500 ? 502 : 400, "The payment service could not complete that request", "PROVIDER_ERROR");
   }
   return body;
 }
@@ -370,7 +370,7 @@ async function handleCreateDeposit(request, env, user) {
         ipn_callback_url: `${String(env.PUBLIC_BASE_URL).replace(/\/$/, "")}/ipn/deposit`,
       },
     });
-    if (!payment.payment_id || !payment.pay_address || !payment.pay_amount) throw httpError(502, "NOWPayments returned incomplete deposit details");
+    if (!payment.payment_id || !payment.pay_address || !payment.pay_amount) throw httpError(502, "The payment service returned incomplete deposit details");
     const paymentId = String(payment.payment_id);
     const status = String(payment.payment_status || payment.status || "waiting").toLowerCase();
     await env.DB.batch([
