@@ -580,7 +580,7 @@ async function preloadDepositAddresses(generation = preloadGeneration) {
         try { await getOrCreateDepositAddress(asset.code, true); } catch { /* Leave this asset retryable in the UI. */ }
       }
     }
-    if (queue.length) await new Promise((resolve) => setTimeout(resolve, 250));
+    if (queue.length) await new Promise((resolve) => setTimeout(resolve, 1200));
   }
 }
 

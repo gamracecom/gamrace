@@ -166,9 +166,12 @@ async function nowPayments(env, path, options = {}) {
       code: body?.code || body?.status,
       message: providerMessage,
     });
-    const error = httpError(response.status >= 500 ? 502 : 400, "The payment service could not complete that request", "PROVIDER_ERROR");
+    const clientStatus = response.status === 429 ? 503 : response.status >= 500 ? 502 : 400;
+    const error = httpError(clientStatus, "The payment service could not complete that request", "PROVIDER_ERROR");
     error.providerMessage = providerMessage;
     error.providerStatus = response.status;
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    error.providerRetryAfterMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 0;
     throw error;
   }
   return body;
@@ -358,7 +361,8 @@ function isProviderMinimumError(error) {
 
 async function createProviderDeposit(env, body, initialUsdCents, maximumUsdCents) {
   let amountUsdCents = initialUsdCents;
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  let rateLimitRetries = 0;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
     try {
       const payment = await nowPayments(env, "/payment", {
         method: "POST",
@@ -366,7 +370,17 @@ async function createProviderDeposit(env, body, initialUsdCents, maximumUsdCents
       });
       return { payment, amountUsdCents };
     } catch (error) {
-      if (!isProviderMinimumError(error) || attempt === 7) throw error;
+      if (error?.providerStatus === 429 && attempt < 11) {
+        const backoffMs = Math.min(5000, Math.max(error.providerRetryAfterMs || 0, 1200 * (2 ** rateLimitRetries)));
+        rateLimitRetries += 1;
+        console.warn("Waiting for provider rate limit before retrying deposit address", {
+          payCurrency: body.pay_currency,
+          backoffMs,
+        });
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      if (!isProviderMinimumError(error) || attempt === 11) throw error;
       const nextAmountUsdCents = Math.min(maximumUsdCents, Math.max(amountUsdCents + 100, amountUsdCents * 2));
       if (nextAmountUsdCents <= amountUsdCents) throw error;
       console.warn("Retrying deposit address above live provider minimum", {
@@ -375,6 +389,8 @@ async function createProviderDeposit(env, body, initialUsdCents, maximumUsdCents
         nextUsdCents: nextAmountUsdCents,
       });
       amountUsdCents = nextAmountUsdCents;
+      // The provider counts the rejected payment toward its rate limit.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
     }
   }
   throw httpError(502, "The payment service could not create a deposit address");
