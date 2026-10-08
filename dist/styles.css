@@ -297,9 +297,8 @@ body.modal-open { overflow: hidden; }
 .wallet-warning { margin: 18px 0 0; color: #8299aa; font-size: .74rem; line-height: 1.5; }
 .deposit-instructions { display: grid; gap: 15px; margin-top: 22px; padding: 20px; border: 1px solid #1b3d50; border-radius: 10px; background: #081a25; }
 .deposit-instructions[hidden] { display: none; }
-.deposit-state, .deposit-amount { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.deposit-state span, .deposit-amount span, .deposit-address-row > span, .deposit-memo-row > span { color: #8098a8; font-size: .76rem; }
-.deposit-state strong { color: #64d9ff; font-size: .82rem; }
+.deposit-amount { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.deposit-amount span, .deposit-address-row > span, .deposit-memo-row > span { color: #8098a8; font-size: .76rem; }
 .deposit-amount strong { color: #f4fbff; font-size: 1.18rem; }
 .deposit-address-row, .deposit-memo-row { display: grid; gap: 8px; }
 .deposit-address-row > div, .deposit-memo-row > div { display: grid; grid-template-columns: 1fr auto; overflow: hidden; border: 1px solid #1a3a4c; border-radius: 7px; background: #05131d; }
@@ -474,7 +473,7 @@ body.modal-open { overflow: hidden; }
   .profile-sidebar { padding: 22px 18px 12px; border-right: 0; border-bottom: 1px solid #173447; }
   .profile-heading { margin: 0 42px 18px 2px; }
   .profile-heading h2 { font-size: 1.5rem; }
-  .profile-tabs { grid-template-columns: 1fr 1fr; }
+  .profile-tabs { grid-template-columns: repeat(3, 1fr); }
   .profile-tab { text-align: center; }
   .profile-content { padding: 24px 16px; }
   .profile-identity { margin-top: 16px; padding: 16px; }
@@ -701,9 +700,9 @@ body.modal-open { overflow: hidden; }
 
 .wallet-overlay { background: rgba(0, 6, 11, .86); backdrop-filter: blur(5px); }
 .wallet-modal { width: min(620px, calc(100vw - 32px)); max-height: min(820px, calc(100dvh - 32px)); border: 1px solid #173548; border-radius: 12px; background: #071018; box-shadow: 0 28px 90px rgba(0, 0, 0, .76); }
-.wallet-close { z-index: 2; top: 14px; right: 16px; width: 34px; height: 34px; color: #94a8b6; font-size: 1.55rem; }
+.wallet-close { z-index: 30; top: 14px; right: 16px; width: 34px; height: 34px; color: #94a8b6; font-size: 1.55rem; }
 .wallet-close:hover { color: #fff; }
-.wallet-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 15px 50px 0 22px; border-bottom: 1px solid #20313d; background: #071018; }
+.wallet-tabs { position: sticky; z-index: 20; top: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 15px 50px 0 22px; border-bottom: 1px solid #20313d; background: #071018; }
 .wallet-tab { min-height: 46px; padding: 0 8px; border-radius: 0; position: relative; color: #a3b3bf; font-size: .78rem; font-weight: 680; white-space: nowrap; }
 .wallet-tab.active { background: transparent; color: #55c9ff; }
 .wallet-tab.active::after { height: 2px; position: absolute; right: 5px; bottom: -1px; left: 5px; border-radius: 2px 2px 0 0; background: #24bdf5; content: ""; }
@@ -755,6 +754,7 @@ body.modal-open { overflow: hidden; }
 .deposit-instructions { gap: 14px; margin-top: 18px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .deposit-address-row > div, .deposit-memo-row > div { border-color: #1c3849; background: #06121a; }
 .deposit-address-row button, .deposit-memo-row button { border-color: #1c3849; background: #0c2330; color: #63d4fb; }
+.deposit-memo-row[hidden], [data-withdraw-memo-field][hidden] { display: none; }
 .wallet-qr { width: 190px; height: 190px; display: grid; place-items: center; margin: 2px auto 0; padding: 10px; border-radius: 8px; background: #fff; color: #071018; font-size: .72rem; }
 .wallet-qr-loading { border: 1px solid #1a3344; background: #0b1822; color: #7f96a5; }
 .wallet-qr svg { width: 100%; height: 100%; display: block; }
@@ -763,13 +763,22 @@ body.modal-open { overflow: hidden; }
 .wallet-placeholder-panel h3 { margin: 14px 0 0; font-size: 1.1rem; }
 .wallet-placeholder-panel p { max-width: 330px; margin: 8px 0 0; color: #7990a0; font-size: .8rem; line-height: 1.5; }
 .wallet-placeholder-icon { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid #1b4962; border-radius: 50%; background: #0a2230; color: #47cbf5; font-size: 1.55rem; }
-.wallet-history { margin-top: 18px; padding-top: 18px; border-top: 1px solid #1a3344; }
-.wallet-history-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.wallet-history-heading h3 { margin: 0; font-size: .96rem; }
-.wallet-history-heading button { border: 0; background: transparent; color: #9cafbb; cursor: pointer; font-size: 1.4rem; }
 .wallet-activity-row { border-color: #173548; background: #091721; }
 .wallet-activity-icon { width: 32px; height: 32px; border-radius: 50%; object-fit: contain; background: transparent; }
 .wallet-status { color: #9ab0bd; }
+
+.transaction-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 14px; padding: 5px; border: 1px solid #17384b; border-radius: 9px; background: #06151f; }
+.transaction-tab { min-height: 40px; border: 0; border-radius: 6px; background: transparent; color: #879dac; cursor: pointer; font-size: .8rem; font-weight: 760; }
+.transaction-tab.active { background: #0d3042; color: #f2faff; }
+.transaction-list { display: grid; gap: 8px; }
+.transaction-list > p { margin: 34px 0; color: #7890a1; text-align: center; }
+.transaction-row { min-height: 62px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid #17384b; border-radius: 9px; background: #081a26; }
+.transaction-row > div { min-width: 0; display: grid; gap: 4px; }
+.transaction-row strong { color: #eef8fd; font-size: .82rem; }
+.transaction-row > div span { overflow: hidden; color: #7f96a6; font-size: .71rem; text-overflow: ellipsis; white-space: nowrap; }
+.transaction-row > strong { color: #64d9ff; text-align: right; white-space: nowrap; }
+.transaction-status { min-height: 1.2em; margin: 14px 0 0; color: #ff9eac; font-size: .76rem; text-align: center; }
+.transaction-status:empty { display: none; }
 
 @media (max-width: 680px) {
   .wallet-overlay { padding: 0; align-items: end; }

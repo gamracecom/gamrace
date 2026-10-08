@@ -79,9 +79,8 @@ function createWalletDialog() {
             <div class="deposit-memo-row" data-deposit-memo-row hidden><span>Memo / destination tag</span><div><code data-deposit-memo></code><button type="button" data-copy-memo aria-label="Copy memo">Copy</button></div></div>
             <p class="wallet-network-warning" data-deposit-warning>Loading a secure live deposit address…</p>
             <div class="wallet-qr wallet-qr-loading" data-deposit-qr aria-label="Deposit address QR code"><span>Preparing QR…</span></div>
-            <div class="deposit-state"><span>Deposit status</span><strong data-deposit-status>Preparing address</strong></div>
           </div>
-          <button class="wallet-history-toggle" type="button" data-history-toggle>Transaction history</button>
+          <button class="wallet-history-toggle" type="button" data-open-transactions>Transaction history</button>
         </section>
 
         <section class="wallet-panel" data-wallet-panel="withdraw" hidden>
@@ -97,7 +96,7 @@ function createWalletDialog() {
             <p class="wallet-fee-note">Network and provider fees are confirmed during owner review before the payout is sent.</p>
             <button class="wallet-primary" type="submit">Request withdrawal</button>
           </form>
-          <button class="wallet-history-toggle" type="button" data-history-toggle>Transaction history</button>
+          <button class="wallet-history-toggle" type="button" data-open-transactions>Transaction history</button>
         </section>
 
         <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="buy" hidden>
@@ -110,10 +109,6 @@ function createWalletDialog() {
           <span class="wallet-placeholder-icon" aria-hidden="true">◇</span><h3>Vault</h3><p>This section is reserved for protected balances.</p>
         </section>
 
-        <section class="wallet-history" data-wallet-history hidden>
-          <div class="wallet-history-heading"><h3>Transaction history</h3><button type="button" data-history-close aria-label="Close transaction history">×</button></div>
-          <div class="wallet-activity" data-wallet-activity><p>No wallet activity yet.</p></div>
-        </section>
         <p class="wallet-status" role="status" aria-live="polite"></p>
       </div>
     </section>`;
@@ -132,7 +127,6 @@ function createWalletDialog() {
     withdrawalMemoField: overlay.querySelector("[data-withdraw-memo-field]"),
     withdrawalAmountIcon: overlay.querySelector("[data-withdraw-amount-icon]"),
     instructions: overlay.querySelector("[data-deposit-instructions]"),
-    depositStatus: overlay.querySelector("[data-deposit-status]"),
     depositAddress: overlay.querySelector("[data-deposit-address]"),
     depositAddressLabel: overlay.querySelector("[data-deposit-address-label]"),
     depositMemoRow: overlay.querySelector("[data-deposit-memo-row]"),
@@ -141,10 +135,7 @@ function createWalletDialog() {
     depositQr: overlay.querySelector("[data-deposit-qr]"),
     copyAddress: overlay.querySelector("[data-copy-address]"),
     copyMemo: overlay.querySelector("[data-copy-memo]"),
-    history: overlay.querySelector("[data-wallet-history]"),
-    historyToggles: [...overlay.querySelectorAll("[data-history-toggle]")],
-    historyClose: overlay.querySelector("[data-history-close]"),
-    activity: overlay.querySelector("[data-wallet-activity]"),
+    transactionLinks: [...overlay.querySelectorAll("[data-open-transactions]")],
     status: overlay.querySelector(".wallet-status"),
   };
 }
@@ -253,41 +244,10 @@ function updateHeader() {
 
 function friendlyStatus(status) {
   const labels = {
-    waiting: "Waiting for payment", confirming: "Confirming on the network", confirmed: "Payment confirmed",
-    sending: "Processing deposit", partially_paid: "Partially paid", finished: "Complete", failed: "Failed",
-    refunded: "Refunded", expired: "Expired", pending_review: "Pending review", processing: "Processing",
-    rejected: "Rejected", cancelled: "Cancelled",
+    pending_review: "Pending review", processing: "Processing", finished: "Complete",
+    rejected: "Rejected", cancelled: "Cancelled", failed: "Failed", refunded: "Refunded",
   };
   return labels[String(status || "").toLowerCase()] || String(status || "Pending").replaceAll("_", " ");
-}
-
-function renderActivity(items = []) {
-  dialog.activity.replaceChildren();
-  if (!items.length) {
-    const empty = document.createElement("p");
-    empty.textContent = "No wallet activity yet.";
-    dialog.activity.append(empty);
-    return;
-  }
-  items.forEach((item) => {
-    const asset = assetFor(item.currency) || { symbol: String(item.currency).toUpperCase(), icon: "usdt" };
-    const row = document.createElement("article");
-    row.className = "wallet-activity-row";
-    const icon = document.createElement("img");
-    icon.className = "wallet-activity-icon";
-    icon.src = iconUrl(asset);
-    icon.alt = "";
-    const copy = document.createElement("div");
-    const title = document.createElement("strong");
-    title.textContent = item.type === "deposit" ? "Deposit" : "Withdrawal";
-    const detail = document.createElement("span");
-    detail.textContent = `${asset.symbol} · ${friendlyStatus(item.status)}`;
-    copy.append(title, detail);
-    const amount = document.createElement("strong");
-    amount.textContent = `${item.type === "deposit" ? "+" : "−"}${cleanCryptoAmount(item.amount)} ${asset.symbol}`;
-    row.append(icon, copy, amount);
-    dialog.activity.append(row);
-  });
 }
 
 function fillAssetSelect(select, allowedAssets = currencies) {
@@ -356,7 +316,6 @@ function refreshControls() {
 async function loadWallet() {
   const result = await api("/wallet");
   walletSnapshot = result.wallet;
-  renderActivity(result.activity);
   if (currencies.length) refreshControls();
 }
 
@@ -382,7 +341,6 @@ function selectTab(name) {
     tab.setAttribute("aria-selected", String(selected));
   });
   dialog.panels.forEach((panel) => { panel.hidden = panel.dataset.walletPanel !== name; });
-  dialog.history.hidden = true;
   setStatus();
   if (name === "deposit" && !dialog.overlay.hidden && currencies.length) {
     ensureDepositAddress(dialog.depositSelect.value).catch((error) => setStatus(error.message, "error"));
@@ -433,7 +391,6 @@ function setDepositLoading(asset) {
   dialog.depositMemoRow.hidden = true;
   dialog.depositMemo.textContent = "";
   dialog.depositWarning.textContent = "Creating a live address for the selected network…";
-  dialog.depositStatus.textContent = "Preparing address";
   dialog.depositQr.classList.add("wallet-qr-loading");
   dialog.depositQr.innerHTML = "<span>Preparing QR…</span>";
 }
@@ -481,7 +438,6 @@ function renderDeposit(deposit) {
   activeDepositId = deposit.id;
   activeDepositCurrency = deposit.payCurrency;
   const asset = assetFor(deposit.payCurrency) || { symbol: String(deposit.payCurrency).toUpperCase(), network: deposit.network || "selected" };
-  dialog.depositStatus.textContent = friendlyStatus(deposit.status);
   dialog.depositAddress.textContent = deposit.payAddress;
   dialog.depositAddressLabel.textContent = `${asset.name || asset.symbol} (${asset.network || deposit.network}) address`;
   dialog.depositMemoRow.hidden = !deposit.payinExtraId;
@@ -534,8 +490,10 @@ dialog.overlay.addEventListener("click", (event) => {
 });
 dialog.copyAddress.addEventListener("click", () => copyText(dialog.depositAddress.textContent, dialog.copyAddress));
 dialog.copyMemo.addEventListener("click", () => copyText(dialog.depositMemo.textContent, dialog.copyMemo));
-dialog.historyToggles.forEach((button) => button.addEventListener("click", () => { dialog.history.hidden = false; }));
-dialog.historyClose.addEventListener("click", () => { dialog.history.hidden = true; });
+dialog.transactionLinks.forEach((button) => button.addEventListener("click", () => {
+  closeWallet();
+  window.dispatchEvent(new CustomEvent("gamrace:open-transactions"));
+}));
 
 dialog.depositSelect.addEventListener("change", async () => {
   updateAssetControl("deposit");
@@ -585,7 +543,6 @@ if (LOCAL_PREVIEW) {
     selectedUsdCents: 128450,
     balances: PREVIEW_ASSETS.map((asset) => ({ ...asset, available: asset.code === "usdttrc20" ? "1284.50000000" : "0.00000000", held: "0.00000000" })),
   };
-  renderActivity([]);
   refreshControls();
   openWallet("deposit");
 } else {

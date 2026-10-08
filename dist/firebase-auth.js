@@ -35,6 +35,7 @@ const authModal = document.querySelector("#auth-modal");
 const headerSignIn = document.querySelector(".auth.login");
 const headerRegister = document.querySelector(".auth.register");
 const profileButton = document.querySelector(".profile-action");
+const WALLET_API_BASE_URL = "https://gamrace-wallet-api.gamracecom.workers.dev";
 
 const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{2,19}$/;
 const USERNAME_ADJECTIVES = ["Swift", "Lucky", "Royal", "Turbo", "Neon", "Rapid", "Prime", "Bold", "Ace", "Epic"];
@@ -105,6 +106,7 @@ function createProfileDialog() {
           <nav class="profile-tabs" aria-label="Profile sections">
             <button class="profile-tab active" type="button" data-profile-section="overview" aria-selected="true">Overview</button>
             <button class="profile-tab" type="button" data-profile-section="settings" aria-selected="false">Settings</button>
+            <button class="profile-tab" type="button" data-profile-section="transactions" aria-selected="false">Transactions</button>
           </nav>
         </aside>
         <div class="profile-content">
@@ -160,6 +162,17 @@ function createProfileDialog() {
               <p class="profile-status" role="status" aria-live="polite"></p>
             </form>
           </section>
+          <section class="profile-section" data-profile-panel="transactions" hidden>
+            <span class="profile-section-label">WALLET</span>
+            <h3>Transaction history</h3>
+            <p class="settings-copy">Review your recent deposits and withdrawals.</p>
+            <div class="transaction-tabs" role="tablist" aria-label="Transaction type">
+              <button class="transaction-tab active" type="button" role="tab" aria-selected="true" data-transaction-view="deposit">Deposits</button>
+              <button class="transaction-tab" type="button" role="tab" aria-selected="false" data-transaction-view="withdrawal">Withdrawals</button>
+            </div>
+            <div class="transaction-list" data-transaction-list><p>Loading transactions…</p></div>
+            <p class="transaction-status" role="status" aria-live="polite"></p>
+          </section>
         </div>
       </div>
     </section>`;
@@ -189,6 +202,9 @@ function createProfileDialog() {
     help: overlay.querySelector(".username-help"),
     save: overlay.querySelector(".username-save"),
     status: overlay.querySelector(".profile-status"),
+    transactionTabs: [...overlay.querySelectorAll("[data-transaction-view]")],
+    transactionList: overlay.querySelector("[data-transaction-list]"),
+    transactionStatus: overlay.querySelector(".transaction-status"),
   };
 }
 
@@ -251,6 +267,80 @@ function selectProfileSection(section) {
   });
 }
 
+function transactionStatusLabel(status) {
+  const labels = {
+    waiting: "Waiting", confirming: "Confirming", confirmed: "Confirmed", sending: "Processing",
+    partially_paid: "Partially paid", finished: "Complete", pending_review: "Pending review",
+    processing: "Processing", rejected: "Rejected", cancelled: "Cancelled", failed: "Failed",
+    refunded: "Refunded", expired: "Expired",
+  };
+  return labels[String(status || "").toLowerCase()] || String(status || "Pending").replaceAll("_", " ");
+}
+
+function formatTransactionAmount(value) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount)
+    ? amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })
+    : "0.00";
+}
+
+function displayTransactionCurrency(code) {
+  const symbols = {
+    usdterc20: "USDT", usdttrc20: "USDT", btc: "BTC", eth: "ETH", usdc: "USDC",
+    sol: "SOL", trx: "TRX", ltc: "LTC", doge: "DOGE", xrp: "XRP", bnbbsc: "BNB",
+  };
+  return symbols[String(code || "").toLowerCase()] || String(code || "").toUpperCase();
+}
+
+function renderTransactions(items, type) {
+  profileDialog.transactionList.replaceChildren();
+  const filtered = items.filter((item) => item.type === type);
+  if (!filtered.length) {
+    const empty = document.createElement("p");
+    empty.textContent = type === "deposit" ? "No deposits yet." : "No withdrawals yet.";
+    profileDialog.transactionList.append(empty);
+    return;
+  }
+  filtered.forEach((item) => {
+    const row = document.createElement("article");
+    row.className = "transaction-row";
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = type === "deposit" ? "Deposit" : "Withdrawal";
+    const detail = document.createElement("span");
+    const currency = displayTransactionCurrency(item.currency);
+    detail.textContent = `${currency} · ${transactionStatusLabel(item.status)}`;
+    copy.append(title, detail);
+    const amount = document.createElement("strong");
+    amount.textContent = `${type === "deposit" ? "+" : "−"}${formatTransactionAmount(item.amount)} ${currency}`;
+    row.append(copy, amount);
+    profileDialog.transactionList.append(row);
+  });
+}
+
+async function loadTransactionHistory(type = "deposit") {
+  if (!auth.currentUser) return;
+  profileDialog.transactionTabs.forEach((tab) => {
+    const selected = tab.dataset.transactionView === type;
+    tab.classList.toggle("active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+  });
+  profileDialog.transactionList.innerHTML = "<p>Loading transactions…</p>";
+  profileDialog.transactionStatus.textContent = "";
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(`${WALLET_API_BASE_URL}/wallet`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Transaction history could not be loaded");
+    renderTransactions(result.activity || [], type);
+  } catch (error) {
+    profileDialog.transactionList.innerHTML = "<p>Transactions are unavailable right now.</p>";
+    profileDialog.transactionStatus.textContent = error.message;
+  }
+}
+
 function setProfileStatus(message = "", state = "") {
   profileDialog.status.textContent = message;
   if (state) profileDialog.status.dataset.state = state;
@@ -272,11 +362,12 @@ function refreshProfileDialog() {
     : "Your username can be changed once.";
 }
 
-function openProfileDialog({ welcome = false } = {}) {
+function openProfileDialog({ welcome = false, section = null } = {}) {
   if (!auth.currentUser || !currentProfile) return;
   setProfileStatus(welcome ? "A random username was created for you. Choose carefully—you can change it once." : "");
   refreshProfileDialog();
-  selectProfileSection(welcome ? "settings" : "overview");
+  const selectedSection = section || (welcome ? "settings" : "overview");
+  selectProfileSection(selectedSection);
   profileDialog.overlay.hidden = false;
   document.body.classList.add("modal-open");
   if (welcome && !currentProfile.usernameChanged) {
@@ -285,6 +376,7 @@ function openProfileDialog({ welcome = false } = {}) {
   } else {
     profileDialog.close.focus();
   }
+  if (selectedSection === "transactions") loadTransactionHistory("deposit");
 }
 
 function closeProfileDialog() {
@@ -438,6 +530,17 @@ profileDialog.tabs.forEach((tab) => {
     selectProfileSection(tab.dataset.profileSection);
     setProfileStatus();
     if (tab.dataset.profileSection === "settings" && !currentProfile?.usernameChanged) profileDialog.input.focus();
+    if (tab.dataset.profileSection === "transactions") loadTransactionHistory("deposit");
+  });
+});
+profileDialog.transactionTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    profileDialog.transactionTabs.forEach((item) => {
+      const selected = item === tab;
+      item.classList.toggle("active", selected);
+      item.setAttribute("aria-selected", String(selected));
+    });
+    loadTransactionHistory(tab.dataset.transactionView);
   });
 });
 profileDialog.close.addEventListener("click", closeProfileDialog);
@@ -493,6 +596,10 @@ window.addEventListener("gamrace-auth-signout", async () => {
   } catch {
     setStatus("Sign out could not be completed. Please try again.", "error");
   }
+});
+
+window.addEventListener("gamrace:open-transactions", () => {
+  openProfileDialog({ section: "transactions" });
 });
 
 onAuthStateChanged(auth, async (user) => {
