@@ -29,6 +29,12 @@
   const result = document.querySelector("#mines-result");
   const resultPayout = document.querySelector("#result-payout");
   const balanceMessage = document.querySelector("#mines-balance-message");
+  const gameTools = document.querySelector("[data-game-tools]");
+  const toolButtons = [...document.querySelectorAll("[data-game-tool]")];
+  const toolPanels = [...document.querySelectorAll("[data-game-tool-panel]")];
+  const favoriteButton = document.querySelector('[data-game-favorite="mines"]');
+  const FAVORITES_KEY = "gamrace-favourites-v1";
+  const SETTINGS_KEY = "gamrace-game-settings-v1";
 
   let balance = 0;
   let selectedCurrency = "";
@@ -37,7 +43,28 @@
   let currentMode = "manual";
   let autoplayRunning = false;
   let stopAutoplayRequested = false;
+  let swipePointerActive = false;
+  let swipePointerId = null;
   const selectedAutoTiles = new Set();
+  const swipedTiles = new Set();
+  const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0, cumulativeProfit: [] };
+  let statCurrency = "";
+
+  function readStoredJson(key, fallback) {
+    try {
+      const value = JSON.parse(localStorage.getItem(key));
+      return value && typeof value === "object" ? value : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  const storedSettings = readStoredJson(SETTINGS_KEY, {});
+  const settings = {
+    turbo: Boolean(storedSettings.turbo),
+    swipe: Boolean(storedSettings.swipe),
+    mute: Boolean(storedSettings.mute),
+  };
 
   // Remove balances created by the earlier local prototype. Real balances must
   // come from the account backend; until then every visitor remains at zero.
@@ -97,9 +124,20 @@
     setBalanceMessage(`Insufficient ${selectedSymbol} balance. Deposit funds or select another coin above.`);
   }
 
+  function resetSessionStats() {
+    sessionStats.profit = 0;
+    sessionStats.wagered = 0;
+    sessionStats.wins = 0;
+    sessionStats.losses = 0;
+    sessionStats.cumulativeProfit = [];
+    renderSessionStats();
+  }
+
   function applyWalletSelection(detail) {
     if (!detail?.asset || !detail?.balance) return;
+    if (statCurrency && statCurrency !== detail.currency) resetSessionStats();
     selectedCurrency = detail.currency;
+    statCurrency = selectedCurrency;
     selectedSymbol = detail.asset.symbol || selectedCurrency.toUpperCase();
     balance = Math.max(0, Number(detail.balance.available || 0));
     renderBalance();
@@ -159,7 +197,10 @@
       tile.classList.toggle("auto-selectable", canSelectAutoTiles);
       tile.classList.toggle("auto-selected", selected);
       tile.disabled = !(manualRoundActive || canSelectAutoTiles);
-      tile.addEventListener("click", () => handleTileClick(index, tile));
+      tile.addEventListener("click", () => {
+        if (settings.swipe) return;
+        handleTileClick(index, tile);
+      });
       board.append(tile);
     }
   }
@@ -287,6 +328,7 @@
 
   function endLoss(explodedIndex) {
     activeRound.finished = true;
+    recordCompletedRound(0);
     revealRemainingMines(explodedIndex);
     resultPayout.textContent = money(0);
     result.hidden = false;
@@ -299,6 +341,7 @@
     const multiplier = calculateMultiplier(activeRound.mines, activeRound.revealed.size);
     const payout = Math.round(activeRound.amount * multiplier * 100) / 100;
     activeRound.finished = true;
+    recordCompletedRound(payout);
     revealRemainingMines();
     resultPayout.textContent = money(payout);
     result.hidden = false;
@@ -342,6 +385,134 @@
 
   function delay(milliseconds) {
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  }
+
+  function statAmount(value) {
+    const decimals = Math.abs(value) >= 100 ? 2 : 4;
+    return `${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: decimals })} ${selectedSymbol}`;
+  }
+
+  function renderStatsChart() {
+    const line = document.querySelector("[data-chart-line]");
+    const area = document.querySelector("[data-chart-area]");
+    const zeroLine = document.querySelector("[data-chart-zero]");
+    const label = document.querySelector("[data-chart-label]");
+    if (!line || !area || !zeroLine || !label) return;
+    const values = [0, ...sessionStats.cumulativeProfit];
+    if (values.length === 1) {
+      line.setAttribute("points", "0,58 320,58");
+      area.setAttribute("d", "M0 58 L320 58 L320 58 L0 58 Z");
+      zeroLine.setAttribute("y1", "58");
+      zeroLine.setAttribute("y2", "58");
+      label.textContent = "No completed bets yet";
+      return;
+    }
+    const minimum = Math.min(0, ...values);
+    const maximum = Math.max(0, ...values);
+    const spread = Math.max(maximum - minimum, Math.abs(maximum || minimum) * .25, .00000001);
+    const chartMin = minimum - spread * .12;
+    const chartMax = maximum + spread * .12;
+    const xFor = (index) => (index / Math.max(1, values.length - 1)) * 320;
+    const yFor = (value) => 108 - ((value - chartMin) / (chartMax - chartMin)) * 100;
+    const points = values.map((value, index) => `${xFor(index).toFixed(1)},${yFor(value).toFixed(1)}`);
+    const zeroY = yFor(0).toFixed(1);
+    line.setAttribute("points", points.join(" "));
+    area.setAttribute("d", `M${points.join(" L")} L320,${zeroY} L0,${zeroY} Z`);
+    zeroLine.setAttribute("y1", zeroY);
+    zeroLine.setAttribute("y2", zeroY);
+    label.textContent = `${sessionStats.cumulativeProfit.length} completed ${sessionStats.cumulativeProfit.length === 1 ? "bet" : "bets"}`;
+  }
+
+  function renderSessionStats() {
+    const fields = {
+      profit: statAmount(sessionStats.profit),
+      wagered: statAmount(sessionStats.wagered),
+      wins: String(sessionStats.wins),
+      losses: String(sessionStats.losses),
+    };
+    Object.entries(fields).forEach(([name, value]) => {
+      const field = document.querySelector(`[data-stat="${name}"]`);
+      if (!field) return;
+      field.textContent = value;
+      if (name === "profit") {
+        field.classList.toggle("positive", sessionStats.profit > 0);
+        field.classList.toggle("negative", sessionStats.profit < 0);
+      }
+    });
+    renderStatsChart();
+  }
+
+  function recordCompletedRound(payout) {
+    if (!activeRound || activeRound.statsRecorded) return;
+    activeRound.statsRecorded = true;
+    const profit = payout - activeRound.amount;
+    sessionStats.wagered += activeRound.amount;
+    sessionStats.profit += profit;
+    if (profit >= 0) sessionStats.wins += 1;
+    else sessionStats.losses += 1;
+    sessionStats.cumulativeProfit.push(sessionStats.profit);
+    renderSessionStats();
+  }
+
+  function writeSettings() {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function applySetting(name) {
+    if (name === "turbo") minesGame.classList.toggle("turbo-mode", settings.turbo);
+    if (name === "swipe") minesGame.classList.toggle("swipe-mode", settings.swipe);
+    if (name === "mute") minesGame.dataset.muted = String(settings.mute);
+    const control = document.querySelector(`[data-game-setting="${name}"]`);
+    if (control) control.setAttribute("aria-checked", String(settings[name]));
+  }
+
+  function favoriteIds() {
+    const stored = readStoredJson(FAVORITES_KEY, []);
+    return new Set(Array.isArray(stored) ? stored.filter((value) => typeof value === "string") : []);
+  }
+
+  function renderFavorite() {
+    const selected = favoriteIds().has("mines");
+    favoriteButton.setAttribute("aria-pressed", String(selected));
+    favoriteButton.setAttribute("aria-label", selected ? "Remove Mines from favourites" : "Add Mines to favourites");
+  }
+
+  function toggleFavorite() {
+    const favorites = favoriteIds();
+    if (favorites.has("mines")) favorites.delete("mines");
+    else favorites.add("mines");
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]));
+    renderFavorite();
+  }
+
+  function closeToolPanels() {
+    toolPanels.forEach((panel) => { panel.hidden = true; });
+    toolButtons.forEach((button) => {
+      button.classList.remove("active");
+      button.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  function toggleToolPanel(name) {
+    const panel = document.querySelector(`[data-game-tool-panel="${name}"]`);
+    const button = document.querySelector(`[data-game-tool="${name}"]`);
+    if (!panel || !button) return;
+    const willOpen = panel.hidden;
+    closeToolPanels();
+    if (willOpen) {
+      panel.hidden = false;
+      button.classList.add("active");
+      button.setAttribute("aria-expanded", "true");
+    }
+  }
+
+  function tileFromPointer(event) {
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".mine-tile");
+    if (!target || !board.contains(target)) return;
+    const index = Number(target.dataset.index);
+    if (swipedTiles.has(index)) return;
+    swipedTiles.add(index);
+    handleTileClick(index, target);
   }
 
   async function runAutoplay() {
@@ -393,6 +564,9 @@
   updateBetDisplay();
   updateAutoSelectionDisplay();
   updateWagerAvailability();
+  Object.keys(settings).forEach(applySetting);
+  renderFavorite();
+  renderSessionStats();
 
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
@@ -427,6 +601,46 @@
     buildBoard();
     updateAutoSelectionDisplay();
   });
+
+  toolButtons.forEach((button) => button.addEventListener("click", () => toggleToolPanel(button.dataset.gameTool)));
+  favoriteButton.addEventListener("click", toggleFavorite);
+  document.querySelectorAll("[data-close-game-tool]").forEach((button) => button.addEventListener("click", closeToolPanels));
+  document.querySelectorAll("[data-game-setting]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const name = button.dataset.gameSetting;
+      settings[name] = !settings[name];
+      applySetting(name);
+      writeSettings();
+    });
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!gameTools.contains(event.target)) closeToolPanels();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeToolPanels();
+  });
+
+  board.addEventListener("pointerdown", (event) => {
+    if (!settings.swipe || (event.pointerType === "mouse" && event.button !== 0)) return;
+    swipePointerActive = true;
+    swipePointerId = event.pointerId;
+    swipedTiles.clear();
+    event.preventDefault();
+    tileFromPointer(event);
+  });
+  board.addEventListener("pointermove", (event) => {
+    if (!settings.swipe || !swipePointerActive || event.pointerId !== swipePointerId) return;
+    event.preventDefault();
+    tileFromPointer(event);
+  });
+  const finishSwipe = (event) => {
+    if (swipePointerId !== null && event.pointerId !== swipePointerId) return;
+    swipePointerActive = false;
+    swipePointerId = null;
+    swipedTiles.clear();
+  };
+  window.addEventListener("pointerup", finishSwipe);
+  window.addEventListener("pointercancel", finishSwipe);
 
   document.querySelectorAll("[data-mines-mode]").forEach((tab) => {
     tab.addEventListener("click", () => {

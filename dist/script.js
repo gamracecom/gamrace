@@ -10,6 +10,7 @@ const modeIcon = document.querySelector("#lobby-mode-icon");
 const emptyState = document.querySelector("#empty-state");
 const gameSections = document.querySelector("#game-sections");
 const carouselControls = [...document.querySelectorAll("[data-carousel-controls]")];
+const FAVORITES_KEY = "gamrace-favourites-v1";
 let currentFilter = "all";
 let currentMode = "house";
 let selectedPlayMode = "house";
@@ -64,8 +65,28 @@ function modeAllowsSection(sectionName) {
   return ["original", "slot", "live", "provider"].includes(sectionName);
 }
 
+function favoriteGameIds() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FAVORITES_KEY));
+    return new Set(Array.isArray(stored) ? stored : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function gameIdForCard(card) {
+  const href = card.getAttribute("href");
+  if (!href) return card.dataset.game || "";
+  try {
+    return new URL(href, window.location.href).searchParams.get("game") || card.dataset.game || "";
+  } catch {
+    return card.dataset.game || "";
+  }
+}
+
 function applyFilters() {
   const query = search.value.trim().toLowerCase();
+  const favorites = favoriteGameIds();
   let totalVisible = 0;
 
   updateBrowseLayout();
@@ -74,7 +95,8 @@ function applyFilters() {
     let visibleInSection = 0;
     const modeAllows = modeAllowsSection(section.dataset.section);
     section.querySelectorAll(".game-card").forEach((card) => {
-      const matchesCategory = currentFilter === "all" || card.classList.contains(currentFilter);
+      const matchesCategory = currentFilter === "all"
+        || (currentFilter === "favorite" ? favorites.has(gameIdForCard(card)) : card.classList.contains(currentFilter));
       const matchesQuery = !query || card.dataset.name.includes(query) || card.textContent.toLowerCase().includes(query);
       card.hidden = !(modeAllows && matchesCategory && matchesQuery);
       if (!card.hidden) visibleInSection += 1;
@@ -170,6 +192,9 @@ document.querySelectorAll(".view-all-button").forEach((button) => {
 });
 
 search.addEventListener("input", applyFilters);
+window.addEventListener("storage", (event) => {
+  if (event.key === FAVORITES_KEY) applyFilters();
+});
 
 document.querySelectorAll(".nav-link").forEach((link) => {
   link.addEventListener("click", (event) => {

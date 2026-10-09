@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=wallet-balances-1" />
+    <link rel="stylesheet" href="styles.css?v=mines-tools-1" />
   </head>
   <body class="game-page" data-authenticated="false">
     <div class="app-shell">
@@ -92,9 +92,57 @@
               </section>
 
               <footer class="mines-stage-footer">
-                <div aria-label="Game tools"><span>[1]</span><span>[2]</span><span>[3]</span><span>[4]</span><span>[5]</span></div>
+                <div class="game-tools" data-game-tools aria-label="Game tools">
+                  <button class="game-tool-button" type="button" data-game-tool="settings" aria-label="Game settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-game-favorite="mines" aria-label="Add Mines to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-game-tool="stats" aria-label="Session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-game-tool="info" aria-label="Game information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
+
+                  <section class="game-tool-panel settings-panel" data-game-tool-panel="settings" aria-label="Game settings" hidden>
+                    <header><div><strong>Game settings</strong><span>Choose how Mines plays</span></div><button type="button" data-close-game-tool aria-label="Close settings">×</button></header>
+                    <button class="game-setting-row" type="button" role="switch" aria-checked="false" data-game-setting="turbo">
+                      <span><strong>Turbo mode</strong><small>Reveal gems instantly with no animation</small></span><i aria-hidden="true"></i>
+                    </button>
+                    <button class="game-setting-row" type="button" role="switch" aria-checked="false" data-game-setting="swipe">
+                      <span><strong>Swipe mode</strong><small>Hold and swipe across tiles to reveal them</small></span><i aria-hidden="true"></i>
+                    </button>
+                    <button class="game-setting-row" type="button" role="switch" aria-checked="false" data-game-setting="mute">
+                      <span><strong>Mute</strong><small>Turn off game sounds</small></span><i aria-hidden="true"></i>
+                    </button>
+                  </section>
+
+                  <section class="game-tool-panel stats-panel" data-game-tool-panel="stats" aria-label="Session statistics" hidden>
+                    <header><div><strong>Session statistics</strong><span>Resets when this page closes</span></div><button type="button" data-close-game-tool aria-label="Close statistics">×</button></header>
+                    <div class="game-stats-grid">
+                      <article><span>Profit</span><strong data-stat="profit">0.00</strong></article>
+                      <article><span>Wins</span><strong data-stat="wins">0</strong></article>
+                      <article><span>Wagered</span><strong data-stat="wagered">0.00</strong></article>
+                      <article><span>Losses</span><strong data-stat="losses">0</strong></article>
+                    </div>
+                    <div class="game-stats-chart" aria-label="Cumulative profit chart">
+                      <div><span>Bet performance</span><small data-chart-label>No completed bets yet</small></div>
+                      <svg viewBox="0 0 320 116" role="img" aria-label="Cumulative profit over completed bets" preserveAspectRatio="none">
+                        <line x1="0" y1="58" x2="320" y2="58" data-chart-zero></line>
+                        <path d="M0 58 L320 58" data-chart-area></path>
+                        <polyline points="0,58 320,58" data-chart-line></polyline>
+                      </svg>
+                    </div>
+                  </section>
+
+                  <section class="game-tool-panel info-panel" data-game-tool-panel="info" aria-label="Mines information" hidden>
+                    <header><div><strong>Mines</strong><span>Game information</span></div><button type="button" data-close-game-tool aria-label="Close game information">×</button></header>
+                    <p>Pick tiles to reveal gems. Cash out before you uncover a mine.</p>
+                    <dl>
+                      <div><dt>Maximum win</dt><dd>24.75×</dd></div>
+                      <div><dt>Minimum bet</dt><dd>0.01</dd></div>
+                      <div><dt>Return to player</dt><dd>99%</dd></div>
+                      <div><dt>Board</dt><dd>25 tiles</dd></div>
+                      <div><dt>Mines</dt><dd>1–24</dd></div>
+                    </dl>
+                  </section>
+                </div>
                 <span>GamRace</span>
-                <span class="fairness-label">Fair Play [6]</span>
+                <button class="fairness-label" type="button">Fair Play</button>
               </footer>
             </div>
 
@@ -132,7 +180,7 @@
       <button class="mobile-tab-action" type="button" data-mobile-action="rewards"><img class="mobile-tab-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" /><strong>Rewards</strong></button>
       <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" aria-hidden="true" /><strong>Chat</strong></button>
     </nav>
-    <script src="mines.js?v=wallet-balances-1" defer></script>
+    <script src="mines.js?v=mines-tools-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=wallet-transactions-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
