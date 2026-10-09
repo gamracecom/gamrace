@@ -10,7 +10,7 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=lobby-toolbar-2" />
+    <link rel="stylesheet" href="styles.css?v=account-menu-1" />
   </head>
   <body data-authenticated="false">
     <div class="app-shell">
@@ -50,7 +50,11 @@
               <button class="auth login" type="button">Sign In</button>
               <button class="auth register" type="button">Sign Up</button>
             </div>
-            <button class="profile-action" type="button" aria-label="Profile"><span aria-hidden="true">[20]</span><span class="profile-label">Profile</span></button>
+            <button class="profile-action" type="button" aria-label="Open account menu" aria-expanded="false">
+              <span class="profile-rank-mark" aria-hidden="true"><span class="profile-rank-fallback">R</span><img class="profile-rank-image" alt="" /></span>
+              <span class="profile-label">Account</span>
+              <span class="profile-caret" aria-hidden="true">⌄</span>
+            </button>
           </div>
         </header>
 
@@ -296,8 +300,8 @@
 
     <script src="script.js?v=favourites-1"></script>
     <script src="mobile-nav.js?v=navigation-icons-1"></script>
-    <script type="module" src="firebase-auth.js?v=wallet-transactions-1"></script>
+    <script type="module" src="firebase-auth.js?v=account-menu-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=wallet-addresses-3"></script>
+    <script type="module" src="wallet.js?v=account-wallet-1"></script>
   </body>
 </html>

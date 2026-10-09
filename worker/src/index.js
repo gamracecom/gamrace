@@ -232,6 +232,11 @@ async function handleGetAdminSession(request, env, user) {
   });
 }
 
+function handleAdminAccess(request, env, user) {
+  requireOwner(user, env);
+  return json(request, env, 200, { owner: true });
+}
+
 async function nowPayments(env, path, options = {}) {
   if (!env.NOWPAYMENTS_API_KEY) throw httpError(503, "Wallet payments are not configured yet");
   const url = new URL(`${String(env.NOWPAYMENTS_API_BASE || "https://api.nowpayments.io/v1").replace(/\/$/, "")}${path}`);
@@ -1044,6 +1049,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/ipn/deposit") return handleDepositIpn(request, env);
 
   const user = await requireUser(request, env);
+  if (request.method === "GET" && path === "/admin/access") return handleAdminAccess(request, env, user);
   if (request.method === "POST" && path === "/admin/session") return handleCreateAdminSession(request, env, user);
   if (request.method === "GET" && path === "/admin/session") return handleGetAdminSession(request, env, user);
   if (request.method === "GET" && path === "/admin/overview") return handleAdminOverview(request, env, user);

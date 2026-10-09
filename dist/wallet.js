@@ -28,6 +28,7 @@ const balanceButtons = [...document.querySelectorAll(".utility.balance")];
 
 let currentUser = null;
 let walletSnapshot = null;
+let walletActivity = [];
 let currencies = [];
 let activeDepositId = null;
 let activeDepositCurrency = null;
@@ -69,6 +70,7 @@ function createWalletDialog() {
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="withdraw">Withdraw</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy"><span class="wallet-tab-desktop">Buy Crypto</span><span class="wallet-tab-mobile">Buy</span></button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="tip"><span class="wallet-tab-desktop">Tip User</span><span class="wallet-tab-mobile">Tip</span></button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="transactions"><span class="wallet-tab-desktop">Transactions</span><span class="wallet-tab-mobile">History</span></button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="vault">Vault</button>
       </div>
       <div class="wallet-body">
@@ -109,8 +111,16 @@ function createWalletDialog() {
         <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="tip" hidden>
           <span class="wallet-placeholder-icon" aria-hidden="true">↗</span><h3>Tip User</h3><p>This section is reserved for player-to-player tips.</p>
         </section>
-        <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="vault" hidden>
-          <span class="wallet-placeholder-icon" aria-hidden="true">◇</span><h3>Vault</h3><p>This section is reserved for protected balances.</p>
+        <section class="wallet-panel" data-wallet-panel="transactions" hidden>
+          <div class="wallet-transaction-filters" aria-label="Transaction filters">
+            <button class="active" type="button" data-wallet-transaction-filter="all">All</button><button type="button" data-wallet-transaction-filter="deposit">Deposits</button><button type="button" data-wallet-transaction-filter="withdrawal">Withdrawals</button><button type="button" data-wallet-transaction-filter="tip">Tips</button><button type="button" data-wallet-transaction-filter="purchase">Purchases</button><button type="button" data-wallet-transaction-filter="bonus">Bonuses</button>
+          </div>
+          <div class="wallet-transaction-list" data-wallet-transaction-list></div>
+        </section>
+        <section class="wallet-panel wallet-vault-panel" data-wallet-panel="vault" hidden>
+          <div class="wallet-vault-balances"><article><span>Main balance</span><strong data-vault-main-balance>$0.00</strong></article><article><span>Vault balance</span><strong>$0.00</strong></article></div>
+          <div class="wallet-vault-actions"><button type="button" disabled>Move funds into vault</button><button type="button" disabled>Move funds out of vault</button></div>
+          <p>Funds kept in the vault cannot be wagered until they are moved back to the main balance. Transfers will activate when the secure vault ledger is connected.</p>
         </section>
 
         <p class="wallet-status" role="status" aria-live="polite"></p>
@@ -141,6 +151,9 @@ function createWalletDialog() {
     copyAddress: overlay.querySelector("[data-copy-address]"),
     copyMemo: overlay.querySelector("[data-copy-memo]"),
     transactionLinks: [...overlay.querySelectorAll("[data-open-transactions]")],
+    transactionFilters: [...overlay.querySelectorAll("[data-wallet-transaction-filter]")],
+    transactionList: overlay.querySelector("[data-wallet-transaction-list]"),
+    vaultMainBalance: overlay.querySelector("[data-vault-main-balance]"),
     status: overlay.querySelector(".wallet-status"),
   };
 }
@@ -422,7 +435,28 @@ function refreshControls() {
 async function loadWallet() {
   const result = await api("/wallet");
   walletSnapshot = result.wallet;
+  walletActivity = result.activity || [];
   if (currencies.length) refreshControls();
+}
+
+function renderWalletTransactions(filter = "all") {
+  dialog.transactionFilters.forEach((button) => button.classList.toggle("active", button.dataset.walletTransactionFilter === filter));
+  const rows = walletActivity.filter((item) => filter === "all" || item.type === filter);
+  dialog.transactionList.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "wallet-transaction-empty";
+    empty.innerHTML = "<strong>No transactions yet</strong><span>Your wallet activity will appear here.</span>";
+    dialog.transactionList.append(empty);
+    return;
+  }
+  rows.forEach((item) => {
+    const row = document.createElement("article");
+    row.className = "wallet-activity-row";
+    const asset = assetFor(item.currency);
+    row.innerHTML = `<img class="wallet-activity-icon" src="${iconUrl(asset || item.currency)}" alt="" /><div><strong>${item.type === "withdrawal" ? "Withdrawal" : item.type === "deposit" ? "Deposit" : "Wallet activity"}</strong><span>${asset?.symbol || String(item.currency || "").toUpperCase()} · ${String(item.status || "Pending").replaceAll("_", " ")}</span></div><strong>${item.type === "withdrawal" ? "−" : "+"}${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}</strong>`;
+    dialog.transactionList.append(row);
+  });
 }
 
 async function loadCurrencies() {
@@ -451,6 +485,7 @@ function selectTab(name) {
   if (name === "deposit" && !dialog.overlay.hidden && currencies.length) {
     ensureDepositAddress(dialog.depositSelect.value).catch((error) => setStatus(error.message, "error"));
   }
+  if (name === "transactions") renderWalletTransactions("all");
 }
 
 async function openWallet(defaultTab = "deposit") {
@@ -675,10 +710,8 @@ dialog.copyMemo.addEventListener("click", () => copyText(dialog.depositMemo.text
 dialog.depositRetry.addEventListener("click", () => {
   ensureDepositAddress(dialog.depositSelect.value, true).catch((error) => setStatus(error.message, "error"));
 });
-dialog.transactionLinks.forEach((button) => button.addEventListener("click", () => {
-  closeWallet();
-  window.dispatchEvent(new CustomEvent("gamrace:open-transactions"));
-}));
+dialog.transactionLinks.forEach((button) => button.addEventListener("click", () => selectTab("transactions")));
+dialog.transactionFilters.forEach((button) => button.addEventListener("click", () => renderWalletTransactions(button.dataset.walletTransactionFilter)));
 
 dialog.depositSelect.addEventListener("change", async () => {
   updateAssetControl("deposit");
