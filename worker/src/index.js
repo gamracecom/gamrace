@@ -14,6 +14,7 @@ import {
   signaturesMatch,
 } from "./core.js";
 import { DEFAULT_WALLET_ASSET, WALLET_ASSETS, getWalletAsset, requireWalletAsset } from "./assets.js";
+import { createAdminSessionToken, verifyAdminPassword, verifyAdminSessionToken } from "./admin-auth.js";
 
 let firebaseKeys;
 let firebaseKeysExpiresAt = 0;
@@ -40,7 +41,7 @@ function allowedOrigins(env) {
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");
   const headers = {
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Request-Id",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Request-Id, X-Admin-Session",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Cache-Control": "no-store",
     "Content-Type": "application/json; charset=utf-8",
@@ -140,6 +141,95 @@ async function requireUser(request, env) {
 function requireOwner(user, env) {
   if (!env.OWNER_FIREBASE_UID) throw httpError(503, "Owner access has not been configured");
   if (user.sub !== env.OWNER_FIREBASE_UID) throw httpError(403, "Owner access is required");
+}
+
+function adminSessionSecret(env) {
+  if (!env.ADMIN_PANEL_PASSWORD || String(env.ADMIN_PANEL_PASSWORD).length < 12) {
+    throw httpError(503, "Admin password has not been configured", "ADMIN_NOT_CONFIGURED");
+  }
+  return env.ADMIN_PANEL_PASSWORD;
+}
+
+async function requireAdminSession(request, env, user) {
+  requireOwner(user, env);
+  const token = request.headers.get("X-Admin-Session") || "";
+  const session = await verifyAdminSessionToken(token, {
+    uid: user.sub,
+    secret: adminSessionSecret(env),
+    version: env.ADMIN_SESSION_VERSION || "1",
+  });
+  if (!session) throw httpError(401, "Your admin session has expired. Enter your admin password again.", "ADMIN_SESSION_EXPIRED");
+  return session;
+}
+
+function sessionTtlMs(env) {
+  const configuredMinutes = envNumber(env, "ADMIN_SESSION_TTL_MINUTES", 240);
+  const minutes = Math.min(720, Math.max(15, configuredMinutes));
+  return minutes * 60 * 1000;
+}
+
+async function writeAdminAudit(env, user, eventType, targetId = null, detail = null) {
+  try {
+    await env.DB.prepare(`
+      INSERT INTO admin_audit_log(id, uid, event_type, target_id, detail, created_at)
+      VALUES(?, ?, ?, ?, ?, ?)
+    `).bind(
+      crypto.randomUUID(),
+      user.sub,
+      String(eventType).slice(0, 80),
+      targetId ? String(targetId).slice(0, 160) : null,
+      detail ? String(detail).slice(0, 500) : null,
+      now(),
+    ).run();
+  } catch (error) {
+    console.error("Admin audit write failed", { eventType, message: error?.message });
+  }
+}
+
+async function handleCreateAdminSession(request, env, user) {
+  requireOwner(user, env);
+  const configuredPassword = adminSessionSecret(env);
+  const attempt = await env.DB.prepare("SELECT failed_count, blocked_until FROM admin_login_attempts WHERE uid = ?").bind(user.sub).first();
+  const timestamp = now();
+  if (Number(attempt?.blocked_until || 0) > timestamp) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((Number(attempt.blocked_until) - timestamp) / 1000));
+    throw httpError(429, `Too many attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute${retryAfterSeconds > 60 ? "s" : ""}.`, "ADMIN_RATE_LIMITED");
+  }
+  const body = await requestJson(request);
+  const valid = await verifyAdminPassword(body.password, configuredPassword);
+  if (!valid) {
+    const failedCount = Number(attempt?.failed_count || 0) + 1;
+    const blockedUntil = failedCount >= 5 ? timestamp + 15 * 60 * 1000 : 0;
+    await env.DB.prepare(`
+      INSERT INTO admin_login_attempts(uid, failed_count, blocked_until, updated_at)
+      VALUES(?, ?, ?, ?)
+      ON CONFLICT(uid) DO UPDATE SET failed_count = excluded.failed_count,
+        blocked_until = excluded.blocked_until, updated_at = excluded.updated_at
+    `).bind(user.sub, failedCount >= 5 ? 0 : failedCount, blockedUntil, timestamp).run();
+    await writeAdminAudit(env, user, "admin.login.failed");
+    throw httpError(401, "That admin password is not correct", "ADMIN_PASSWORD_INVALID");
+  }
+  await env.DB.prepare("DELETE FROM admin_login_attempts WHERE uid = ?").bind(user.sub).run();
+  const session = await createAdminSessionToken({
+    uid: user.sub,
+    secret: configuredPassword,
+    ttlMs: sessionTtlMs(env),
+    version: env.ADMIN_SESSION_VERSION || "1",
+  });
+  await writeAdminAudit(env, user, "admin.login.succeeded");
+  return json(request, env, 201, {
+    session,
+    owner: { uid: user.sub, email: user.email || null, name: user.name || user.email || "Owner" },
+  });
+}
+
+async function handleGetAdminSession(request, env, user) {
+  const session = await requireAdminSession(request, env, user);
+  return json(request, env, 200, {
+    valid: true,
+    expiresAt: new Date(session.exp * 1000).toISOString(),
+    owner: { uid: user.sub, email: user.email || null, name: user.name || user.email || "Owner" },
+  });
 }
 
 async function nowPayments(env, path, options = {}) {
@@ -686,8 +776,209 @@ async function handleGetWithdrawal(request, env, user, withdrawalId) {
   return json(request, env, 200, { withdrawal: withdrawalResponse(withdrawal) });
 }
 
+function adminAssetAmount(row, field = "amount_units") {
+  try {
+    return assetUnitsToString(Number(row?.[field] || 0), false);
+  } catch {
+    return "0.00000000";
+  }
+}
+
+async function handleAdminOverview(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const timestamp = now();
+  const dayStart = timestamp - 24 * 60 * 60 * 1000;
+  const weekStart = timestamp - 7 * 24 * 60 * 60 * 1000;
+  const [summary, balances, recent, daily] = await Promise.all([
+    env.DB.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM wallet_preferences) AS total_users,
+        (SELECT COUNT(*) FROM crypto_deposits WHERE credited = 1) AS completed_deposits,
+        (SELECT COUNT(*) FROM crypto_deposits WHERE credited = 1 AND updated_at >= ?) AS deposits_24h,
+        (SELECT COUNT(*) FROM crypto_withdrawals WHERE created_at >= ?) AS withdrawals_24h,
+        (SELECT COUNT(*) FROM crypto_withdrawals WHERE status = 'pending_review') AS pending_withdrawals,
+        (SELECT COUNT(*) FROM crypto_withdrawals WHERE status IN ('failed', 'rejected') AND updated_at >= ?) AS flagged_24h
+    `).bind(dayStart, dayStart, dayStart).first(),
+    env.DB.prepare(`
+      SELECT currency,
+             SUM(available_units) AS available_units,
+             SUM(held_units) AS held_units,
+             SUM(lifetime_deposited_units) AS deposited_units,
+             COUNT(*) AS holders
+      FROM crypto_balances
+      GROUP BY currency
+      ORDER BY deposited_units DESC, currency ASC
+    `).all(),
+    env.DB.prepare(`
+      SELECT * FROM (
+        SELECT 'deposit' AS type, payment_id AS id, uid, pay_currency AS currency,
+               pay_amount AS amount, status, updated_at AS occurred_at
+        FROM crypto_deposits
+        UNION ALL
+        SELECT 'withdrawal' AS type, id, uid, payout_currency AS currency,
+               payout_amount AS amount, status, updated_at AS occurred_at
+        FROM crypto_withdrawals
+      ) activity
+      ORDER BY occurred_at DESC LIMIT 12
+    `).all(),
+    env.DB.prepare(`
+      SELECT day, SUM(deposit_count) AS deposits, SUM(withdrawal_count) AS withdrawals FROM (
+        SELECT strftime('%Y-%m-%d', updated_at / 1000, 'unixepoch') AS day,
+               COUNT(*) AS deposit_count, 0 AS withdrawal_count
+        FROM crypto_deposits WHERE updated_at >= ? GROUP BY day
+        UNION ALL
+        SELECT strftime('%Y-%m-%d', updated_at / 1000, 'unixepoch') AS day,
+               0 AS deposit_count, COUNT(*) AS withdrawal_count
+        FROM crypto_withdrawals WHERE updated_at >= ? GROUP BY day
+      ) GROUP BY day ORDER BY day ASC
+    `).bind(weekStart, weekStart).all(),
+  ]);
+  return json(request, env, 200, {
+    generatedAt: new Date(timestamp).toISOString(),
+    summary: {
+      totalUsers: Number(summary?.total_users || 0),
+      completedDeposits: Number(summary?.completed_deposits || 0),
+      deposits24h: Number(summary?.deposits_24h || 0),
+      withdrawals24h: Number(summary?.withdrawals_24h || 0),
+      pendingWithdrawals: Number(summary?.pending_withdrawals || 0),
+      flagged24h: Number(summary?.flagged_24h || 0),
+    },
+    balances: (balances.results || []).map((row) => ({
+      currency: row.currency,
+      available: adminAssetAmount(row, "available_units"),
+      held: adminAssetAmount(row, "held_units"),
+      lifetimeDeposited: adminAssetAmount(row, "deposited_units"),
+      holders: Number(row.holders || 0),
+    })),
+    recentActivity: (recent.results || []).map((row) => ({
+      type: row.type,
+      id: row.id,
+      uid: row.uid,
+      currency: row.currency,
+      amount: String(row.amount || "0"),
+      status: row.status,
+      occurredAt: new Date(Number(row.occurred_at)).toISOString(),
+    })),
+    dailyActivity: (daily.results || []).map((row) => ({
+      day: row.day,
+      deposits: Number(row.deposits || 0),
+      withdrawals: Number(row.withdrawals || 0),
+    })),
+  });
+}
+
+async function handleAdminUsers(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const url = new URL(request.url);
+  const query = String(url.searchParams.get("query") || "").trim().slice(0, 64);
+  const limit = Math.min(100, Math.max(10, Number(url.searchParams.get("limit") || 50)));
+  const result = query
+    ? await env.DB.prepare(`
+        SELECT p.uid, p.selected_currency, p.updated_at,
+               COALESCE(SUM(b.available_units), 0) AS available_units,
+               COALESCE(SUM(b.held_units), 0) AS held_units,
+               COUNT(b.currency) AS asset_count,
+               MAX(b.updated_at) AS balance_updated_at
+        FROM wallet_preferences p LEFT JOIN crypto_balances b ON b.uid = p.uid
+        WHERE p.uid LIKE ? GROUP BY p.uid ORDER BY COALESCE(MAX(b.updated_at), p.updated_at) DESC LIMIT ?
+      `).bind(`%${query}%`, limit).all()
+    : await env.DB.prepare(`
+        SELECT p.uid, p.selected_currency, p.updated_at,
+               COALESCE(SUM(b.available_units), 0) AS available_units,
+               COALESCE(SUM(b.held_units), 0) AS held_units,
+               COUNT(b.currency) AS asset_count,
+               MAX(b.updated_at) AS balance_updated_at
+        FROM wallet_preferences p LEFT JOIN crypto_balances b ON b.uid = p.uid
+        GROUP BY p.uid ORDER BY COALESCE(MAX(b.updated_at), p.updated_at) DESC LIMIT ?
+      `).bind(limit).all();
+  return json(request, env, 200, {
+    users: (result.results || []).map((row) => ({
+      uid: row.uid,
+      selectedCurrency: row.selected_currency,
+      assetCount: Number(row.asset_count || 0),
+      lastWalletActivity: new Date(Number(row.balance_updated_at || row.updated_at || 0)).toISOString(),
+    })),
+  });
+}
+
+async function handleAdminDeposits(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const url = new URL(request.url);
+  const allowedStatuses = new Set(["all", "waiting", "confirming", "confirmed", "sending", "finished", "failed", "refunded", "expired"]);
+  const status = allowedStatuses.has(url.searchParams.get("status")) ? url.searchParams.get("status") : "all";
+  const limit = Math.min(100, Math.max(10, Number(url.searchParams.get("limit") || 50)));
+  const result = status === "all"
+    ? await env.DB.prepare(`
+        SELECT payment_id, uid, status, requested_usd_cents, pay_amount, pay_currency,
+               network, credited, created_at, updated_at FROM crypto_deposits
+        ORDER BY created_at DESC LIMIT ?
+      `).bind(limit).all()
+    : await env.DB.prepare(`
+        SELECT payment_id, uid, status, requested_usd_cents, pay_amount, pay_currency,
+               network, credited, created_at, updated_at FROM crypto_deposits
+        WHERE status = ? ORDER BY created_at DESC LIMIT ?
+      `).bind(status, limit).all();
+  return json(request, env, 200, {
+    deposits: (result.results || []).map((row) => ({
+      id: row.payment_id,
+      uid: row.uid,
+      status: row.status,
+      requestedUsdCents: Number(row.requested_usd_cents || 0),
+      payAmount: String(row.pay_amount || "0"),
+      payCurrency: row.pay_currency,
+      network: row.network || null,
+      credited: Boolean(row.credited),
+      createdAt: new Date(Number(row.created_at)).toISOString(),
+      updatedAt: new Date(Number(row.updated_at)).toISOString(),
+    })),
+  });
+}
+
+async function handleAdminAudit(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const result = await env.DB.prepare(`
+    SELECT id, uid, event_type, target_id, detail, created_at
+    FROM admin_audit_log ORDER BY created_at DESC LIMIT 100
+  `).all();
+  return json(request, env, 200, {
+    events: (result.results || []).map((row) => ({
+      id: row.id,
+      uid: row.uid,
+      type: row.event_type,
+      targetId: row.target_id || null,
+      detail: row.detail || null,
+      createdAt: new Date(Number(row.created_at)).toISOString(),
+    })),
+  });
+}
+
+async function handleAdminSystem(request, env, user) {
+  const session = await requireAdminSession(request, env, user);
+  return json(request, env, 200, {
+    environment: "production",
+    walletMode: "live",
+    sessionExpiresAt: new Date(session.exp * 1000).toISOString(),
+    services: [
+      { id: "identity", label: "Firebase identity", status: env.FIREBASE_PROJECT_ID ? "operational" : "attention" },
+      { id: "database", label: "Wallet database", status: env.DB ? "operational" : "attention" },
+      { id: "payments", label: "Crypto payments", status: env.NOWPAYMENTS_API_KEY ? "operational" : "paused" },
+      { id: "owner", label: "Owner access", status: env.OWNER_FIREBASE_UID ? "operational" : "attention" },
+      { id: "admin-password", label: "Admin password", status: env.ADMIN_PANEL_PASSWORD ? "operational" : "attention" },
+    ],
+    capabilities: {
+      deposits: Boolean(env.NOWPAYMENTS_API_KEY),
+      withdrawals: true,
+      withdrawalReview: true,
+      multiAssetBalances: true,
+      playerProfiles: false,
+      gameManagement: false,
+      promotions: false,
+    },
+  });
+}
+
 async function handleAdminWithdrawals(request, env, user) {
-  requireOwner(user, env);
+  await requireAdminSession(request, env, user);
   const result = await env.DB.prepare(`
     SELECT id, uid, status, hold_state, requested_units, payout_amount, payout_currency,
            address, extra_id, provider_reference, review_note, created_at, updated_at
@@ -714,7 +1005,7 @@ async function handleAdminWithdrawals(request, env, user) {
 }
 
 async function handleAdminWithdrawalDecision(request, env, user, withdrawalId, decision) {
-  requireOwner(user, env);
+  await requireAdminSession(request, env, user);
   const body = await requestJson(request);
   const current = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ?").bind(withdrawalId).first();
   if (!current) throw httpError(404, "Withdrawal not found");
@@ -738,6 +1029,7 @@ async function handleAdminWithdrawalDecision(request, env, user, withdrawalId, d
     `).bind(note, timestamp, withdrawalId).run();
   }
   const updated = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ?").bind(withdrawalId).first();
+  await writeAdminAudit(env, user, `withdrawal.${decision === "complete" ? "completed" : "rejected"}`, withdrawalId, String(body.note || "") || null);
   return json(request, env, 200, { withdrawal: withdrawalResponse(updated) });
 }
 
@@ -752,6 +1044,13 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/ipn/deposit") return handleDepositIpn(request, env);
 
   const user = await requireUser(request, env);
+  if (request.method === "POST" && path === "/admin/session") return handleCreateAdminSession(request, env, user);
+  if (request.method === "GET" && path === "/admin/session") return handleGetAdminSession(request, env, user);
+  if (request.method === "GET" && path === "/admin/overview") return handleAdminOverview(request, env, user);
+  if (request.method === "GET" && path === "/admin/users") return handleAdminUsers(request, env, user);
+  if (request.method === "GET" && path === "/admin/deposits") return handleAdminDeposits(request, env, user);
+  if (request.method === "GET" && path === "/admin/audit") return handleAdminAudit(request, env, user);
+  if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/currencies") return handleCurrencies(request, env);
@@ -772,6 +1071,7 @@ async function route(request, env) {
 
 function publicError(error) {
   const status = Number(error?.httpStatus || 500);
+  if (error?.code === "ADMIN_NOT_CONFIGURED") return error.message;
   if (status >= 500) return "The wallet service could not complete that request";
   return error?.message || "The wallet service could not complete that request";
 }

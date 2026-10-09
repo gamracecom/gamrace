@@ -270,6 +270,26 @@ CREATE TABLE IF NOT EXISTS crypto_ledger (
 
 CREATE INDEX IF NOT EXISTS crypto_ledger_uid_created_idx ON crypto_ledger(uid, created_at DESC);
 
+-- Owner-only admin control plane. Passwords and session tokens are never stored
+-- in D1; only throttling and an immutable activity trail are persisted here.
+CREATE TABLE IF NOT EXISTS admin_login_attempts (
+  uid TEXT PRIMARY KEY,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  blocked_until INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id TEXT PRIMARY KEY,
+  uid TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  target_id TEXT,
+  detail TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit_log(created_at DESC);
+
 CREATE TRIGGER IF NOT EXISTS credit_finished_crypto_deposit_after_insert
 AFTER INSERT ON crypto_deposits
 WHEN NEW.status = 'finished' AND NEW.credited = 0 AND NEW.credit_units > 0
