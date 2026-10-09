@@ -81,21 +81,23 @@
           </div>
         </section>
 
-        <nav class="lobby-category-nav" aria-label="Browse games">
-          <button class="category active" type="button" data-filter="all" aria-pressed="true">Lobby</button>
-          <button class="category" type="button" data-filter="favorite" aria-pressed="false">Favorites</button>
-          <button class="category" type="button" data-filter="live" aria-pressed="false">Live Games</button>
-          <button class="category" type="button" data-filter="slot" aria-pressed="false">Slots</button>
-          <button class="category" type="button" data-filter="original" aria-pressed="false">Originals</button>
-          <button class="category" type="button" data-filter="exclusive" aria-pressed="false">Exclusive</button>
-          <button class="category" type="button" data-filter="provider" aria-pressed="false">Providers</button>
-        </nav>
+        <div class="lobby-toolbar">
+          <nav class="lobby-category-nav" aria-label="Browse games">
+            <button class="category active" type="button" data-filter="all" aria-pressed="true">Lobby</button>
+            <button class="category" type="button" data-filter="favorite" aria-pressed="false">Favorites</button>
+            <button class="category" type="button" data-filter="live" aria-pressed="false">Live Games</button>
+            <button class="category" type="button" data-filter="slot" aria-pressed="false">Slots</button>
+            <button class="category" type="button" data-filter="original" aria-pressed="false">Originals</button>
+            <button class="category" type="button" data-filter="exclusive" aria-pressed="false">Exclusive</button>
+            <button class="category" type="button" data-filter="provider" aria-pressed="false">Providers</button>
+          </nav>
 
-        <label class="search-box">
-          <img class="search-icon" src="assets/icons/navigation/search.png" alt="" aria-hidden="true" />
-          <span class="sr-only">Search games</span>
-          <input id="game-search" type="search" placeholder="Search games, providers or categories..." autocomplete="off" />
-        </label>
+          <label class="search-box">
+            <img class="search-icon" src="assets/icons/navigation/search.png" alt="" aria-hidden="true" />
+            <span class="sr-only">Search games</span>
+            <input id="game-search" type="search" placeholder="Search games, providers or categories..." autocomplete="off" />
+          </label>
+        </div>
 
         <div id="game-sections">
           <section class="game-section" id="originals" data-section="original">
