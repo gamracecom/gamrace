@@ -233,9 +233,9 @@ body.modal-open { overflow: hidden; }
 .profile-current-name { display: block; color: #f4fbff; font-size: 1.1rem; }
 .profile-email { display: block; margin-top: 5px; color: #8fa7b9; font-size: .82rem; }
 .rank-card { margin-top: 16px; padding: 18px; border: 1px solid #18394e; border-radius: 12px; background: #061621; }
-.rank-card-heading { display: grid; grid-template-columns: 68px minmax(0, 1fr); align-items: center; gap: 8px 15px; }
-.rank-badge { position: relative; width: 68px; height: 68px; display: grid; grid-row: 1 / span 2; place-items: center; overflow: visible; border: 1px solid #1f5975; border-radius: 15px; background: #0a2230; }
-.rank-badge-image { position: absolute; inset: 5px; width: calc(100% - 10px); height: calc(100% - 10px); object-fit: contain; opacity: 0; }
+.rank-card-heading { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 8px 15px; }
+.rank-badge { position: relative; width: 76px; height: 76px; display: grid; grid-row: 1 / span 2; place-items: center; overflow: visible; border: 0; background: transparent; }
+.rank-badge-image { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); object-fit: contain; opacity: 0; }
 .rank-badge.has-image .rank-badge-image { opacity: 1; }
 .rank-badge.has-image .rank-badge-fallback { opacity: 0; }
 .rank-badge-fallback { color: #66ddff; font-size: 1.45rem; font-weight: 900; letter-spacing: -.05em; }
@@ -263,9 +263,9 @@ body.modal-open { overflow: hidden; }
 .profile-status[data-state="success"] { color: #69e0ff; }
 
 /* GamRace account menu and profile workspace */
-.profile-rank-mark, .menu-rank-badge { position: relative; display: grid; place-items: center; overflow: visible; border: 1px solid #24516a; background: #0a2432; color: #6fdcff; font-weight: 900; }
-.profile-rank-mark { width: 29px; height: 29px; flex: 0 0 29px; border-radius: 8px; font-size: .72rem; }
-.profile-rank-image, .menu-rank-image { position: absolute; width: calc(100% - 4px); height: calc(100% - 4px); object-fit: contain; opacity: 0; }
+.profile-rank-mark, .menu-rank-badge { position: relative; display: grid; place-items: center; overflow: visible; border: 0; background: transparent; color: #6fdcff; font-weight: 900; }
+.profile-rank-mark { width: 34px; height: 34px; flex: 0 0 34px; font-size: .72rem; }
+.profile-rank-image, .menu-rank-image { position: absolute; width: 112%; height: 112%; object-fit: contain; opacity: 0; }
 .profile-rank-mark.has-image .profile-rank-image, .menu-rank-badge.has-image .menu-rank-image { opacity: 1; }
 .profile-rank-mark.has-image .profile-rank-fallback, .menu-rank-badge.has-image .menu-rank-fallback { opacity: 0; }
 .profile-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -274,7 +274,7 @@ body.modal-open { overflow: hidden; }
 .account-menu[hidden] { display: none; }
 .account-menu-rank { padding: 14px; border-bottom: 1px solid #173447; background: #081925; }
 .menu-rank-heading { display: flex; align-items: center; gap: 13px; }
-.menu-rank-badge { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 9px; font-size: .9rem; }
+.menu-rank-badge { width: 50px; height: 50px; flex: 0 0 50px; font-size: .9rem; }
 .menu-rank-tier { position: absolute; right: -5px; bottom: -5px; min-width: 22px; height: 19px; display: grid; place-items: center; padding: 0 4px; border: 1px solid #2c6380; border-radius: 5px; background: #07151f; color: #fff; font-size: .55rem; }
 .menu-rank-heading > span:last-child { min-width: 0; display: grid; gap: 2px; }
 .menu-rank-heading small { color: #4cccf7; font-size: .56rem; font-weight: 900; letter-spacing: .14em; }
@@ -639,8 +639,8 @@ body.modal-open { overflow: hidden; }
   .profile-identity { margin-top: 16px; padding: 16px; }
   .profile-avatar { width: 52px; height: 52px; flex-basis: 52px; font-size: 1.35rem; }
   .rank-card { padding: 15px; }
-  .rank-card-heading { grid-template-columns: 58px minmax(0, 1fr); gap: 13px; }
-  .rank-badge { width: 58px; height: 58px; border-radius: 13px; }
+  .rank-card-heading { grid-template-columns: 66px minmax(0, 1fr); gap: 13px; }
+  .rank-badge { width: 66px; height: 66px; }
   .rank-wager-line, .rank-progress-copy { align-items: flex-start; }
 }
 
