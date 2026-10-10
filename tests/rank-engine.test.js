@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { RANK_LEVELS, RANK_STAGES } from "../dist/rank-config.js";
 import {
   calculateWeightedWager,
@@ -12,12 +14,27 @@ import { getPlayerRankStats } from "../dist/player-rank-service.js";
 test("the configuration contains ten stages and three tiers per stage", () => {
   assert.equal(RANK_STAGES.length, 10);
   assert.equal(RANK_LEVELS.length, 30);
-  for (const stage of RANK_STAGES) assert.equal(stage.thresholds.length, 3);
+  for (const stage of RANK_STAGES) {
+    assert.equal(stage.thresholds.length, 3);
+    assert.equal(stage.badgePaths.length, 3);
+  }
+  assert.equal(new Set(RANK_LEVELS.map((rank) => rank.badgePath)).size, 30);
 });
 
 test("every exact threshold resolves to its configured rank", () => {
   for (const rank of RANK_LEVELS) {
     assert.equal(getRankFromWeightedWager(rank.threshold).label, rank.label);
+  }
+});
+
+test("every rank level has an equal-size transparent PNG badge", () => {
+  for (const rank of RANK_LEVELS) {
+    const badgeFile = fileURLToPath(new URL(`../dist${rank.badgePath}`, import.meta.url));
+    const png = readFileSync(badgeFile);
+    assert.equal(png.toString("ascii", 1, 4), "PNG", `${rank.label} is not a PNG`);
+    assert.equal(png.readUInt32BE(16), 1_254, `${rank.label} width changed`);
+    assert.equal(png.readUInt32BE(20), 1_254, `${rank.label} height changed`);
+    assert.equal(png[25], 6, `${rank.label} must use RGBA transparency`);
   }
 });
 
