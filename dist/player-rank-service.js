@@ -1,4 +1,4 @@
-import { calculateWeightedWager, getRankProgress } from "./rank-engine.js";
+import { calculateWeightedWager, getRankProgress } from "./rank-engine.js?v=rank-badges-1";
 
 function asNonNegativeNumber(value) {
   const number = Number(value);

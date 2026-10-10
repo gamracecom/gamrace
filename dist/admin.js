@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { RANK_STAGES } from "./rank-config.js";
+import { RANK_STAGES } from "./rank-config.js?v=rank-badges-1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBS3pib3PsHnSJGaQqBc--S99qI7sqhDuU",
