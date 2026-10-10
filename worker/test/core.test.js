@@ -10,6 +10,7 @@ import {
   normalizeCurrency,
   normalizeRequestId,
   parseAssetUnits,
+  parseNonNegativeAssetUnits,
   providerAmountToUnits,
   parseUsdCents,
   paymentCanCredit,
@@ -71,4 +72,7 @@ test("asset balances use exact eight-decimal integer units", () => {
   assert.throws(() => parseAssetUnits("0.000000001"), /8 decimal/);
   assert.throws(() => parseAssetUnits("-1"), /valid amount/);
   assert.equal(providerAmountToUnits("0.123456789"), 12_345_678);
+  assert.equal(parseNonNegativeAssetUnits("0"), 0);
+  assert.equal(parseNonNegativeAssetUnits("125.50000000"), 12_550_000_000);
+  assert.throws(() => parseNonNegativeAssetUnits("-0.01"), /valid amount/);
 });

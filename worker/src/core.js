@@ -85,6 +85,17 @@ export function parseAssetUnits(value, options = {}) {
   return units;
 }
 
+export function parseNonNegativeAssetUnits(value, options = {}) {
+  const raw = String(value ?? "").trim();
+  if (!/^\d+(?:\.\d{1,8})?$/.test(raw)) throw new Error("Enter a valid amount with no more than 8 decimal places");
+  const [whole, fraction = ""] = raw.split(".");
+  const units = Number(whole) * ASSET_SCALE + Number(fraction.padEnd(8, "0"));
+  const maximumUnits = options.maximumUnits ?? Number.MAX_SAFE_INTEGER;
+  if (!Number.isSafeInteger(units) || units < 0) throw new Error("Enter a valid amount");
+  if (units > maximumUnits) throw new Error("The amount is above the maximum");
+  return units;
+}
+
 export function assetUnitsToString(value, trim = true) {
   const units = Number(value || 0);
   if (!Number.isSafeInteger(units) || units < 0) throw new Error("Invalid asset balance");

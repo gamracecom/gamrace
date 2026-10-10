@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#040d14" />
     <title>Control Room | GamRace</title>
     <link rel="icon" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="admin.css?v=country-access-1" />
+    <link rel="stylesheet" href="admin.css?v=player-balances-1" />
   </head>
   <body>
     <div class="admin-ambient" aria-hidden="true"></div>
@@ -129,7 +129,7 @@
             </div>
           </section>
 
-          <section class="admin-view" data-admin-panel="players" hidden><div class="page-intro"><div><p class="section-kicker">PLAYER OPERATIONS</p><h2>Players</h2><p>Find wallet accounts, inspect asset activity, and prepare for account-level controls.</p></div><div class="future-badge">ACCOUNT CONTROLS READY TO CONNECT</div></div><div class="toolbar-card"><label class="admin-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="player-search" type="search" placeholder="Search by Firebase UID…" /></label><button class="solid-button" id="player-search-button" type="button">Search players</button></div><article class="panel-card table-card"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Player</th><th>Active asset</th><th>Assets held</th><th>Last wallet activity</th><th>Status</th></tr></thead><tbody id="players-table-body"></tbody></table></div></article><div class="future-control-grid"><article><span>Responsible play</span><strong>Limits & exclusions</strong><p>Session, deposit, loss and cooling-off controls are reserved here for the player service.</p></article><article><span>Account access</span><strong>Freeze & review</strong><p>Account state changes will require a reason and appear in the audit log.</p></article><article><span>Player value</span><strong>VIP & lifecycle</strong><p>Rank, wager history, rewards and retention tools connect here.</p></article></div></section>
+          <section class="admin-view" data-admin-panel="players" hidden><div class="page-intro"><div><p class="section-kicker">PLAYER OPERATIONS</p><h2>Players</h2><p>Find accounts by username or Firebase UID and securely manage available wallet balances.</p></div><div class="security-note"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.8 8.3 7 10 4.2-1.7 7-5.2 7-10V6l-7-3Z"/><path d="m9.2 12 1.8 1.8 4-4"/></svg><span>Every balance edit is audited</span></div></div><div class="toolbar-card"><label class="admin-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="player-search" type="search" placeholder="Search username or Firebase UID…" /></label><button class="solid-button" id="player-search-button" type="button">Search players</button></div><article class="panel-card table-card"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Player</th><th>Active asset</th><th>Wallet assets</th><th>Last wallet activity</th><th>Status</th><th></th></tr></thead><tbody id="players-table-body"></tbody></table></div></article><div class="future-control-grid"><article><span>Responsible play</span><strong>Limits & exclusions</strong><p>Session, deposit, loss and cooling-off controls are reserved here for the player service.</p></article><article><span>Account access</span><strong>Freeze & review</strong><p>Account state changes will require a reason and appear in the audit log.</p></article><article><span>Player value</span><strong>VIP & lifecycle</strong><p>Rank, wager history, rewards and retention tools connect here.</p></article></div></section>
 
           <section class="admin-view" data-admin-panel="deposits" hidden><div class="page-intro"><div><p class="section-kicker">FINANCE</p><h2>Deposits</h2><p>Monitor live crypto deposits and provider settlement status.</p></div><select class="admin-select" id="deposit-status-filter" aria-label="Filter deposits by status"><option value="all">All statuses</option><option value="waiting">Waiting</option><option value="confirming">Confirming</option><option value="confirmed">Confirmed</option><option value="finished">Finished</option><option value="failed">Failed</option><option value="expired">Expired</option></select></div><article class="panel-card table-card"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Payment</th><th>Player</th><th>Asset</th><th>Amount</th><th>Status</th><th>Created</th></tr></thead><tbody id="deposits-table-body"></tbody></table></div></article></section>
 
@@ -176,6 +176,22 @@
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=country-access-1"></script>
+    <dialog class="review-dialog balance-dialog" id="balance-dialog">
+      <form method="dialog" class="review-shell" id="balance-form">
+        <button class="dialog-close" value="cancel" aria-label="Close balance editor">×</button>
+        <p class="section-kicker">PLAYER WALLET</p>
+        <h2>Edit available balance</h2>
+        <div class="balance-player-summary"><strong id="balance-player-username">Player</strong><span id="balance-player-uid">—</span></div>
+        <label>Wallet asset<select id="balance-asset" required></select></label>
+        <div class="balance-current-grid"><div><span>Available now</span><strong id="balance-current-available">0</strong></div><div><span>Held for withdrawals</span><strong id="balance-current-held">0</strong></div></div>
+        <label>New available balance<input id="balance-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00000000" required /></label>
+        <label>Audit reason<textarea id="balance-reason" maxlength="200" placeholder="Why is this balance being changed?" required></textarea></label>
+        <p class="balance-safety-note">Held funds are protected and cannot be changed here.</p>
+        <div class="dialog-actions"><button class="outline-button" value="cancel">Cancel</button><button class="solid-button" id="confirm-balance-update" type="submit">Save balance</button></div>
+        <p class="dialog-status" id="balance-status" role="status"></p>
+      </form>
+    </dialog>
+
+    <script type="module" src="admin.js?v=player-balances-1"></script>
   </body>
 </html>

@@ -42,6 +42,17 @@ function setStatus(message = "", state = "") {
   else delete authStatus.dataset.state;
 }
 
+async function syncPlayerUsername(user) {
+  const token = await user.getIdToken();
+  const response = await fetch(`${WALLET_API_BASE_URL}/profile/sync`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: "{}",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Player profile sync failed");
+}
+
 function setGoogleButtonsBusy(busy) {
   googleButtons.forEach((button) => {
     button.disabled = busy;
@@ -450,7 +461,7 @@ profileDialog.form.addEventListener("submit", async (event) => {
   profileBusy = true;
   setProfileStatus("Checking username…");
   refreshProfileDialog();
-  try { currentProfile = await changeUsername(auth.currentUser, requestedUsername); renderUser(auth.currentUser); setProfileStatus(`Your username is now ${currentProfile.username}.`, "success"); }
+  try { currentProfile = await changeUsername(auth.currentUser, requestedUsername); renderUser(auth.currentUser); syncPlayerUsername(auth.currentUser).catch(() => {}); setProfileStatus(`Your username is now ${currentProfile.username}.`, "success"); }
   catch (error) { setProfileStatus(friendlyProfileError(error), "error"); }
   finally { profileBusy = false; refreshProfileDialog(); }
 });
@@ -472,6 +483,7 @@ onAuthStateChanged(auth, async (user) => {
     currentProfile = result.profile;
     renderUser(user);
     refreshProfileDialog();
+    syncPlayerUsername(user).catch((error) => console.warn("GamRace username sync deferred", error));
     checkOwnerAccess(user);
     if (result.created) {
       try { await updateProfile(user, { displayName: currentProfile.username }); } catch { /* Firestore remains the source of truth. */ }

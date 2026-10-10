@@ -195,6 +195,13 @@ CREATE TABLE IF NOT EXISTS wallet_preferences (
   updated_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS player_profiles (
+  uid TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS player_profiles_username_idx ON player_profiles(username COLLATE NOCASE);
+
 CREATE TABLE IF NOT EXISTS crypto_deposit_requests (
   id TEXT PRIMARY KEY,
   uid TEXT NOT NULL,

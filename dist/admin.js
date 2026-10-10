@@ -37,6 +37,7 @@ const passwordInput = document.querySelector("#admin-password");
 const navButtons = [...document.querySelectorAll("[data-admin-view]")];
 const panels = [...document.querySelectorAll("[data-admin-panel]")];
 const reviewDialog = document.querySelector("#review-dialog");
+const balanceDialog = document.querySelector("#balance-dialog");
 
 let firebaseUser = null;
 let adminSession = readSession();
@@ -46,6 +47,8 @@ let activeWithdrawal = null;
 let overviewCache = null;
 let systemCache = null;
 let countryAccessCache = null;
+let playersCache = [];
+let activePlayer = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -65,9 +68,12 @@ const viewMeta = {
 };
 
 const assetNames = {
-  usdterc20: "USDT · ERC20", usdttrc20: "USDT · TRC20", btc: "BTC", eth: "ETH",
-  usdc: "USDC", sol: "SOL", trx: "TRX", ltc: "LTC", doge: "DOGE", xrp: "XRP", bnbbsc: "BNB · BEP20",
+  usdttrc20: "USDT · TRC20", usdtbep20: "USDT · BEP20", usdtsol: "USDT · Solana", usdtpolygon: "USDT · Polygon", usdterc20: "USDT · ERC20",
+  btc: "BTC · Bitcoin", eth: "ETH · Ethereum",
+  usdcsol: "USDC · Solana", usdcpolygon: "USDC · Polygon", usdcbase: "USDC · Base", usdcbep20: "USDC · BEP20", usdc: "USDC · ERC20",
+  sol: "SOL · Solana", trx: "TRX · Tron", ltc: "LTC · Litecoin", doge: "DOGE · Dogecoin", xrp: "XRP · XRP Ledger", bnbbsc: "BNB · BEP20",
 };
+const assetOrder = Object.keys(assetNames);
 
 function readSession() {
   try {
@@ -266,6 +272,10 @@ function shortId(value, size = 8) {
   return text.length > size * 2 ? `${text.slice(0, size)}…${text.slice(-size)}` : text || "—";
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+}
+
 function statusClass(status) {
   return String(status || "").toLowerCase().replaceAll(" ", "_");
 }
@@ -444,12 +454,73 @@ async function loadPlayers() {
   const query = document.querySelector("#player-search").value.trim();
   const result = await api(`/admin/users?limit=50${query ? `&query=${encodeURIComponent(query)}` : ""}`);
   const body = document.querySelector("#players-table-body");
-  if (!result.users.length) setTableEmpty(body, 5, query ? "No player matches that UID." : "No wallet players yet.");
-  else body.innerHTML = result.users.map((user) => `
-    <tr><td><span class="table-primary">Player ${shortId(user.uid, 6)}</span><span class="table-secondary">${user.uid}</span></td><td>${formatAsset(user.selectedCurrency)}</td><td>${user.assetCount}</td><td>${formatDate(user.lastWalletActivity, true)}</td><td><span class="status-pill live">ACTIVE</span></td></tr>
+  playersCache = result.users;
+  if (!result.users.length) setTableEmpty(body, 6, query ? "No player matches that username or UID." : "No wallet players yet.");
+  else body.innerHTML = result.users.map((user, index) => `
+    <tr><td><span class="table-primary player-username">${escapeHtml(user.username || "Username pending")}</span><span class="table-secondary" title="${escapeHtml(user.uid)}">${escapeHtml(user.uid)}</span></td><td>${escapeHtml(formatAsset(user.selectedCurrency))}</td><td>${Number(user.assetCount || 0)}</td><td>${formatDate(user.lastWalletActivity, true)}</td><td><span class="status-pill live">ACTIVE</span></td><td><button class="table-action-button" type="button" data-edit-player-balance="${index}">Edit balance</button></td></tr>
   `).join("");
+  body.querySelectorAll("[data-edit-player-balance]").forEach((button) => button.addEventListener("click", () => openBalanceEditor(playersCache[Number(button.dataset.editPlayerBalance)])));
   setLastRefresh();
 }
+
+function playerBalance(player, currency) {
+  return player?.balances?.find((balance) => balance.currency === currency) || { currency, available: "0", held: "0" };
+}
+
+function refreshBalanceEditor() {
+  if (!activePlayer) return;
+  const currency = document.querySelector("#balance-asset").value;
+  const balance = playerBalance(activePlayer, currency);
+  document.querySelector("#balance-current-available").textContent = `${balance.available} ${formatAsset(currency)}`;
+  document.querySelector("#balance-current-held").textContent = `${balance.held} ${formatAsset(currency)}`;
+  document.querySelector("#balance-amount").value = balance.available;
+}
+
+function openBalanceEditor(player) {
+  if (!player) return;
+  activePlayer = player;
+  document.querySelector("#balance-player-username").textContent = player.username || "Username pending";
+  document.querySelector("#balance-player-uid").textContent = player.uid;
+  const select = document.querySelector("#balance-asset");
+  select.innerHTML = assetOrder.map((code) => `<option value="${code}">${escapeHtml(assetNames[code])}</option>`).join("");
+  select.value = assetNames[player.selectedCurrency] ? player.selectedCurrency : assetOrder[0];
+  document.querySelector("#balance-reason").value = "";
+  document.querySelector("#balance-status").textContent = "";
+  refreshBalanceEditor();
+  balanceDialog.showModal();
+}
+
+document.querySelector("#balance-asset").addEventListener("change", refreshBalanceEditor);
+document.querySelector("#balance-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!activePlayer) return;
+  const currency = document.querySelector("#balance-asset").value;
+  const amount = document.querySelector("#balance-amount").value.trim();
+  const reason = document.querySelector("#balance-reason").value.trim();
+  const status = document.querySelector("#balance-status");
+  const button = document.querySelector("#confirm-balance-update");
+  if (!/^\d+(?:\.\d{1,8})?$/.test(amount)) { status.textContent = "Enter a non-negative balance with no more than 8 decimal places."; return; }
+  if (reason.length < 3) { status.textContent = "Add a brief reason for this balance change."; return; }
+  button.disabled = true;
+  button.textContent = "Saving securely…";
+  status.textContent = "";
+  try {
+    const playerName = activePlayer.username || "Player";
+    await api(`/admin/users/${encodeURIComponent(activePlayer.uid)}/balances/${encodeURIComponent(currency)}`, {
+      method: "POST",
+      body: JSON.stringify({ amount, reason }),
+    });
+    balanceDialog.close();
+    showToast(`${playerName} balance updated and audited`);
+    await loadPlayers();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Save balance";
+  }
+});
+balanceDialog.addEventListener("close", () => { activePlayer = null; });
 
 document.querySelector("#player-search-button").addEventListener("click", () => loadPlayers().catch((error) => showToast(error.message, "error")));
 document.querySelector("#player-search").addEventListener("keydown", (event) => { if (event.key === "Enter") loadPlayers().catch((error) => showToast(error.message, "error")); });

@@ -7,6 +7,7 @@ import {
   normalizeExtraId,
   normalizeRequestId,
   parseAssetUnits,
+  parseNonNegativeAssetUnits,
   oxaDepositStatus,
   oxaPayoutStatus,
   providerAmountToUnits,
@@ -495,6 +496,22 @@ async function handleGetWallet(request, env, user) {
   return json(request, env, 200, { wallet: await walletResponse(env, user.sub), activity: await listActivity(env, user.sub) });
 }
 
+async function handleSyncProfile(request, env, user) {
+  const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  const projectId = env.FIREBASE_PROJECT_ID || "gamrace";
+  const profileUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(user.sub)}`;
+  const response = await fetch(profileUrl, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+  if (!response.ok) throw httpError(502, "Your username could not be synchronized");
+  const profile = await response.json();
+  const username = String(profile?.fields?.username?.stringValue || "").trim();
+  if (!/^[A-Za-z][A-Za-z0-9_]{2,19}$/.test(username)) throw httpError(409, "Your profile username is not ready yet");
+  await env.DB.prepare(`
+    INSERT INTO player_profiles(uid, username, updated_at) VALUES(?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET username = excluded.username, updated_at = excluded.updated_at
+  `).bind(user.sub, username, now()).run();
+  return json(request, env, 200, { profile: { username } });
+}
+
 async function handleCurrencies(request, env) {
   const provider = await providerCurrencies(env);
   return json(request, env, 200, {
@@ -955,30 +972,99 @@ async function handleAdminUsers(request, env, user) {
   const limit = Math.min(100, Math.max(10, Number(url.searchParams.get("limit") || 50)));
   const result = query
     ? await env.DB.prepare(`
-        SELECT p.uid, p.selected_currency, p.updated_at,
+        SELECT p.uid, profile.username, p.selected_currency, p.updated_at,
                COALESCE(SUM(b.available_units), 0) AS available_units,
                COALESCE(SUM(b.held_units), 0) AS held_units,
                COUNT(b.currency) AS asset_count,
                MAX(b.updated_at) AS balance_updated_at
-        FROM wallet_preferences p LEFT JOIN crypto_balances b ON b.uid = p.uid
-        WHERE p.uid LIKE ? GROUP BY p.uid ORDER BY COALESCE(MAX(b.updated_at), p.updated_at) DESC LIMIT ?
-      `).bind(`%${query}%`, limit).all()
+        FROM wallet_preferences p
+        LEFT JOIN player_profiles profile ON profile.uid = p.uid
+        LEFT JOIN crypto_balances b ON b.uid = p.uid
+        WHERE p.uid LIKE ? OR profile.username LIKE ?
+        GROUP BY p.uid ORDER BY COALESCE(MAX(b.updated_at), p.updated_at) DESC LIMIT ?
+      `).bind(`%${query}%`, `%${query}%`, limit).all()
     : await env.DB.prepare(`
-        SELECT p.uid, p.selected_currency, p.updated_at,
+        SELECT p.uid, profile.username, p.selected_currency, p.updated_at,
                COALESCE(SUM(b.available_units), 0) AS available_units,
                COALESCE(SUM(b.held_units), 0) AS held_units,
                COUNT(b.currency) AS asset_count,
                MAX(b.updated_at) AS balance_updated_at
-        FROM wallet_preferences p LEFT JOIN crypto_balances b ON b.uid = p.uid
+        FROM wallet_preferences p
+        LEFT JOIN player_profiles profile ON profile.uid = p.uid
+        LEFT JOIN crypto_balances b ON b.uid = p.uid
         GROUP BY p.uid ORDER BY COALESCE(MAX(b.updated_at), p.updated_at) DESC LIMIT ?
       `).bind(limit).all();
-  return json(request, env, 200, {
-    users: (result.results || []).map((row) => ({
+  const users = await Promise.all((result.results || []).map(async (row) => {
+    const balanceResult = await env.DB.prepare(`
+      SELECT currency, available_units, held_units FROM crypto_balances
+      WHERE uid = ? ORDER BY currency
+    `).bind(row.uid).all();
+    return {
       uid: row.uid,
+      username: row.username || null,
       selectedCurrency: row.selected_currency,
       assetCount: Number(row.asset_count || 0),
       lastWalletActivity: new Date(Number(row.balance_updated_at || row.updated_at || 0)).toISOString(),
-    })),
+      balances: (balanceResult.results || []).map((balance) => ({
+        currency: balance.currency,
+        available: assetUnitsToString(Number(balance.available_units || 0)),
+        held: assetUnitsToString(Number(balance.held_units || 0)),
+      })),
+    };
+  }));
+  return json(request, env, 200, { users });
+}
+
+async function handleAdminSetBalance(request, env, user, uid, currency) {
+  await requireAdminSession(request, env, user);
+  const targetUid = decodeURIComponent(uid);
+  if (!/^[A-Za-z0-9_-]{6,128}$/.test(targetUid)) throw httpError(400, "Choose a valid player");
+  const asset = requireWalletAsset(currency);
+  const body = await requestJson(request);
+  const reason = String(body.reason || "").trim().replace(/[\r\n]+/g, " ").slice(0, 200);
+  if (reason.length < 3) throw httpError(400, "Add a brief reason for this balance change");
+  const nextUnits = parseNonNegativeAssetUnits(body.amount);
+  const account = await env.DB.prepare(`
+    SELECT uid FROM wallet_preferences WHERE uid = ?
+    UNION SELECT uid FROM player_profiles WHERE uid = ? LIMIT 1
+  `).bind(targetUid, targetUid).first();
+  if (!account) throw httpError(404, "That player account was not found");
+  const current = await env.DB.prepare("SELECT available_units, held_units FROM crypto_balances WHERE uid = ? AND currency = ?")
+    .bind(targetUid, asset.code).first();
+  const previousUnits = Number(current?.available_units || 0);
+  if (previousUnits === nextUnits) throw httpError(409, "That balance is already set to this amount");
+  const timestamp = now();
+  const auditId = crypto.randomUUID();
+  const detail = JSON.stringify({
+    asset: asset.code,
+    previous: assetUnitsToString(previousUnits),
+    next: assetUnitsToString(nextUnits),
+    reason,
+  });
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO crypto_balances(
+        uid, currency, available_units, held_units, lifetime_deposited_units, lifetime_withdrawn_units, created_at, updated_at
+      ) VALUES(?, ?, ?, 0, 0, 0, ?, ?)
+      ON CONFLICT(uid, currency) DO UPDATE SET available_units = excluded.available_units, updated_at = excluded.updated_at
+    `).bind(targetUid, asset.code, nextUnits, timestamp, timestamp),
+    env.DB.prepare(`
+      INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      VALUES(?, ?, ?, 'admin_balance_set', ?, ?, ?)
+    `).bind(crypto.randomUUID(), targetUid, asset.code, nextUnits - previousUnits, `admin:${auditId}`, timestamp),
+    env.DB.prepare(`
+      INSERT INTO admin_audit_log(id, uid, event_type, target_id, detail, created_at)
+      VALUES(?, ?, 'player.balance.set', ?, ?, ?)
+    `).bind(auditId, user.sub, `${targetUid}:${asset.code}`, detail.slice(0, 500), timestamp),
+  ]);
+  return json(request, env, 200, {
+    balance: {
+      uid: targetUid,
+      currency: asset.code,
+      available: assetUnitsToString(nextUnits),
+      held: assetUnitsToString(Number(current?.held_units || 0)),
+      updatedAt: new Date(timestamp).toISOString(),
+    },
   });
 }
 
@@ -1188,6 +1274,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/session") return handleGetAdminSession(request, env, user);
   if (request.method === "GET" && path === "/admin/overview") return handleAdminOverview(request, env, user);
   if (request.method === "GET" && path === "/admin/users") return handleAdminUsers(request, env, user);
+  const adminBalanceMatch = path.match(/^\/admin\/users\/([^/]+)\/balances\/([A-Za-z0-9_-]+)$/);
+  if (request.method === "POST" && adminBalanceMatch) return handleAdminSetBalance(request, env, user, adminBalanceMatch[1], adminBalanceMatch[2]);
   if (request.method === "GET" && path === "/admin/deposits") return handleAdminDeposits(request, env, user);
   if (request.method === "GET" && path === "/admin/audit") return handleAdminAudit(request, env, user);
   if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
@@ -1201,6 +1289,7 @@ async function route(request, env) {
   }
   if (request.method === "GET" && path === "/sessions") return handleSessions(request, env, user);
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
+  if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/currencies") return handleCurrencies(request, env);
   if (request.method === "GET" && path === "/deposit-addresses") return handleDepositAddresses(request, env, user);
