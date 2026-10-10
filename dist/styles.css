@@ -270,37 +270,36 @@ body.modal-open { overflow: hidden; }
 .profile-rank-mark.has-image .profile-rank-fallback, .menu-rank-badge.has-image .menu-rank-fallback { opacity: 0; }
 .profile-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-caret { color: #758c9b; font-size: .85rem; transform: translateY(-2px); }
-.account-menu { position: fixed; z-index: 215; top: 84px; right: clamp(18px, 2.25vw, 44px); width: min(340px, calc(100vw - 24px)); overflow: hidden; border: 1px solid #19394d; border-radius: 12px; background: #07151f; box-shadow: 0 26px 72px rgba(0, 0, 0, .68); }
+.account-menu { position: fixed; z-index: 215; width: min(286px, calc(100vw - 20px)); overflow: hidden; border: 1px solid #173447; border-radius: 10px; background: #07151f; box-shadow: 0 18px 46px rgba(0, 0, 0, .58); }
 .account-menu[hidden] { display: none; }
-.account-menu-rank { padding: 18px; border-bottom: 1px solid #173447; background: #081925; }
+.account-menu-rank { padding: 14px; border-bottom: 1px solid #173447; background: #081925; }
 .menu-rank-heading { display: flex; align-items: center; gap: 13px; }
-.menu-rank-badge { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 11px; font-size: 1rem; }
+.menu-rank-badge { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 9px; font-size: .9rem; }
 .menu-rank-tier { position: absolute; right: -5px; bottom: -5px; min-width: 22px; height: 19px; display: grid; place-items: center; padding: 0 4px; border: 1px solid #2c6380; border-radius: 5px; background: #07151f; color: #fff; font-size: .55rem; }
 .menu-rank-heading > span:last-child { min-width: 0; display: grid; gap: 2px; }
 .menu-rank-heading small { color: #4cccf7; font-size: .56rem; font-weight: 900; letter-spacing: .14em; }
 .menu-rank-heading strong { color: #f1f8fb; font-size: .94rem; }
 .menu-rank-heading em { color: #7891a1; font-size: .66rem; font-style: normal; }
-.menu-rank-progress-copy { display: flex; justify-content: space-between; gap: 12px; margin-top: 15px; font-size: .62rem; }
+.menu-rank-progress-copy { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: .6rem; }
 .menu-rank-values { color: #a9bac5; font-variant-numeric: tabular-nums; }
 .menu-rank-next { color: #61d8fb; white-space: nowrap; }
 .menu-rank-track { height: 5px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: #03101a; }
 .menu-rank-fill { width: 0; height: 100%; display: block; border-radius: inherit; background: #21bde8; }
-.account-menu-items { display: grid; padding: 7px; }
-.account-menu-item { width: 100%; min-height: 39px; display: flex; align-items: center; justify-content: space-between; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: #acbec9; cursor: pointer; font: inherit; font-size: .76rem; font-weight: 720; text-align: left; }
+.account-menu-items { display: grid; padding: 6px; }
+.account-menu-item { width: 100%; min-height: 35px; display: flex; align-items: center; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #a9bbc6; cursor: pointer; font: inherit; font-size: .72rem; font-weight: 700; text-align: left; }
 .account-menu-item:hover { background: #0c2634; color: #f4fbff; }
-.account-menu-item span { color: #4d6878; font-size: 1rem; }
-.account-menu-item.divider-before { margin-top: 7px; border-top: 1px solid #173447; border-radius: 0 0 7px 7px; padding-top: 7px; }
+.account-menu-item.divider-before { margin-top: 5px; border-top: 1px solid #173447; border-radius: 0 0 6px 6px; padding-top: 5px; }
 .account-menu-item.danger { color: #ff9daa; }
 
-.profile-modal.account-workspace { width: min(1180px, calc(100vw - 32px)); height: min(790px, calc(100dvh - 36px)); min-height: min(620px, calc(100dvh - 36px)); border-color: #1a4056; border-radius: 14px; background: #06141e; }
-.account-workspace .profile-shell { grid-template-columns: 224px minmax(0, 1fr); }
-.account-workspace .profile-sidebar { padding: 30px 14px; background: #05121b; }
-.account-workspace .profile-heading { margin: 0 10px 24px; }
-.account-workspace .profile-heading h2 { font-size: 1.55rem; }
+.profile-modal.account-workspace { width: min(980px, calc(100vw - 32px)); height: min(680px, calc(100dvh - 42px)); min-height: min(560px, calc(100dvh - 42px)); border-color: #17384b; border-radius: 12px; background: #06141e; box-shadow: 0 24px 64px rgba(0, 0, 0, .66); }
+.account-workspace .profile-shell { grid-template-columns: 190px minmax(0, 1fr); }
+.account-workspace .profile-sidebar { padding: 25px 12px; background: #05121b; }
+.account-workspace .profile-heading { margin: 0 9px 19px; }
+.account-workspace .profile-heading h2 { font-size: 1.35rem; }
 .account-workspace .profile-tabs { gap: 3px; }
 .account-workspace .profile-tab { min-height: 42px; border-radius: 7px; padding-inline: 12px; font-size: .76rem; }
 .account-workspace .profile-tab.active { background: #0b2838; }
-.account-workspace .profile-content { padding: 42px 32px 34px; background: #071722; }
+.account-workspace .profile-content { padding: 32px 26px 28px; background: #071722; }
 .account-workspace .profile-section { animation: account-section-in .16s ease-out; }
 @keyframes account-section-in { from { opacity: 0; transform: translateY(3px); } }
 .account-workspace .profile-section h3 { font-size: 1.35rem; }
@@ -403,7 +402,7 @@ body.modal-open { overflow: hidden; }
 }
 
 @media (max-width: 700px) {
-  .account-menu { top: 72px; right: 10px; }
+  .account-menu { width: min(276px, calc(100vw - 20px)); }
   .profile-overlay { padding: 0; align-items: end; }
   .profile-modal.account-workspace { width: 100vw; height: calc(100dvh - 8px); min-height: 0; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 16px 16px 0 0; }
   .account-workspace .profile-shell { display: flex; flex-direction: column; }

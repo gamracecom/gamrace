@@ -97,7 +97,7 @@ function createAccountMenu() {
   const menu = document.createElement("div");
   menu.className = "account-menu";
   menu.hidden = true;
-  menu.innerHTML = `<section class="account-menu-rank" aria-label="Current rank progress"><div class="menu-rank-heading"><span class="menu-rank-badge"><span class="menu-rank-fallback">R</span><img class="menu-rank-image" alt="" /><b class="menu-rank-tier">I</b></span><span><small>YOUR RANK</small><strong class="menu-rank-name">Rookie I</strong><em class="menu-rank-subtitle">Starting Grid</em></span></div><div class="menu-rank-progress-copy"><span class="menu-rank-values">$0 / $1,000</span><strong class="menu-rank-next">Next: Rookie II</strong></div><div class="menu-rank-track"><i class="menu-rank-fill"></i></div></section><nav class="account-menu-items" aria-label="Account menu">${PROFILE_MENU.map((item) => `<button class="account-menu-item ${item.dividerBefore ? "divider-before" : ""} ${item.danger ? "danger" : ""}" type="button" data-account-menu-item="${item.id}" ${item.ownerOnly ? "hidden" : ""}>${item.label}<span aria-hidden="true">›</span></button>`).join("")}</nav>`;
+  menu.innerHTML = `<section class="account-menu-rank" aria-label="Current rank progress"><div class="menu-rank-heading"><span class="menu-rank-badge"><span class="menu-rank-fallback">R</span><img class="menu-rank-image" alt="" /><b class="menu-rank-tier">I</b></span><span><small>YOUR RANK</small><strong class="menu-rank-name">Rookie I</strong><em class="menu-rank-subtitle">Starting Grid</em></span></div><div class="menu-rank-progress-copy"><span class="menu-rank-values">$0 / $1,000</span><strong class="menu-rank-next">Next: Rookie II</strong></div><div class="menu-rank-track"><i class="menu-rank-fill"></i></div></section><nav class="account-menu-items" aria-label="Account menu">${PROFILE_MENU.map((item) => `<button class="account-menu-item ${item.dividerBefore ? "divider-before" : ""} ${item.danger ? "danger" : ""}" type="button" data-account-menu-item="${item.id}" ${item.ownerOnly ? "hidden" : ""}>${item.label}</button>`).join("")}</nav>`;
   document.body.append(menu);
   return {
     element: menu,
@@ -286,7 +286,22 @@ function openProfileDialog({ welcome = false, section = "profile", settingsSecti
 }
 
 function closeProfileDialog() { profileDialog.overlay.hidden = true; document.body.classList.remove("modal-open"); }
-function openAccountMenu() { if (!auth.currentUser || !currentProfile) return; accountMenu.element.hidden = false; profileButton?.setAttribute("aria-expanded", "true"); }
+function positionAccountMenu() {
+  if (!profileButton || accountMenu.element.hidden) return;
+  const buttonRect = profileButton.getBoundingClientRect();
+  const menuWidth = accountMenu.element.offsetWidth;
+  const pageGutter = 10;
+  const left = Math.min(window.innerWidth - menuWidth - pageGutter, Math.max(pageGutter, buttonRect.right - menuWidth));
+  accountMenu.element.style.top = `${Math.round(buttonRect.bottom + 8)}px`;
+  accountMenu.element.style.left = `${Math.round(left)}px`;
+}
+
+function openAccountMenu() {
+  if (!auth.currentUser || !currentProfile) return;
+  accountMenu.element.hidden = false;
+  positionAccountMenu();
+  profileButton?.setAttribute("aria-expanded", "true");
+}
 function closeAccountMenu() { accountMenu.element.hidden = true; profileButton?.setAttribute("aria-expanded", "false"); }
 
 async function checkOwnerAccess(user) {
@@ -401,6 +416,7 @@ accountMenu.items.forEach((button) => button.addEventListener("click", () => {
   else if (item.kind === "panel") openProfileDialog({ section: item.id });
 }));
 document.addEventListener("click", (event) => { if (!accountMenu.element.hidden && !accountMenu.element.contains(event.target) && !profileButton?.contains(event.target)) closeAccountMenu(); });
+window.addEventListener("resize", positionAccountMenu);
 profileDialog.tabs.forEach((tab) => tab.addEventListener("click", () => selectProfileSection(tab.dataset.profileSection)));
 profileDialog.settingsTabs.forEach((tab) => tab.addEventListener("click", () => selectSettingsSection(tab.dataset.settingsSection)));
 profileDialog.activityTabs.forEach((tab) => tab.addEventListener("click", () => selectActivityTab(tab.dataset.activityTab)));
