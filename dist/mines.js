@@ -6,8 +6,10 @@
   const blankState = document.querySelector("#game-blank-state");
 
   if (gameName !== "mines") {
-    document.title = "GamRace";
-    blankState.hidden = false;
+    if (gameName !== "dice") {
+      document.title = "GamRace";
+      blankState.hidden = false;
+    }
     return;
   }
 

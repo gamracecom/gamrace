@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=wallet-menu-controls-1" />
+    <link rel="stylesheet" href="styles.css?v=dice-1" />
   </head>
   <body class="game-page" data-authenticated="false">
     <div class="app-shell">
@@ -168,6 +168,108 @@
               </div>
             </section>
           </section>
+          <section class="dice-game" id="dice-game" hidden aria-label="Dice">
+            <div class="dice-stage">
+              <section class="dice-controls" aria-label="Dice controls">
+                <div class="dice-mode-tabs" role="tablist" aria-label="Game mode">
+                  <button class="dice-mode-tab active" type="button" role="tab" aria-selected="true" data-dice-mode="manual">Manual</button>
+                  <button class="dice-mode-tab" type="button" role="tab" aria-selected="false" data-dice-mode="auto">Auto</button>
+                </div>
+
+                <div class="dice-control-stack" data-dice-mode-panel="manual">
+                  <label class="dice-field">
+                    <span><strong>Bet Amount</strong><small data-dice-balance>0.00000000 COIN</small></span>
+                    <span class="dice-input-shell dice-bet-shell"><span class="dice-currency-mark" data-dice-currency>$</span><input id="dice-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Dice bet amount" /><button type="button" data-dice-bet-action="half">½</button><button type="button" data-dice-bet-action="double">2×</button></span>
+                  </label>
+                  <label class="dice-field">
+                    <span><strong>Profit on Win</strong><small data-dice-profit-label>0.00000000 COIN</small></span>
+                    <span class="dice-input-shell dice-profit-shell"><span class="dice-currency-mark" data-dice-currency>$</span><output id="dice-profit">0.00</output></span>
+                  </label>
+                  <button class="dice-primary-button" id="dice-action" type="button" disabled>Roll Dice</button>
+                </div>
+
+                <div class="dice-control-stack" data-dice-mode-panel="auto" hidden>
+                  <label class="dice-field">
+                    <span><strong>Bet Amount</strong><small>Per roll</small></span>
+                    <span class="dice-input-shell dice-bet-shell"><span class="dice-currency-mark" data-dice-currency>$</span><input id="dice-auto-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Automatic Dice bet amount" /><button type="button" data-dice-auto-bet-action="half">½</button><button type="button" data-dice-auto-bet-action="double">2×</button></span>
+                  </label>
+                  <label class="dice-field">
+                    <span><strong>Number of Bets</strong><small>1–100</small></span>
+                    <span class="dice-input-shell"><input id="dice-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Dice bets" /></span>
+                  </label>
+                  <div class="dice-auto-rules">
+                    <label><span>On Win</span><span><input id="dice-auto-win" type="number" min="0" max="1000" step="1" value="0" inputmode="decimal" aria-label="Increase bet on win percentage" /><b>%</b></span></label>
+                    <label><span>On Loss</span><span><input id="dice-auto-loss" type="number" min="0" max="1000" step="1" value="0" inputmode="decimal" aria-label="Increase bet on loss percentage" /><b>%</b></span></label>
+                  </div>
+                  <button class="dice-primary-button" id="dice-auto-action" type="button" disabled>Start Autoplay</button>
+                </div>
+                <p class="dice-balance-message" id="dice-balance-message" role="status" aria-live="polite" hidden></p>
+              </section>
+
+              <section class="dice-play-panel" aria-label="Dice roll controls">
+                <div class="dice-result-card" id="dice-result-card" hidden aria-live="assertive">
+                  <span>Roll</span><strong id="dice-result-value">00.00</strong><small id="dice-result-outcome">Ready</small>
+                </div>
+                <div class="dice-slider-area">
+                  <div class="dice-slider-shell" id="dice-slider-shell">
+                    <input class="dice-range-input" id="dice-roll-target" type="range" min="1" max="98" step="0.01" value="50.5" aria-label="Roll target" />
+                  </div>
+                  <div class="dice-scale" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+                </div>
+                <div class="dice-metrics">
+                  <label class="dice-metric"><span>Multiplier</span><span><input id="dice-multiplier" type="number" min="1.01" max="99" step="0.0001" value="2.0000" aria-label="Dice multiplier" /><b>×</b></span></label>
+                  <label class="dice-metric"><span id="dice-direction-label">Roll Over</span><span><input id="dice-roll-over" type="number" min="1" max="98" step="0.01" value="50.50" aria-label="Roll over target" /><button id="dice-direction-toggle" type="button" aria-label="Switch between roll over and roll under"><span aria-hidden="true">⇄</span></button></span></label>
+                  <label class="dice-metric"><span>Chance</span><span><input id="dice-chance" type="number" min="1" max="98" step="0.0001" value="49.5000" aria-label="Win chance" /><b>%</b></span></label>
+                </div>
+              </section>
+
+              <footer class="dice-stage-footer">
+                <div class="game-tools" data-dice-game-tools aria-label="Game tools">
+                  <button class="game-tool-button" type="button" data-dice-game-tool="settings" aria-label="Game settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-dice-game-favorite="dice" aria-label="Add Dice to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-dice-game-tool="stats" aria-label="Session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-dice-game-tool="info" aria-label="Game information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
+
+                  <section class="game-tool-panel settings-panel" data-dice-game-tool-panel="settings" aria-label="Dice settings" hidden>
+                    <header><div><strong>Game settings</strong><span>Choose how Dice plays</span></div><button type="button" data-close-dice-tool aria-label="Close settings">×</button></header>
+                    <button class="game-setting-row" type="button" role="switch" aria-checked="false" data-dice-game-setting="turbo"><span><strong>Turbo mode</strong><small>Show roll results instantly</small></span><i aria-hidden="true"></i></button>
+                    <button class="game-setting-row" type="button" role="switch" aria-checked="false" data-dice-game-setting="mute"><span><strong>Mute</strong><small>Turn off game sounds</small></span><i aria-hidden="true"></i></button>
+                  </section>
+
+                  <section class="game-tool-panel stats-panel" data-dice-game-tool-panel="stats" aria-label="Dice session statistics" hidden>
+                    <header><div><strong>Session statistics</strong><span>Resets when this page closes</span></div><button type="button" data-close-dice-tool aria-label="Close statistics">×</button></header>
+                    <div class="game-stats-grid">
+                      <article><span>Profit</span><strong data-dice-stat="profit">0.00</strong></article>
+                      <article><span>Wins</span><strong data-dice-stat="wins">0</strong></article>
+                      <article><span>Wagered</span><strong data-dice-stat="wagered">0.00</strong></article>
+                      <article><span>Losses</span><strong data-dice-stat="losses">0</strong></article>
+                    </div>
+                    <div class="game-stats-chart" aria-label="Cumulative Dice profit chart">
+                      <div><span>Bet performance</span><small data-dice-chart-label>No completed bets yet</small></div>
+                      <svg viewBox="0 0 320 116" role="img" aria-label="Cumulative profit over completed Dice bets" preserveAspectRatio="none">
+                        <line x1="0" y1="58" x2="320" y2="58" data-dice-chart-zero></line>
+                        <path d="M0 58 L320 58" data-dice-chart-area></path>
+                        <polyline points="0,58 320,58" data-dice-chart-line></polyline>
+                      </svg>
+                    </div>
+                  </section>
+
+                  <section class="game-tool-panel info-panel" data-dice-game-tool-panel="info" aria-label="Dice information" hidden>
+                    <header><div><strong>Dice</strong><span>Game information</span></div><button type="button" data-close-dice-tool aria-label="Close game information">×</button></header>
+                    <p>Choose your target and roll direction. Your roll wins when it lands in the highlighted blue zone.</p>
+                    <dl>
+                      <div><dt>Maximum multiplier</dt><dd>99×</dd></div>
+                      <div><dt>Minimum bet</dt><dd>0.01</dd></div>
+                      <div><dt>Return to player</dt><dd>99%</dd></div>
+                      <div><dt>Roll range</dt><dd>0.00–99.99</dd></div>
+                    </dl>
+                  </section>
+                </div>
+                <span>GamRace</span>
+                <button class="fairness-label" type="button">Fair Play</button>
+              </footer>
+            </div>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -182,6 +284,7 @@
     </nav>
     <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="mines.js?v=mines-tools-1" defer></script>
+    <script src="dice.js?v=dice-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=rank-badges-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

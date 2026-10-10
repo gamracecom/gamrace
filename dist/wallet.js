@@ -381,7 +381,7 @@ function walletSelectionDetail() {
   const currency = walletSnapshot?.selectedCurrency;
   const asset = assetFor(currency);
   if (!currency || !asset) return null;
-  return { currency, asset: { ...asset }, balance: { ...balanceFor(currency) } };
+  return { currency, asset: { ...asset }, balance: { ...balanceFor(currency) }, displayFiat: balancePreferences.displayFiat };
 }
 
 function broadcastWalletSelection() {
