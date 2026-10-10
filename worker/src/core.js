@@ -32,6 +32,19 @@ export async function createIpnSignature(payload, secret) {
   return toHex(await crypto.subtle.sign("HMAC", key, encoder.encode(canonicalPayload)));
 }
 
+export async function createRawHmacSignature(payload, secret) {
+  if (!secret) throw new Error("HMAC secret is required");
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"],
+  );
+  return toHex(await crypto.subtle.sign("HMAC", key, encoder.encode(String(payload ?? ""))));
+}
+
 export function signaturesMatch(received, expected) {
   if (typeof received !== "string" || typeof expected !== "string") return false;
   const left = received.trim().toLowerCase();
@@ -118,4 +131,19 @@ export function paymentCanCredit(status) {
 
 export function paymentIsTerminal(status) {
   return ["finished", "failed", "refunded", "expired"].includes(String(status || "").toLowerCase());
+}
+
+export function oxaDepositStatus(status, transactionStatus = "") {
+  const payment = String(status || "").toLowerCase();
+  const transaction = String(transactionStatus || "").toLowerCase();
+  if (payment === "paid" && ["", "confirmed", "complete", "completed"].includes(transaction)) return "finished";
+  if (["failed", "expired", "refunded", "canceled", "cancelled"].includes(payment)) return payment === "canceled" ? "cancelled" : payment;
+  return "confirming";
+}
+
+export function oxaPayoutStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (["confirmed", "complete", "completed"].includes(normalized)) return "finished";
+  if (["canceled", "cancelled", "rejected", "failed"].includes(normalized)) return normalized === "canceled" ? "cancelled" : normalized;
+  return "processing";
 }

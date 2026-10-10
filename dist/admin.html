@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#040d14" />
     <title>Control Room | GamRace</title>
     <link rel="icon" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="admin.css?v=admin-1" />
+    <link rel="stylesheet" href="admin.css?v=oxapay-admin-1" />
   </head>
   <body>
     <div class="admin-ambient" aria-hidden="true"></div>
@@ -133,7 +133,7 @@
 
           <section class="admin-view" data-admin-panel="deposits" hidden><div class="page-intro"><div><p class="section-kicker">FINANCE</p><h2>Deposits</h2><p>Monitor live crypto deposits and provider settlement status.</p></div><select class="admin-select" id="deposit-status-filter" aria-label="Filter deposits by status"><option value="all">All statuses</option><option value="waiting">Waiting</option><option value="confirming">Confirming</option><option value="confirmed">Confirmed</option><option value="finished">Finished</option><option value="failed">Failed</option><option value="expired">Expired</option></select></div><article class="panel-card table-card"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Payment</th><th>Player</th><th>Asset</th><th>Amount</th><th>Status</th><th>Created</th></tr></thead><tbody id="deposits-table-body"></tbody></table></div></article></section>
 
-          <section class="admin-view" data-admin-panel="withdrawals" hidden><div class="page-intro"><div><p class="section-kicker">FINANCE</p><h2>Withdrawal review</h2><p>Every request remains held until you complete or reject it.</p></div><div class="security-note"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.8 8.3 7 10 4.2-1.7 7-5.2 7-10V6l-7-3Z"/><path d="m9.2 12 1.8 1.8 4-4"/></svg><span>Funds remain reserved during review</span></div></div><div class="withdrawal-queue" id="withdrawal-queue"></div></section>
+          <section class="admin-view" data-admin-panel="withdrawals" hidden><div class="page-intro"><div><p class="section-kicker">FINANCE</p><h2>Withdrawal review</h2><p>Approve a request to send it through OxaPay, or reject it to release the held funds.</p></div><div class="security-note"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.8 8.3 7 10 4.2-1.7 7-5.2 7-10V6l-7-3Z"/><path d="m9.2 12 1.8 1.8 4-4"/></svg><span>Funds remain reserved until OxaPay confirms the payout</span></div></div><div class="withdrawal-queue" id="withdrawal-queue"></div></section>
 
           <section class="admin-view" data-admin-panel="games" hidden><div class="page-intro"><div><p class="section-kicker">PRODUCT</p><h2>Game management</h2><p>One operating view for originals, slots, live games and player-versus-player releases.</p></div><button class="solid-button" type="button" disabled>Add game</button></div><div class="product-summary-grid"><article><span>12</span><strong>GamRace Originals</strong><small>1 playable · 11 staged</small></article><article><span>0</span><strong>Slots connected</strong><small>Provider catalogue pending</small></article><article><span>0</span><strong>Live tables</strong><small>Provider catalogue pending</small></article><article><span>2</span><strong>Game modes</strong><small>House · Player</small></article></div><article class="panel-card"><div class="panel-heading"><div><p class="section-kicker">CATALOGUE</p><h3>Release control</h3></div><span class="future-badge">GAME SERVICE PLANNED</span></div><div class="management-list"><div><span class="management-icon">M</span><div><strong>Mines</strong><small>GamRace Original · House</small></div><span class="status-pill live">LIVE UI</span><button disabled>Manage</button></div><div><span class="management-icon">C</span><div><strong>Crash</strong><small>GamRace Original · House</small></div><span class="status-pill staged">STAGED</span><button disabled>Manage</button></div><div><span class="management-icon">B</span><div><strong>Blackjack</strong><small>GamRace Original · House</small></div><span class="status-pill staged">STAGED</span><button disabled>Manage</button></div><div><span class="management-icon">D</span><div><strong>Dice</strong><small>GamRace Original · House</small></div><span class="status-pill staged">STAGED</span><button disabled>Manage</button></div></div></article></section>
 
@@ -167,16 +167,15 @@
         <h2 id="review-title">Review request</h2>
         <div class="review-summary" id="review-summary"></div>
         <div class="review-choice" role="tablist" aria-label="Withdrawal decision">
-          <button class="active" type="button" data-review-decision="complete">Mark completed</button>
+          <button class="active" type="button" data-review-decision="complete">Approve &amp; send</button>
           <button type="button" data-review-decision="reject">Reject & release funds</button>
         </div>
-        <label id="provider-reference-field">Provider payout reference<input id="provider-reference" type="text" maxlength="160" placeholder="Enter the completed payout reference" /></label>
         <label>Internal review note<textarea id="review-note" maxlength="500" placeholder="Add a clear audit note…"></textarea></label>
-        <div class="dialog-actions"><button class="outline-button" value="cancel">Cancel</button><button class="solid-button" id="confirm-review" type="button">Confirm completion</button></div>
+        <div class="dialog-actions"><button class="outline-button" value="cancel">Cancel</button><button class="solid-button" id="confirm-review" type="button">Approve &amp; send</button></div>
         <p class="dialog-status" id="review-status" role="status"></p>
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=admin-1"></script>
+    <script type="module" src="admin.js?v=oxapay-admin-1"></script>
   </body>
 </html>

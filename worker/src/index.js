@@ -1,25 +1,26 @@
 import {
-  DEFAULT_LIMITS,
   assetUnitsToString,
-  createIpnSignature,
+  createRawHmacSignature,
   maskAddress,
   normalizeAddress,
   normalizeCurrency,
   normalizeExtraId,
   normalizeRequestId,
   parseAssetUnits,
-  parseUsdCents,
-  paymentIsTerminal,
+  oxaDepositStatus,
+  oxaPayoutStatus,
   providerAmountToUnits,
   signaturesMatch,
 } from "./core.js";
-import { DEFAULT_WALLET_ASSET, WALLET_ASSETS, getWalletAsset, requireWalletAsset } from "./assets.js";
+import { DEFAULT_WALLET_ASSET, WALLET_ASSETS, getWalletAsset, getWalletAssetByProvider, requireWalletAsset } from "./assets.js";
 import { createAdminSessionToken, verifyAdminPassword, verifyAdminSessionToken } from "./admin-auth.js";
 
 let firebaseKeys;
 let firebaseKeysExpiresAt = 0;
 let currencyCache;
 let currencyCacheExpiresAt = 0;
+let priceCache;
+let priceCacheExpiresAt = 0;
 
 function httpError(status, message, code = "REQUEST_FAILED") {
   return Object.assign(new Error(message), { httpStatus: status, code });
@@ -237,9 +238,11 @@ function handleAdminAccess(request, env, user) {
   return json(request, env, 200, { owner: true });
 }
 
-async function nowPayments(env, path, options = {}) {
-  if (!env.NOWPAYMENTS_API_KEY) throw httpError(503, "Wallet payments are not configured yet");
-  const url = new URL(`${String(env.NOWPAYMENTS_API_BASE || "https://api.nowpayments.io/v1").replace(/\/$/, "")}${path}`);
+async function oxaPay(env, path, options = {}) {
+  const auth = options.auth || "none";
+  const secret = auth === "merchant" ? env.OXAPAY_MERCHANT_API_KEY : auth === "payout" ? env.OXAPAY_PAYOUT_API_KEY : null;
+  if (auth !== "none" && !secret) throw httpError(503, auth === "merchant" ? "Wallet deposits are not configured yet" : "Wallet withdrawals are not configured yet");
+  const url = new URL(`${String(env.OXAPAY_API_BASE || "https://api.oxapay.com/v1").replace(/\/$/, "")}${path}`);
   Object.entries(options.query || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
   });
@@ -248,14 +251,16 @@ async function nowPayments(env, path, options = {}) {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "x-api-key": env.NOWPAYMENTS_API_KEY,
+      ...(auth === "merchant" ? { merchant_api_key: secret } : {}),
+      ...(auth === "payout" ? { payout_api_key: secret } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const providerMessage = String(body?.message || body?.error || "").slice(0, 200);
-    console.error("NOWPayments request failed", {
+  const providerError = body?.error && typeof body.error === "object" ? body.error : {};
+  if (!response.ok || Number(body?.status || response.status) >= 400 || providerError?.message) {
+    const providerMessage = String(providerError?.message || body?.message || "").slice(0, 200);
+    console.error("OxaPay request failed", {
       path,
       status: response.status,
       code: body?.code || body?.status,
@@ -264,12 +269,35 @@ async function nowPayments(env, path, options = {}) {
     const clientStatus = response.status === 429 ? 503 : response.status >= 500 ? 502 : 400;
     const error = httpError(clientStatus, "The payment service could not complete that request", "PROVIDER_ERROR");
     error.providerMessage = providerMessage;
-    error.providerStatus = response.status;
+    error.providerStatus = Number(body?.status || response.status);
     const retryAfter = Number(response.headers.get("Retry-After"));
     error.providerRetryAfterMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 0;
     throw error;
   }
-  return body;
+  return body?.data ?? body;
+}
+
+async function providerCurrencies(env) {
+  if (!currencyCache || currencyCacheExpiresAt < now()) {
+    currencyCache = await oxaPay(env, "/common/currencies");
+    currencyCacheExpiresAt = now() + 5 * 60 * 1000;
+  }
+  return currencyCache || {};
+}
+
+async function providerPrices(env) {
+  if (!priceCache || priceCacheExpiresAt < now()) {
+    priceCache = await oxaPay(env, "/common/prices");
+    priceCacheExpiresAt = now() + 60 * 1000;
+  }
+  return priceCache || {};
+}
+
+function providerRules(currencies, asset) {
+  const currency = currencies?.[asset.providerCurrency];
+  const network = currency?.networks?.[asset.providerNetwork];
+  if (!currency?.status || !network) return null;
+  return network;
 }
 
 async function ensureWalletPreference(env, uid) {
@@ -303,10 +331,9 @@ async function walletResponse(env, uid) {
   let selectedUsdCents = 0;
   if (Number(selected.available) > 0) {
     try {
-      const estimate = await nowPayments(env, "/estimate", {
-        query: { amount: selected.available, currency_from: selected.code, currency_to: "usd" },
-      });
-      selectedUsdCents = Math.max(0, Math.round(Number(estimate.estimated_amount || 0) * 100));
+      const asset = requireWalletAsset(selected.code);
+      const prices = await providerPrices(env);
+      selectedUsdCents = Math.max(0, Math.round(Number(selected.available) * Number(prices?.[asset.providerCurrency] || 0) * 100));
     } catch {
       selectedUsdCents = 0;
     }
@@ -320,6 +347,7 @@ function depositResponse(row) {
     status: row.status,
     requestedUsdCents: Number(row.requested_usd_cents),
     payAmount: String(row.pay_amount),
+    minimumDepositAmount: String(row.pay_amount),
     payCurrency: row.pay_currency,
     payAddress: row.pay_address,
     payinExtraId: row.payin_extra_id || null,
@@ -359,7 +387,7 @@ async function listActivity(env, uid) {
   const result = await env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
            pay_currency AS currency, created_at
-    FROM crypto_deposits WHERE uid = ?
+    FROM crypto_deposits WHERE uid = ? AND status <> 'address_ready'
     UNION ALL
     SELECT id, 'withdrawal' AS type, status, payout_amount AS amount,
            payout_currency AS currency, created_at
@@ -380,38 +408,24 @@ async function handleGetWallet(request, env, user) {
   return json(request, env, 200, { wallet: await walletResponse(env, user.sub), activity: await listActivity(env, user.sub) });
 }
 
-function normalizeProviderCurrencies(body) {
-  // NOWPayments' merchant-specific endpoint returns `selectedCurrencies`,
-  // while the general currency endpoints return `currencies` (or an array).
-  const source = Array.isArray(body?.selectedCurrencies)
-    ? body.selectedCurrencies
-    : Array.isArray(body?.currencies)
-      ? body.currencies
-      : Array.isArray(body)
-        ? body
-        : [];
-  return source.map((entry) => {
-    if (typeof entry === "string") return { code: entry.toLowerCase(), name: entry.toUpperCase(), network: null, requiresExtraId: false };
-    return {
-      code: String(entry?.code || "").toLowerCase(),
-      name: entry?.name || String(entry?.code || "").toUpperCase(),
-      network: entry?.network ? String(entry.network).toLowerCase() : null,
-      requiresExtraId: Boolean(entry?.extra_id_exists),
-      enabled: entry?.enable == null ? true : Boolean(entry.enable),
-    };
-  }).filter((entry) => entry.code && entry.enabled !== false)
-    .map(({ enabled: _enabled, ...entry }) => entry)
-    .sort((left, right) => left.code.localeCompare(right.code));
-}
-
 async function handleCurrencies(request, env) {
-  if (!currencyCache || currencyCacheExpiresAt < now()) {
-    currencyCache = normalizeProviderCurrencies(await nowPayments(env, "/merchant/coins"));
-    currencyCacheExpiresAt = now() + 5 * 60 * 1000;
-  }
-  const available = new Set(currencyCache.map((currency) => currency.code));
+  const provider = await providerCurrencies(env);
   return json(request, env, 200, {
-    currencies: WALLET_ASSETS.filter((asset) => available.has(asset.code)),
+    currencies: WALLET_ASSETS.flatMap((asset) => {
+      const rules = providerRules(provider, asset);
+      if (!rules) return [];
+      return [{
+        code: asset.code,
+        symbol: asset.symbol,
+        name: asset.name,
+        network: asset.network,
+        icon: asset.icon,
+        requiresExtraId: Boolean(asset.requiresExtraId),
+        minimumDeposit: String(rules.deposit_min ?? "0"),
+        minimumWithdrawal: String(rules.withdraw_min ?? "0"),
+        withdrawalFee: String(rules.withdraw_fee ?? "0"),
+      }];
+    }),
   });
 }
 
@@ -425,14 +439,10 @@ async function handleSelectCurrency(request, env, user) {
   return json(request, env, 200, { wallet: await walletResponse(env, user.sub) });
 }
 
-async function existingDepositForRequest(env, uid, requestId) {
-  return env.DB.prepare("SELECT * FROM crypto_deposits WHERE uid = ? AND request_id = ?").bind(uid, requestId).first();
-}
-
 async function existingDepositForCurrency(env, uid, payCurrency) {
   return env.DB.prepare(`
     SELECT * FROM crypto_deposits
-    WHERE uid = ? AND pay_currency = ? AND pay_address <> ''
+    WHERE uid = ? AND pay_currency = ? AND status = 'address_ready' AND pay_address <> ''
     ORDER BY created_at DESC LIMIT 1
   `).bind(uid, payCurrency).first();
 }
@@ -440,121 +450,45 @@ async function existingDepositForCurrency(env, uid, payCurrency) {
 async function handleDepositAddresses(request, env, user) {
   const result = await env.DB.prepare(`
     SELECT * FROM crypto_deposits AS deposit
-    WHERE deposit.uid = ? AND deposit.pay_address <> ''
+    WHERE deposit.uid = ? AND deposit.status = 'address_ready' AND deposit.pay_address <> ''
       AND deposit.created_at = (
         SELECT MAX(candidate.created_at) FROM crypto_deposits AS candidate
         WHERE candidate.uid = deposit.uid AND candidate.pay_currency = deposit.pay_currency
+          AND candidate.status = 'address_ready'
       )
     ORDER BY deposit.created_at DESC
   `).bind(user.sub).all();
   return json(request, env, 200, { deposits: (result.results || []).map(depositResponse) });
 }
 
-function isProviderMinimumError(error) {
-  return error?.code === "PROVIDER_ERROR" && /(?:less than|below).*(?:minimum|minimal)|(?:minimum|minimal).*amount/i.test(error?.providerMessage || "");
-}
-
-async function createProviderDeposit(env, body, initialUsdCents, maximumUsdCents) {
-  let amountUsdCents = initialUsdCents;
-  let rateLimitRetries = 0;
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    try {
-      const payment = await nowPayments(env, "/payment", {
-        method: "POST",
-        body: { ...body, price_amount: amountUsdCents / 100 },
-      });
-      return { payment, amountUsdCents };
-    } catch (error) {
-      if (error?.providerStatus === 429 && attempt < 11) {
-        const backoffMs = Math.min(5000, Math.max(error.providerRetryAfterMs || 0, 1200 * (2 ** rateLimitRetries)));
-        rateLimitRetries += 1;
-        console.warn("Waiting for provider rate limit before retrying deposit address", {
-          payCurrency: body.pay_currency,
-          backoffMs,
-        });
-        await new Promise((resolve) => setTimeout(resolve, backoffMs));
-        continue;
-      }
-      if (!isProviderMinimumError(error) || attempt === 11) throw error;
-      const nextAmountUsdCents = Math.min(maximumUsdCents, Math.max(amountUsdCents + 100, amountUsdCents * 2));
-      if (nextAmountUsdCents <= amountUsdCents) throw error;
-      console.warn("Retrying deposit address above live provider minimum", {
-        payCurrency: body.pay_currency,
-        previousUsdCents: amountUsdCents,
-        nextUsdCents: nextAmountUsdCents,
-      });
-      amountUsdCents = nextAmountUsdCents;
-      // The provider counts the rejected payment toward its rate limit.
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-    }
-  }
-  throw httpError(502, "The payment service could not create a deposit address");
-}
-
-async function currentMinimumDepositUsdCents(env, payCurrency) {
-  const configuredFloor = envNumber(env, "MINIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.minimumDepositUsdCents);
-  try {
-    const minimum = await nowPayments(env, "/min-amount", {
-      query: {
-        currency_from: payCurrency,
-        currency_to: payCurrency,
-        fiat_equivalent: "usd",
-      },
-    });
-    let minimumUsd = Number(minimum.fiat_equivalent || minimum.min_amount_fiat || 0);
-    if (!(minimumUsd > 0) && Number(minimum.min_amount) > 0) {
-      const estimate = await nowPayments(env, "/estimate", {
-        query: {
-          amount: minimum.min_amount,
-          currency_from: payCurrency,
-          currency_to: "usd",
-        },
-      });
-      minimumUsd = Number(estimate.estimated_amount || 0);
-    }
-    if (minimumUsd > 0) {
-      // Keep a small buffer so a quote does not fall below a changing network minimum
-      // between checking the limit and creating the payment address.
-      return Math.max(configuredFloor, Math.ceil(minimumUsd * 1.05 * 100));
-    }
-  } catch (error) {
-    console.error("Could not resolve dynamic deposit minimum", { payCurrency, code: error?.code || "unknown" });
-  }
-  return Math.max(configuredFloor, 500);
-}
-
 async function handleCreateDeposit(request, env, user) {
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
-  const payCurrency = requireWalletAsset(normalizeCurrency(body.payCurrency)).code;
+  const asset = requireWalletAsset(normalizeCurrency(body.payCurrency));
+  const payCurrency = asset.code;
   await ensureWalletPreference(env, user.sub);
 
-  // NOWPayments' iGaming flow expects the generated address to be saved and
-  // associated with the player. Returning it before rate limits or provider
-  // calls makes the address instant, stable across devices, and retry-safe.
+  // OxaPay static addresses are permanent for a player and network. Once saved,
+  // the browser can show the address and QR instantly on every future visit.
   const savedAddress = await existingDepositForCurrency(env, user.sub, payCurrency);
   if (savedAddress) return json(request, env, 200, { deposit: depositResponse(savedAddress) });
 
   await enforceCooldown(env, user.sub, `deposit:${payCurrency}`, 3);
-  const minimumUsdCents = await currentMinimumDepositUsdCents(env, payCurrency);
-  const maximumUsdCents = envNumber(env, "MAXIMUM_DEPOSIT_USD_CENTS", DEFAULT_LIMITS.maximumDepositUsdCents);
-  const amountUsdCents = body.amountUsd == null || body.amountUsd === ""
-    ? minimumUsdCents
-    : parseUsdCents(body.amountUsd, {
-      minimumUsdCents,
-      maximumUsdCents,
-    });
-
-  const existing = await existingDepositForRequest(env, user.sub, requestId);
-  if (existing) return json(request, env, 200, { deposit: depositResponse(existing) });
+  const currencies = await providerCurrencies(env);
+  const rules = providerRules(currencies, asset);
+  if (!rules) throw httpError(409, "That currency and network are not currently available");
+  const minimumDeposit = String(rules.deposit_min ?? "0");
+  const prices = await providerPrices(env);
+  const amountUsdCents = Math.max(1, Math.ceil(Number(minimumDeposit) * Number(prices?.[asset.providerCurrency] || 0) * 100));
 
   const timestamp = now();
-  const requestKey = `${user.sub}:${requestId}`;
+  const internalRequestId = `oxa_${requestId}`;
+  const requestKey = `oxa:${user.sub}:${requestId}`;
   const reserved = await env.DB.prepare(`
     INSERT OR IGNORE INTO crypto_deposit_requests(
       id, uid, request_id, status, requested_usd_cents, pay_currency, created_at, updated_at
     ) VALUES(?, ?, ?, 'creating', ?, ?, ?, ?)
-  `).bind(requestKey, user.sub, requestId, amountUsdCents, payCurrency, timestamp, timestamp).run();
+  `).bind(requestKey, user.sub, internalRequestId, amountUsdCents, payCurrency, timestamp, timestamp).run();
 
   if (Number(reserved.meta?.changes || 0) === 0) {
     const requestRow = await env.DB.prepare("SELECT * FROM crypto_deposit_requests WHERE id = ?").bind(requestKey).first();
@@ -567,19 +501,20 @@ async function handleCreateDeposit(request, env, user) {
 
   try {
     if (!env.PUBLIC_BASE_URL) throw httpError(503, "Wallet callback URL has not been configured");
-    const orderId = `GRD-${requestId}`.slice(0, 64);
-    const created = await createProviderDeposit(env, {
-        price_currency: "usd",
-        pay_currency: payCurrency,
+    const orderId = `GRS-${requestId}`.slice(0, 64);
+    const payment = await oxaPay(env, "/payment/static-address", {
+      auth: "merchant",
+      method: "POST",
+      body: {
+        network: asset.providerNetwork,
+        auto_withdrawal: 0,
         order_id: orderId,
-        order_description: "GamRace wallet deposit",
-        ipn_callback_url: `${String(env.PUBLIC_BASE_URL).replace(/\/$/, "")}/ipn/deposit`,
-      }, amountUsdCents, maximumUsdCents);
-    const { payment } = created;
-    const acceptedUsdCents = created.amountUsdCents;
-    if (!payment.payment_id || !payment.pay_address || !payment.pay_amount) throw httpError(502, "The payment service returned incomplete deposit details");
-    const paymentId = String(payment.payment_id);
-    const status = String(payment.payment_status || payment.status || "waiting").toLowerCase();
+        description: `GamRace ${asset.symbol} deposit address`,
+        callback_url: `${String(env.PUBLIC_BASE_URL).replace(/\/$/, "")}/webhooks/oxapay/deposit`,
+      },
+    });
+    if (!payment.track_id || !payment.address) throw httpError(502, "The payment service returned incomplete deposit details");
+    const paymentId = String(payment.track_id);
     await env.DB.batch([
       env.DB.prepare(`
         INSERT INTO crypto_deposits(
@@ -590,20 +525,20 @@ async function handleCreateDeposit(request, env, user) {
       `).bind(
         paymentId,
         user.sub,
-        requestId,
+        internalRequestId,
         orderId,
-        status,
-        acceptedUsdCents,
-        String(payment.pay_amount),
-        String(payment.pay_currency || payCurrency).toLowerCase(),
-        String(payment.pay_address),
-        payment.payin_extra_id || null,
-        payment.network || null,
-        payment.expiration_estimate_date || payment.valid_until || null,
-        String(payment.actually_paid || payment.amount_received || "0"),
-        status === "finished" ? providerAmountToUnits(payment.actually_paid || payment.amount_received) : 0,
-        payment.created_at || null,
-        payment.updated_at || null,
+        "address_ready",
+        amountUsdCents,
+        minimumDeposit,
+        payCurrency,
+        String(payment.address),
+        payment.memo || null,
+        payment.network || asset.providerNetwork,
+        null,
+        "0",
+        0,
+        payment.date ? new Date(Number(payment.date) * 1000).toISOString() : null,
+        null,
         timestamp,
         timestamp,
       ),
@@ -611,7 +546,7 @@ async function handleCreateDeposit(request, env, user) {
         UPDATE crypto_deposit_requests
         SET status = 'created', payment_id = ?, requested_usd_cents = ?, updated_at = ?
         WHERE id = ?
-      `).bind(paymentId, acceptedUsdCents, timestamp, requestKey),
+      `).bind(paymentId, amountUsdCents, timestamp, requestKey),
     ]);
     const deposit = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
     return json(request, env, 201, { deposit: depositResponse(deposit) });
@@ -623,106 +558,102 @@ async function handleCreateDeposit(request, env, user) {
   }
 }
 
-async function adoptRepeatedDeposit(env, payment) {
-  const paymentId = String(payment?.payment_id || payment?.id || "");
-  const parentPaymentId = String(payment?.parent_payment_id || "");
-  const payCurrency = normalizeCurrency(payment?.pay_currency || "");
-  const payAddress = String(payment?.pay_address || "").trim();
-  let parent = null;
-  if (parentPaymentId) {
-    parent = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(parentPaymentId).first();
-  }
-  if (!parent && payAddress) {
-    parent = await env.DB.prepare(`
-      SELECT * FROM crypto_deposits
-      WHERE pay_address = ? AND pay_currency = ?
-      ORDER BY created_at ASC LIMIT 1
-    `).bind(payAddress, payCurrency).first();
-  }
-  if (!parent) return null;
-
-  const status = String(payment.payment_status || payment.status || "waiting").toLowerCase();
-  const timestamp = now();
-  const receivedAmount = String(payment.actually_paid || payment.amount_received || "0");
-  const requestedUsdCents = Math.max(1, Math.round(Number(payment.price_amount || 0) * 100) || Number(parent.requested_usd_cents));
-  await env.DB.prepare(`
-    INSERT OR IGNORE INTO crypto_deposits(
-      payment_id, uid, request_id, order_id, status, requested_usd_cents,
-      pay_amount, pay_currency, pay_address, payin_extra_id, network, expires_at,
-      actually_paid, credit_units, credited, provider_created_at, provider_updated_at, created_at, updated_at
-    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
-  `).bind(
-    paymentId,
-    parent.uid,
-    `repeat_${paymentId}`.slice(0, 80),
-    `GRR-${paymentId}`.slice(0, 64),
-    status,
-    requestedUsdCents,
-    String(payment.pay_amount || receivedAmount || parent.pay_amount),
-    payCurrency,
-    payAddress || parent.pay_address,
-    payment.payin_extra_id || parent.payin_extra_id || null,
-    payment.network || parent.network || null,
-    payment.expiration_estimate_date || payment.valid_until || null,
-    receivedAmount,
-    status === "finished" ? providerAmountToUnits(receivedAmount) : 0,
-    payment.created_at || null,
-    payment.updated_at || null,
-    timestamp,
-    timestamp,
-  ).run();
-  return env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
+function safeProviderId(value) {
+  return String(value || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 96);
 }
 
-async function applyProviderPayment(env, payment) {
-  const paymentId = String(payment?.payment_id || payment?.id || "");
-  if (!paymentId) throw httpError(400, "Payment identifier is missing");
-  let deposit = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
-  if (!deposit) deposit = await adoptRepeatedDeposit(env, payment);
-  if (!deposit) throw httpError(404, "Deposit not found");
-  const repeated = deposit.request_id.startsWith("repeat_");
-  if (!repeated && payment.order_id && payment.order_id !== deposit.order_id) throw httpError(409, "Payment reference mismatch");
-  const providerCurrency = normalizeCurrency(payment.pay_currency || deposit.pay_currency);
-  if (providerCurrency !== deposit.pay_currency) throw httpError(409, "Payment currency mismatch");
-  const providerPriceCents = Math.round(Number(payment.price_amount || 0) * 100);
-  if (!repeated && providerPriceCents && providerPriceCents !== Number(deposit.requested_usd_cents)) throw httpError(409, "Payment amount mismatch");
-  const status = String(payment.payment_status || payment.status || deposit.status).toLowerCase();
+async function applyOxaPayment(env, payment) {
+  const trackId = safeProviderId(payment?.track_id);
+  if (!trackId) throw httpError(400, "Payment identifier is missing");
+  const address = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ? AND status = 'address_ready'").bind(trackId).first();
+  if (!address) throw httpError(404, "Deposit address not found");
+  if (payment.order_id && payment.order_id !== address.order_id) throw httpError(409, "Payment reference mismatch");
+  const transactions = Array.isArray(payment.txs) ? payment.txs : [];
   const timestamp = now();
-  await env.DB.prepare(`
-    UPDATE crypto_deposits
-    SET status = ?, actually_paid = ?, credit_units = ?, provider_updated_at = ?, updated_at = ?
-    WHERE payment_id = ?
-  `).bind(
-    status,
-    String(payment.actually_paid || payment.amount_received || "0"),
-    status === "finished" ? providerAmountToUnits(payment.actually_paid || payment.amount_received) : Number(deposit.credit_units || 0),
-    payment.updated_at || null,
-    timestamp,
-    paymentId,
-  ).run();
-  return env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
+
+  for (const transaction of transactions) {
+    const transactionHash = safeProviderId(transaction?.tx_hash);
+    const asset = getWalletAssetByProvider(transaction?.currency || payment?.currency, transaction?.network || payment?.network);
+    if (!transactionHash || !asset) continue;
+    if (transaction.address && String(transaction.address).trim() !== String(address.pay_address).trim()) throw httpError(409, "Deposit address mismatch");
+    const receivedAmount = String(transaction.received_amount ?? transaction.sent_amount ?? "0");
+    const status = oxaDepositStatus(payment.status, transaction.status);
+    const paymentId = `oxa_${trackId}_${transactionHash}`;
+    const requestId = `oxa_tx_${transactionHash}`.slice(0, 120);
+    const orderId = `GRX-${trackId}-${transactionHash}`.slice(0, 120);
+    const transactionDate = Number(transaction.date || payment.date || 0);
+    const createdAt = transactionDate > 0 ? transactionDate * 1000 : timestamp;
+    const creditUnits = status === "finished" ? providerAmountToUnits(receivedAmount) : 0;
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_deposits(
+        payment_id, uid, request_id, order_id, status, requested_usd_cents,
+        pay_amount, pay_currency, pay_address, payin_extra_id, network, expires_at,
+        actually_paid, credit_units, credited, provider_created_at, provider_updated_at, created_at, updated_at
+      ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 0, ?, ?, ?, ?)
+    `).bind(
+      paymentId,
+      address.uid,
+      requestId,
+      orderId,
+      status,
+      Math.max(1, Number(address.requested_usd_cents || 1)),
+      receivedAmount,
+      asset.code,
+      address.pay_address,
+      address.payin_extra_id || null,
+      transaction.network || asset.providerNetwork,
+      receivedAmount,
+      creditUnits,
+      transactionDate > 0 ? new Date(createdAt).toISOString() : null,
+      new Date(timestamp).toISOString(),
+      createdAt,
+      timestamp,
+    ).run();
+    const existing = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(paymentId).first();
+    if (existing && !existing.credited) {
+      await env.DB.prepare(`
+        UPDATE crypto_deposits
+        SET status = ?, actually_paid = ?, credit_units = ?, provider_updated_at = ?, updated_at = ?
+        WHERE payment_id = ?
+      `).bind(status, receivedAmount, creditUnits || Number(existing.credit_units || 0), new Date(timestamp).toISOString(), timestamp, paymentId).run();
+    }
+  }
+  await env.DB.prepare("UPDATE crypto_deposits SET updated_at = ? WHERE payment_id = ?").bind(timestamp, trackId).run();
+  return env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ?").bind(trackId).first();
 }
 
 async function handleGetDeposit(request, env, user, paymentId) {
   let deposit = await env.DB.prepare("SELECT * FROM crypto_deposits WHERE payment_id = ? AND uid = ?").bind(paymentId, user.sub).first();
   if (!deposit) throw httpError(404, "Deposit not found");
-  if (!deposit.credited && !paymentIsTerminal(deposit.status)) {
-    deposit = await applyProviderPayment(env, await nowPayments(env, `/payment/${encodeURIComponent(paymentId)}`));
+  if (deposit.status === "address_ready" && now() - Number(deposit.updated_at || 0) >= 60_000) {
+    const payment = await oxaPay(env, `/payment/${encodeURIComponent(paymentId)}`, { auth: "merchant" });
+    deposit = await applyOxaPayment(env, payment);
   }
-  return json(request, env, 200, { deposit: depositResponse(deposit) });
+  const latest = await env.DB.prepare(`
+    SELECT * FROM crypto_deposits
+    WHERE uid = ? AND pay_address = ? AND status <> 'address_ready'
+    ORDER BY updated_at DESC LIMIT 1
+  `).bind(user.sub, deposit.pay_address).first();
+  const response = depositResponse(deposit);
+  if (latest) {
+    response.status = latest.status;
+    response.credited = Boolean(latest.credited);
+    response.creditedAmount = assetUnitsToString(Number(latest.credit_units || 0), false);
+  }
+  return json(request, env, 200, { deposit: response });
 }
 
-async function handleDepositIpn(request, env) {
-  if (!env.NOWPAYMENTS_IPN_SECRET) throw httpError(503, "Payment notifications are not configured");
-  const body = await requestJson(request);
-  const received = request.headers.get("x-nowpayments-sig") || "";
-  const expected = await createIpnSignature(body, env.NOWPAYMENTS_IPN_SECRET);
+async function handleDepositWebhook(request, env) {
+  if (!env.OXAPAY_MERCHANT_API_KEY) throw httpError(503, "Payment notifications are not configured");
+  const rawBody = await request.text();
+  let body;
+  try { body = JSON.parse(rawBody); } catch { throw httpError(400, "Request body must be valid JSON"); }
+  const received = request.headers.get("HMAC") || "";
+  const expected = await createRawHmacSignature(rawBody, env.OXAPAY_MERCHANT_API_KEY);
   if (!signaturesMatch(received, expected)) throw httpError(401, "Invalid signature");
-  const paymentId = String(body.payment_id || body.id || "");
-  if (!paymentId) throw httpError(400, "Payment identifier is missing");
-  const verified = await nowPayments(env, `/payment/${encodeURIComponent(paymentId)}`);
-  await applyProviderPayment(env, verified);
-  return json(request, env, 200, { ok: true });
+  if (String(body.type || "").toLowerCase() !== "static_address") throw httpError(400, "Invalid payment type");
+  await applyOxaPayment(env, body);
+  return new Response("ok", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }
 
 async function handleCreateWithdrawal(request, env, user) {
@@ -730,19 +661,21 @@ async function handleCreateWithdrawal(request, env, user) {
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
   const requestedUnits = parseAssetUnits(body.amount);
-  const payoutCurrency = requireWalletAsset(normalizeCurrency(body.payoutCurrency)).code;
+  const asset = requireWalletAsset(normalizeCurrency(body.payoutCurrency));
+  const payoutCurrency = asset.code;
   const address = normalizeAddress(body.address);
   const extraId = normalizeExtraId(body.extraId);
+  if (asset.requiresExtraId && !extraId) throw httpError(400, "Enter the destination tag for this withdrawal");
   const id = `${user.sub}_${requestId}`;
   const existing = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ? AND uid = ?").bind(id, user.sub).first();
   if (existing) return json(request, env, 200, { withdrawal: withdrawalResponse(existing) });
 
   const preference = await ensureWalletPreference(env, user.sub);
   if (preference.selected_currency !== payoutCurrency) throw httpError(409, "Withdraw from the balance currently selected in your wallet");
-  await nowPayments(env, "/payout/validate-address", {
-    method: "POST",
-    body: { address, currency: payoutCurrency, extra_id: extraId || undefined },
-  });
+  const rules = providerRules(await providerCurrencies(env), asset);
+  if (!rules) throw httpError(409, "That currency and network are not currently available");
+  const minimumUnits = providerAmountToUnits(rules.withdraw_min);
+  if (minimumUnits > 0 && requestedUnits < minimumUnits) throw httpError(400, `Minimum withdrawal is ${rules.withdraw_min} ${asset.symbol}`);
   const payoutAmount = assetUnitsToString(requestedUnits);
 
   const timestamp = now();
@@ -776,9 +709,65 @@ async function handleCreateWithdrawal(request, env, user) {
 }
 
 async function handleGetWithdrawal(request, env, user, withdrawalId) {
-  const withdrawal = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ? AND uid = ?").bind(withdrawalId, user.sub).first();
+  let withdrawal = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ? AND uid = ?").bind(withdrawalId, user.sub).first();
   if (!withdrawal) throw httpError(404, "Withdrawal not found");
+  if (withdrawal.provider_reference && withdrawal.status === "processing") {
+    try {
+      withdrawal = await applyOxaPayout(env, await oxaPay(env, `/payout/${encodeURIComponent(withdrawal.provider_reference)}`, { auth: "payout" }));
+    } catch (error) {
+      console.error("OxaPay payout reconciliation failed", {
+        withdrawalId: withdrawal.id,
+        providerReference: withdrawal.provider_reference,
+        message: String(error?.message || error),
+      });
+    }
+  }
   return json(request, env, 200, { withdrawal: withdrawalResponse(withdrawal) });
+}
+
+async function applyOxaPayout(env, payout) {
+  const trackId = safeProviderId(payout?.track_id);
+  if (!trackId) throw httpError(400, "Payout identifier is missing");
+  let withdrawal = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE provider_reference = ?").bind(trackId).first();
+  if (!withdrawal && String(payout.description || "").startsWith("GamRace withdrawal ")) {
+    const describedId = String(payout.description).slice("GamRace withdrawal ".length).trim();
+    withdrawal = await env.DB.prepare(`
+      SELECT * FROM crypto_withdrawals
+      WHERE id = ? AND status IN ('submitting', 'submission_unknown', 'processing')
+    `).bind(describedId).first();
+    if (withdrawal) {
+      await env.DB.prepare(`
+        UPDATE crypto_withdrawals SET provider_reference = ?, updated_at = ?
+        WHERE id = ? AND provider_reference IS NULL
+      `).bind(trackId, now(), withdrawal.id).run();
+      withdrawal.provider_reference = trackId;
+    }
+  }
+  if (!withdrawal) throw httpError(404, "Withdrawal not found");
+  const asset = getWalletAssetByProvider(payout.currency, payout.network);
+  if (payout.currency && (!asset || asset.code !== withdrawal.payout_currency)) throw httpError(409, "Payout currency or network mismatch");
+  if (payout.address && String(payout.address).trim() !== String(withdrawal.address).trim()) throw httpError(409, "Payout address mismatch");
+  const providerUnits = providerAmountToUnits(payout.amount);
+  if (providerUnits && providerUnits !== Number(withdrawal.requested_units)) throw httpError(409, "Payout amount mismatch");
+  const status = oxaPayoutStatus(payout.status);
+  await env.DB.prepare(`
+    UPDATE crypto_withdrawals SET status = ?, updated_at = ?
+    WHERE id = ? AND hold_state = 'held'
+  `).bind(status, now(), withdrawal.id).run();
+  return env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ?").bind(withdrawal.id).first();
+}
+
+async function handlePayoutWebhook(request, env) {
+  if (!env.OXAPAY_PAYOUT_API_KEY) throw httpError(503, "Payout notifications are not configured");
+  const rawBody = await request.text();
+  let body;
+  try { body = JSON.parse(rawBody); } catch { throw httpError(400, "Request body must be valid JSON"); }
+  const received = request.headers.get("HMAC") || "";
+  const expected = await createRawHmacSignature(rawBody, env.OXAPAY_PAYOUT_API_KEY);
+  if (!signaturesMatch(received, expected)) throw httpError(401, "Invalid signature");
+  if (String(body.type || "").toLowerCase() !== "payout") throw httpError(400, "Invalid payout type");
+  await applyOxaPayout(env, body);
+  return new Response("ok", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }
 
 function adminAssetAmount(row, field = "amount_units") {
@@ -801,7 +790,7 @@ async function handleAdminOverview(request, env, user) {
         (SELECT COUNT(*) FROM crypto_deposits WHERE credited = 1) AS completed_deposits,
         (SELECT COUNT(*) FROM crypto_deposits WHERE credited = 1 AND updated_at >= ?) AS deposits_24h,
         (SELECT COUNT(*) FROM crypto_withdrawals WHERE created_at >= ?) AS withdrawals_24h,
-        (SELECT COUNT(*) FROM crypto_withdrawals WHERE status = 'pending_review') AS pending_withdrawals,
+        (SELECT COUNT(*) FROM crypto_withdrawals WHERE status IN ('pending_review', 'submitting', 'submission_unknown', 'processing')) AS pending_withdrawals,
         (SELECT COUNT(*) FROM crypto_withdrawals WHERE status IN ('failed', 'rejected') AND updated_at >= ?) AS flagged_24h
     `).bind(dayStart, dayStart, dayStart).first(),
     env.DB.prepare(`
@@ -818,7 +807,7 @@ async function handleAdminOverview(request, env, user) {
       SELECT * FROM (
         SELECT 'deposit' AS type, payment_id AS id, uid, pay_currency AS currency,
                pay_amount AS amount, status, updated_at AS occurred_at
-        FROM crypto_deposits
+        FROM crypto_deposits WHERE status <> 'address_ready'
         UNION ALL
         SELECT 'withdrawal' AS type, id, uid, payout_currency AS currency,
                payout_amount AS amount, status, updated_at AS occurred_at
@@ -830,7 +819,7 @@ async function handleAdminOverview(request, env, user) {
       SELECT day, SUM(deposit_count) AS deposits, SUM(withdrawal_count) AS withdrawals FROM (
         SELECT strftime('%Y-%m-%d', updated_at / 1000, 'unixepoch') AS day,
                COUNT(*) AS deposit_count, 0 AS withdrawal_count
-        FROM crypto_deposits WHERE updated_at >= ? GROUP BY day
+        FROM crypto_deposits WHERE updated_at >= ? AND status <> 'address_ready' GROUP BY day
         UNION ALL
         SELECT strftime('%Y-%m-%d', updated_at / 1000, 'unixepoch') AS day,
                0 AS deposit_count, COUNT(*) AS withdrawal_count
@@ -916,7 +905,7 @@ async function handleAdminDeposits(request, env, user) {
     ? await env.DB.prepare(`
         SELECT payment_id, uid, status, requested_usd_cents, pay_amount, pay_currency,
                network, credited, created_at, updated_at FROM crypto_deposits
-        ORDER BY created_at DESC LIMIT ?
+        WHERE status <> 'address_ready' ORDER BY created_at DESC LIMIT ?
       `).bind(limit).all()
     : await env.DB.prepare(`
         SELECT payment_id, uid, status, requested_usd_cents, pay_amount, pay_currency,
@@ -966,13 +955,14 @@ async function handleAdminSystem(request, env, user) {
     services: [
       { id: "identity", label: "Firebase identity", status: env.FIREBASE_PROJECT_ID ? "operational" : "attention" },
       { id: "database", label: "Wallet database", status: env.DB ? "operational" : "attention" },
-      { id: "payments", label: "Crypto payments", status: env.NOWPAYMENTS_API_KEY ? "operational" : "paused" },
+      { id: "payments", label: "OxaPay deposits", status: env.OXAPAY_MERCHANT_API_KEY ? "operational" : "paused" },
+      { id: "payouts", label: "OxaPay payouts", status: env.OXAPAY_PAYOUT_API_KEY ? "operational" : "paused" },
       { id: "owner", label: "Owner access", status: env.OWNER_FIREBASE_UID ? "operational" : "attention" },
       { id: "admin-password", label: "Admin password", status: env.ADMIN_PANEL_PASSWORD ? "operational" : "attention" },
     ],
     capabilities: {
-      deposits: Boolean(env.NOWPAYMENTS_API_KEY),
-      withdrawals: true,
+      deposits: Boolean(env.OXAPAY_MERCHANT_API_KEY),
+      withdrawals: Boolean(env.OXAPAY_PAYOUT_API_KEY),
       withdrawalReview: true,
       multiAssetBalances: true,
       playerProfiles: false,
@@ -988,7 +978,7 @@ async function handleAdminWithdrawals(request, env, user) {
     SELECT id, uid, status, hold_state, requested_units, payout_amount, payout_currency,
            address, extra_id, provider_reference, review_note, created_at, updated_at
     FROM crypto_withdrawals
-    WHERE status = 'pending_review'
+    WHERE status IN ('pending_review', 'submitting', 'submission_unknown', 'processing')
     ORDER BY created_at ASC LIMIT 100
   `).all();
   return json(request, env, 200, {
@@ -1017,13 +1007,43 @@ async function handleAdminWithdrawalDecision(request, env, user, withdrawalId, d
   if (current.status !== "pending_review") throw httpError(409, "Withdrawal has already been reviewed");
   const timestamp = now();
   if (decision === "complete") {
-    const providerReference = String(body.providerReference || "").trim();
-    if (providerReference.length < 3 || providerReference.length > 160) throw httpError(400, "Enter the completed NOWPayments payout reference");
-    await env.DB.prepare(`
-      UPDATE crypto_withdrawals
-      SET status = 'finished', provider_reference = ?, review_note = ?, updated_at = ?
+    if (!env.OXAPAY_PAYOUT_API_KEY) throw httpError(503, "Wallet withdrawals are not configured yet");
+    if (!env.PUBLIC_BASE_URL) throw httpError(503, "Wallet callback URL has not been configured");
+    const claimed = await env.DB.prepare(`
+      UPDATE crypto_withdrawals SET status = 'submitting', review_note = ?, updated_at = ?
       WHERE id = ? AND status = 'pending_review'
-    `).bind(providerReference, String(body.note || "").slice(0, 500) || null, timestamp, withdrawalId).run();
+    `).bind(String(body.note || "").slice(0, 500) || null, timestamp, withdrawalId).run();
+    if (Number(claimed.meta?.changes || 0) !== 1) throw httpError(409, "Withdrawal has already been reviewed");
+    const asset = requireWalletAsset(current.payout_currency);
+    try {
+      const payout = await oxaPay(env, "/payout", {
+        auth: "payout",
+        method: "POST",
+        body: {
+          address: current.address,
+          currency: asset.providerCurrency,
+          amount: Number(current.payout_amount),
+          network: asset.providerNetwork,
+          callback_url: `${String(env.PUBLIC_BASE_URL).replace(/\/$/, "")}/webhooks/oxapay/payout`,
+          memo: current.extra_id || undefined,
+          description: `GamRace withdrawal ${current.id}`.slice(0, 160),
+        },
+      });
+      const providerReference = safeProviderId(payout.track_id);
+      if (!providerReference) throw httpError(502, "The payment service returned incomplete payout details");
+      await env.DB.prepare(`
+        UPDATE crypto_withdrawals
+        SET status = ?, provider_reference = ?, updated_at = ?
+        WHERE id = ? AND status = 'submitting'
+      `).bind(oxaPayoutStatus(payout.status), providerReference, now(), withdrawalId).run();
+    } catch (error) {
+      const definitelyRejected = Number(error?.providerStatus || 0) > 0 && Number(error.providerStatus) < 500;
+      await env.DB.prepare(`
+        UPDATE crypto_withdrawals SET status = ?, updated_at = ?
+        WHERE id = ? AND status = 'submitting'
+      `).bind(definitelyRejected ? "pending_review" : "submission_unknown", now(), withdrawalId).run();
+      throw error;
+    }
   } else {
     const note = String(body.note || "").trim();
     if (note.length < 3 || note.length > 500) throw httpError(400, "Enter a brief rejection reason");
@@ -1034,7 +1054,7 @@ async function handleAdminWithdrawalDecision(request, env, user, withdrawalId, d
     `).bind(note, timestamp, withdrawalId).run();
   }
   const updated = await env.DB.prepare("SELECT * FROM crypto_withdrawals WHERE id = ?").bind(withdrawalId).first();
-  await writeAdminAudit(env, user, `withdrawal.${decision === "complete" ? "completed" : "rejected"}`, withdrawalId, String(body.note || "") || null);
+  await writeAdminAudit(env, user, `withdrawal.${decision === "complete" ? "approved" : "rejected"}`, withdrawalId, String(body.note || "") || null);
   return json(request, env, 200, { withdrawal: withdrawalResponse(updated) });
 }
 
@@ -1045,8 +1065,9 @@ function pathFrom(request) {
 async function route(request, env) {
   const path = pathFrom(request);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
-  if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "nowpayments", mode: "live" });
-  if (request.method === "POST" && path === "/ipn/deposit") return handleDepositIpn(request, env);
+  if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
+  if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
+  if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
 
   const user = await requireUser(request, env);
   if (request.method === "GET" && path === "/admin/access") return handleAdminAccess(request, env, user);

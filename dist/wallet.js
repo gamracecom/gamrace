@@ -14,13 +14,21 @@ const WALLET_API_BASE_URL = "https://gamrace-wallet-api.gamracecom.workers.dev";
 const ICON_ROOT = "assets/icons/crypto";
 const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).has("wallet-preview");
 const PREVIEW_ASSETS = [
-  ["usdterc20", "USDT", "Tether", "Ethereum (ERC20)", "usdt"], ["usdttrc20", "USDT", "Tether", "Tron (TRC20)", "usdt"],
+  ["usdttrc20", "USDT", "Tether", "Tron (TRC20)", "usdt", false, "0.01"],
+  ["usdtbep20", "USDT", "Tether", "BNB Smart Chain (BEP20)", "usdt", false, "0.01"],
+  ["usdtsol", "USDT", "Tether", "Solana", "usdt", false, "0.01"],
+  ["usdtpolygon", "USDT", "Tether", "Polygon", "usdt", false, "0.01"],
+  ["usdterc20", "USDT", "Tether", "Ethereum (ERC20)", "usdt", false, "0.01"],
   ["btc", "BTC", "Bitcoin", "Bitcoin", "btc"], ["eth", "ETH", "Ethereum", "Ethereum", "eth"],
-  ["usdc", "USDC", "USD Coin", "Ethereum (ERC20)", "usdc"], ["sol", "SOL", "Solana", "Solana", "sol"],
-  ["trx", "TRX", "TRON", "Tron", "trx"], ["ltc", "LTC", "Litecoin", "Litecoin", "ltc"],
-  ["doge", "DOGE", "Dogecoin", "Dogecoin", "doge"], ["xrp", "XRP", "XRP", "XRP Ledger", "xrp", true],
-  ["bnbbsc", "BNB", "BNB", "BNB Smart Chain (BEP20)", "bnb"],
-].map(([code, symbol, name, network, icon, requiresExtraId = false]) => ({ code, symbol, name, network, icon, requiresExtraId }));
+  ["usdcsol", "USDC", "USD Coin", "Solana", "usdc", false, "0.01"],
+  ["usdcpolygon", "USDC", "USD Coin", "Polygon", "usdc", false, "0.01"],
+  ["usdcbase", "USDC", "USD Coin", "Base", "usdc", false, "0.01"],
+  ["usdcbep20", "USDC", "USD Coin", "BNB Smart Chain (BEP20)", "usdc", false, "0.01"],
+  ["usdc", "USDC", "USD Coin", "Ethereum (ERC20)", "usdc", false, "0.01"],
+  ["sol", "SOL", "Solana", "Solana", "sol"], ["ltc", "LTC", "Litecoin", "Litecoin", "ltc"],
+  ["trx", "TRX", "TRON", "Tron", "trx"], ["xrp", "XRP", "XRP", "XRP Ledger", "xrp", true],
+  ["doge", "DOGE", "Dogecoin", "Dogecoin", "doge"], ["bnbbsc", "BNB", "BNB", "BNB Smart Chain (BEP20)", "bnb"],
+].map(([code, symbol, name, network, icon, requiresExtraId = false, minimumDeposit = "0"]) => ({ code, symbol, name, network, icon, requiresExtraId, minimumDeposit }));
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const walletButtons = [...document.querySelectorAll(".utility.wallet")];
@@ -200,11 +208,12 @@ async function api(path, options = {}) {
     }
     if (path === "/deposits") {
       const payCurrency = JSON.parse(options.body).payCurrency;
+      const asset = assetFor(payCurrency);
       return { deposit: {
-        id: `preview-${payCurrency}`, status: "waiting", payCurrency,
-        requestedUsdCents: 100,
+        id: `preview-${payCurrency}`, status: "address_ready", payCurrency,
+        requestedUsdCents: 1, minimumDepositAmount: asset?.minimumDeposit || "0",
         payAddress: payCurrency === "xrp" ? "rGamRacePreviewAddress123456789" : "0xGamRacePreviewAddress1234567890",
-        payinExtraId: payCurrency === "xrp" ? "248091" : "", network: assetFor(payCurrency)?.network,
+        payinExtraId: payCurrency === "xrp" ? "248091" : "", network: asset?.network,
       } };
     }
     throw new Error("Live financial actions are disabled in the local design preview");
@@ -417,6 +426,7 @@ function updateAssetControl(context) {
     dialog.withdrawalNetwork.textContent = asset.network;
     dialog.withdrawalAvailable.textContent = `Available: ${cleanCryptoAmount(available)} ${asset.symbol}`;
     dialog.withdrawalAmountIcon.src = iconUrl(asset);
+    dialog.withdrawalForm.elements.amount.min = asset.minimumWithdrawal || "0.00000001";
     dialog.withdrawalMemoField.hidden = !asset.requiresExtraId;
     dialog.withdrawalMemoField.querySelector("input").required = Boolean(asset.requiresExtraId);
   }
@@ -602,7 +612,7 @@ async function preloadDepositAddresses(generation = preloadGeneration) {
   const queue = [...currencies]
     .filter((asset) => !depositCache.has(asset.code))
     .sort((left, right) => Number(right.code === preferred) - Number(left.code === preferred));
-  // Provider payment creation is deliberately sequential. A burst of eleven
+  // Provider payment creation is deliberately sequential. A burst of many
   // requests caused rate/minimum races and left some currencies unavailable;
   // saved addresses still render immediately from the server-side cache.
   while (queue.length && generation === preloadGeneration && currentUser) {
@@ -641,8 +651,8 @@ function renderDeposit(deposit) {
   dialog.depositAddressLabel.textContent = `${asset.name || asset.symbol} (${asset.network || deposit.network}) address`;
   dialog.depositMemoRow.hidden = !deposit.payinExtraId;
   dialog.depositMemo.textContent = deposit.payinExtraId || "";
-  const minimumDepositUsd = Math.max(0, Number(deposit.requestedUsdCents || 100)) / 100;
-  dialog.depositWarning.textContent = `Minimum deposit: $${minimumDepositUsd.toFixed(2)} USD equivalent. Only send ${asset.symbol} on ${asset.network || deposit.network}. Using another coin or network can permanently lose funds.`;
+  const minimumDeposit = cleanCryptoAmount(deposit.minimumDepositAmount || asset.minimumDeposit || "0");
+  dialog.depositWarning.textContent = `Minimum deposit: ${minimumDeposit} ${asset.symbol}. Only send ${asset.symbol} on ${asset.network || deposit.network}. Using another coin or network can permanently lose funds.`;
   renderQr(deposit.payAddress);
   dialog.depositRetry.hidden = true;
   if (deposit.credited || ["failed", "refunded", "expired"].includes(deposit.status)) {

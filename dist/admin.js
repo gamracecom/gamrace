@@ -411,7 +411,7 @@ async function loadDeposits() {
   const body = document.querySelector("#deposits-table-body");
   if (!result.deposits.length) setTableEmpty(body, 6, "No deposits match this view.");
   else body.innerHTML = result.deposits.map((deposit) => `
-    <tr><td><span class="table-primary">${shortId(deposit.id, 7)}</span><span class="table-secondary">Provider payment</span></td><td>${shortId(deposit.uid, 6)}</td><td>${formatAsset(deposit.payCurrency)}</td><td><span class="table-primary">${deposit.payAmount}</span><span class="table-secondary">Requested $${(deposit.requestedUsdCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></td><td><span class="status-pill ${statusClass(deposit.status)}">${deposit.status}</span></td><td>${formatDate(deposit.createdAt, true)}</td></tr>
+    <tr><td><span class="table-primary">${shortId(deposit.id, 7)}</span><span class="table-secondary">OxaPay transaction</span></td><td>${shortId(deposit.uid, 6)}</td><td>${formatAsset(deposit.payCurrency)}</td><td><span class="table-primary">${deposit.payAmount}</span><span class="table-secondary">${deposit.network || "Selected network"}</span></td><td><span class="status-pill ${statusClass(deposit.status)}">${deposit.status}</span></td><td>${formatDate(deposit.createdAt, true)}</td></tr>
   `).join("");
   setLastRefresh();
 }
@@ -427,7 +427,7 @@ async function loadWithdrawals() {
   navCount.hidden = count === 0;
   if (!count) container.innerHTML = '<div class="empty-state-card"><div><span>✓</span><strong>No withdrawals waiting for review</strong><p>New requests will appear here with funds already held.</p></div></div>';
   else container.innerHTML = result.withdrawals.map((withdrawal) => `
-    <article class="withdrawal-card"><div><label>Request</label><strong>${shortId(withdrawal.id, 7)}</strong></div><div><label>Amount</label><strong class="amount">${withdrawal.payoutAmount} ${formatAsset(withdrawal.payoutCurrency)}</strong></div><div><label>Player</label><strong>${shortId(withdrawal.uid, 6)}</strong></div><div><label>Submitted</label><strong>${formatDate(withdrawal.createdAt, true)}</strong></div><button type="button" data-review-withdrawal="${withdrawal.id}">Review</button></article>
+    <article class="withdrawal-card"><div><label>Request</label><strong>${shortId(withdrawal.id, 7)}</strong></div><div><label>Amount</label><strong class="amount">${withdrawal.payoutAmount} ${formatAsset(withdrawal.payoutCurrency)}</strong></div><div><label>Status</label><strong><span class="status-pill ${statusClass(withdrawal.status)}">${withdrawal.status.replaceAll("_", " ")}</span></strong></div><div><label>Submitted</label><strong>${formatDate(withdrawal.createdAt, true)}</strong></div>${withdrawal.status === "pending_review" ? `<button type="button" data-review-withdrawal="${withdrawal.id}">Review</button>` : ""}</article>
   `).join("");
   container.querySelectorAll("[data-review-withdrawal]").forEach((button) => button.addEventListener("click", () => openWithdrawalReview(result.withdrawals.find((item) => item.id === button.dataset.reviewWithdrawal))));
   setLastRefresh();
@@ -437,11 +437,9 @@ function openWithdrawalReview(withdrawal) {
   activeWithdrawal = withdrawal;
   reviewDecision = "complete";
   document.querySelectorAll("[data-review-decision]").forEach((button) => button.classList.toggle("active", button.dataset.reviewDecision === "complete"));
-  document.querySelector("#provider-reference-field").hidden = false;
-  document.querySelector("#provider-reference").value = "";
   document.querySelector("#review-note").value = "";
   document.querySelector("#review-status").textContent = "";
-  document.querySelector("#confirm-review").textContent = "Confirm completion";
+  document.querySelector("#confirm-review").textContent = "Approve & send";
   document.querySelector("#review-title").textContent = `Review ${shortId(withdrawal.id, 7)}`;
   document.querySelector("#review-summary").innerHTML = `
     <div><span>Amount</span><strong>${withdrawal.payoutAmount} ${formatAsset(withdrawal.payoutCurrency)}</strong></div><div><span>Player</span><strong>${shortId(withdrawal.uid, 7)}</strong></div><div><span>Address</span><strong title="${withdrawal.address}">${shortId(withdrawal.address, 9)}</strong></div><div><span>Submitted</span><strong>${formatDate(withdrawal.createdAt, true)}</strong></div>`;
@@ -451,25 +449,22 @@ function openWithdrawalReview(withdrawal) {
 document.querySelectorAll("[data-review-decision]").forEach((button) => button.addEventListener("click", () => {
   reviewDecision = button.dataset.reviewDecision;
   document.querySelectorAll("[data-review-decision]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
-  document.querySelector("#provider-reference-field").hidden = reviewDecision !== "complete";
-  document.querySelector("#confirm-review").textContent = reviewDecision === "complete" ? "Confirm completion" : "Reject and release funds";
+  document.querySelector("#confirm-review").textContent = reviewDecision === "complete" ? "Approve & send" : "Reject and release funds";
 }));
 
 document.querySelector("#confirm-review").addEventListener("click", async () => {
   if (!activeWithdrawal) return;
-  const providerReference = document.querySelector("#provider-reference").value.trim();
   const note = document.querySelector("#review-note").value.trim();
   const status = document.querySelector("#review-status");
   const button = document.querySelector("#confirm-review");
-  if (reviewDecision === "complete" && providerReference.length < 3) { status.textContent = "Enter the completed payout reference."; return; }
   if (reviewDecision === "reject" && note.length < 3) { status.textContent = "Enter a brief rejection reason."; return; }
   button.disabled = true;
   status.textContent = "";
   try {
-    await api(`/admin/withdrawals/${encodeURIComponent(activeWithdrawal.id)}/${reviewDecision}`, { method: "POST", body: JSON.stringify({ providerReference, note }) });
+    await api(`/admin/withdrawals/${encodeURIComponent(activeWithdrawal.id)}/${reviewDecision}`, { method: "POST", body: JSON.stringify({ note }) });
     reviewDialog.close();
     overviewCache = null;
-    showToast(reviewDecision === "complete" ? "Withdrawal marked complete" : "Withdrawal rejected and funds released");
+    showToast(reviewDecision === "complete" ? "Withdrawal sent to OxaPay" : "Withdrawal rejected and funds released");
     await loadWithdrawals();
   } catch (error) {
     status.textContent = error.message;

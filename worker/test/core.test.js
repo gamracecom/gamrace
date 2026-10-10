@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 import {
   createIpnSignature,
+  createRawHmacSignature,
   assetUnitsToString,
   maskAddress,
   normalizeAddress,
@@ -12,6 +13,8 @@ import {
   providerAmountToUnits,
   parseUsdCents,
   paymentCanCredit,
+  oxaDepositStatus,
+  oxaPayoutStatus,
   signaturesMatch,
   sortObject,
 } from "../src/core.js";
@@ -23,6 +26,12 @@ test("IPN signing recursively sorts object keys", async () => {
   assert.equal(await createIpnSignature(payload, "secret"), expected);
   assert.equal(signaturesMatch(expected.toUpperCase(), expected), true);
   assert.equal(signaturesMatch(`${expected}0`, expected), false);
+});
+
+test("OxaPay signatures cover the exact raw webhook body", async () => {
+  const raw = '{"track_id":"123","status":"Paid"}';
+  const expected = createHmac("sha512", "merchant-key").update(raw).digest("hex");
+  assert.equal(await createRawHmacSignature(raw, "merchant-key"), expected);
 });
 
 test("USD parsing enforces exact cent limits", () => {
@@ -43,6 +52,14 @@ test("only finished deposits are creditable", () => {
   assert.equal(paymentCanCredit("finished"), true);
   assert.equal(paymentCanCredit("confirmed"), false);
   assert.equal(maskAddress("TExampleWalletAddress123456"), "TExampl…123456");
+});
+
+test("OxaPay statuses settle only confirmed provider events", () => {
+  assert.equal(oxaDepositStatus("Paid", "confirmed"), "finished");
+  assert.equal(oxaDepositStatus("Paying", "confirming"), "confirming");
+  assert.equal(oxaPayoutStatus("Confirmed"), "finished");
+  assert.equal(oxaPayoutStatus("Confirming"), "processing");
+  assert.equal(oxaPayoutStatus("Rejected"), "rejected");
 });
 
 test("asset balances use exact eight-decimal integer units", () => {

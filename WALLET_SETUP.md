@@ -1,11 +1,8 @@
-# GamRace live wallet setup
+# GamRace live wallet setup (OxaPay)
 
-The active wallet backend runs on Cloudflare Workers and D1, while Firebase
-Authentication continues to identify signed-in GamRace users. NOWPayments is
-called only from the Worker. The browser never receives the merchant API key,
-IPN secret or account credentials.
+The active wallet backend runs on Cloudflare Workers and D1. Firebase Authentication identifies the signed-in player; OxaPay is called only from the Worker. The browser never receives an OxaPay key or account credential.
 
-Production API base:
+Production API:
 
 ```text
 https://gamrace-wallet-api.gamracecom.workers.dev
@@ -17,113 +14,92 @@ Health check:
 https://gamrace-wallet-api.gamracecom.workers.dev/health
 ```
 
-The Worker always calls `https://api.nowpayments.io/v1`. There is no sandbox,
-test-provider or fake-balance fallback in this implementation.
+The integration uses OxaPay's live v1 API. There is no sandbox, fake payment provider, or fake-balance fallback.
 
-## Secrets to add after creating the replacement credentials
+## Required Worker secrets
 
-Never paste a live secret into source code, chat, screenshots, a command-line
-argument or a Git commit. From the `worker` directory, run each command and
-paste the value only when Wrangler displays its private interactive prompt:
+Create a Merchant API key and a Payout API key in OxaPay. Never put either key in source code, chat, screenshots, command arguments, or Git. From the `worker` directory, let Wrangler ask for each value in its private interactive prompt:
 
 ```text
-wrangler secret put NOWPAYMENTS_API_KEY
-wrangler secret put NOWPAYMENTS_IPN_SECRET
+wrangler secret put OXAPAY_MERCHANT_API_KEY
+wrangler secret put OXAPAY_PAYOUT_API_KEY
 wrangler secret put OWNER_FIREBASE_UID
 ```
 
-`OWNER_FIREBASE_UID` is the Firebase Authentication UID for the Emperor
-account. It is used by the owner-only withdrawal review routes. A NOWPayments
-JWT is not required for deposits or for the current manual-review withdrawal
-flow.
+The owner UID and existing admin password remain separate owner-only controls. No JWT token is required for this OxaPay integration.
 
-After the three secrets are present, deploy from `worker`:
+The old `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` secrets are no longer read by the Worker. Remove them only after OxaPay has been tested successfully.
+
+## Deploy order
+
+Apply the idempotent D1 schema first, then deploy the Worker:
 
 ```text
+wrangler d1 execute gamrace-wallet --remote --file schema.sql
 wrangler deploy
 ```
 
-In NOWPayments, configure the payment notification/IPN callback as:
+The Worker supplies these callback URLs when it creates each address or payout:
 
 ```text
-https://gamrace-wallet-api.gamracecom.workers.dev/ipn/deposit
+https://gamrace-wallet-api.gamracecom.workers.dev/webhooks/oxapay/deposit
+https://gamrace-wallet-api.gamracecom.workers.dev/webhooks/oxapay/payout
 ```
 
-The IPN secret configured at NOWPayments must exactly match the encrypted
-`NOWPAYMENTS_IPN_SECRET` Worker secret.
+OxaPay signs deposit callbacks with the Merchant API key and payout callbacks with the Payout API key. The Worker verifies the HMAC-SHA512 signature against the exact raw body and credits only a final `Paid` / confirmed transaction.
 
-## Security model
+## Supported balances and networks
 
-- Firebase ID tokens are verified with Google's current public signing keys.
-- Requests from browsers are restricted to GamRace and the documented local
-  development origins.
-- Every supported coin is stored as its own exact eight-decimal integer balance
-  in D1. There is no automatic exchange between assets.
-- A deposit credits exactly once and only after a signed IPN is re-fetched from
-  the live NOWPayments API and reports `finished`.
-- Duplicate deposit and withdrawal submissions are idempotent.
-- Withdrawal requests atomically move funds from available to held balance.
-- Completing a reviewed withdrawal consumes held funds; rejecting it returns
-  the funds to available balance.
-- The ledger and database triggers, rather than browser code, perform every
-  balance mutation.
-- Provider errors and server logs never include secret values.
+Every coin/network pair is a separate eight-decimal GamRace balance:
 
-## Supported balances
+- USDT: Tron (TRC20), BNB Smart Chain (BEP20), Solana, Polygon, Ethereum (ERC20)
+- BTC: Bitcoin
+- ETH: Ethereum
+- USDC: Solana, Polygon, Base, BNB Smart Chain (BEP20), Ethereum (ERC20)
+- SOL: Solana
+- LTC: Litecoin
+- TRX: Tron
+- XRP: XRP Ledger (`xrpl`, destination tag supported)
+- DOGE: Dogecoin
+- BNB: BNB Smart Chain (BEP20)
 
-The approved wallet asset list is maintained in `worker/src/assets.js`. The
-current live set is:
+The `/currencies` response is filtered against OxaPay's current live currency and network list. Minimum deposits, minimum withdrawals, and withdrawal fees come from OxaPay's current network rules instead of hard-coded USD minimums.
 
-- USDT on Ethereum (`USDTERC20`)
-- USDT on Tron (`USDTTRC20`)
-- Bitcoin (`BTC`)
-- Ethereum (`ETH`)
-- USD Coin on Ethereum (`USDC`)
-- Solana (`SOL`)
-- TRON (`TRX`)
-- Litecoin (`LTC`)
-- Dogecoin (`DOGE`)
-- XRP (`XRP`, destination tag supported)
-- BNB on BNB Smart Chain (`BNBBSC`)
+## Deposit flow
 
-A deposit credits only its matching asset balance. A withdrawal reserves and
-withdraws only that same selected asset; the application never converts one
-coin into another. The header can estimate the selected coin balance in USD
-for display, but that estimate does not change the stored coin amount.
+- The Worker creates one OxaPay static address for each player and selected coin/network pair, saves it in D1, and returns it on every future visit.
+- The browser renders the saved address and QR immediately.
+- Static-address conversion is disabled, so a received coin remains that coin.
+- A signed webhook transaction is deduplicated by OxaPay track ID and blockchain transaction hash.
+- The credited amount is OxaPay's confirmed `received_amount`, keeping the internal player liability aligned with funds actually received after fees.
+- Database triggers, not browser code, perform the one-time balance credit.
 
-## Withdrawals
+OxaPay may revoke a static address with no transactions for six months. Before launch, add a maintenance path for revocation/replacement if inactive accounts will be kept longer than that.
 
-NOWPayments wallet and IP allowlisting should remain enabled. Cloudflare
-Workers do not provide a fixed outbound IP, so automated payout submission must
-not be enabled from this Worker while the NOWPayments account requires an IP
-allowlist. The current production-safe flow accepts and validates a real
-withdrawal request, reserves the player's funds, and places it in owner review.
-The owner sends the payout from the NOWPayments dashboard and records its real
-provider reference through the owner-only completion endpoint. A rejection
-releases the held balance.
+## Withdrawal flow
 
-This is not a mock or sandbox withdrawal: it is a live request and real balance
-hold, with the final provider payout intentionally requiring owner approval.
-Automated payouts can be added later behind fixed egress without changing the
-player wallet or ledger model.
+- A player can withdraw only the currently selected coin/network balance.
+- The Worker checks OxaPay's live minimum before accepting the request.
+- D1 atomically moves the requested amount from available to held.
+- The request enters the owner-only review queue.
+- `Approve & send` creates the real OxaPay payout. The held balance is settled only after OxaPay reports `Confirmed`.
+- Rejecting a pending request releases the held balance.
+- If submission has an ambiguous network failure, the request is marked `submission_unknown`; do not retry it until the OxaPay dashboard is checked, because a blind retry could create a duplicate payout.
+
+The current accounting sends the player's requested amount and treats OxaPay's withdrawal fee as an operator cost. Decide and implement a player-fee policy before launch if GamRace should deduct those fees instead.
+
+If IP allowlisting is enabled for the Payout API key, remember that ordinary Cloudflare Workers do not have a fixed outbound IP. Do not enable an allowlist that blocks the Worker unless fixed egress is added.
 
 ## Launch checks
 
-Before giving users access:
+1. Enable all required coins and networks in OxaPay Merchant Service.
+2. Add both OxaPay Worker secrets through Wrangler's hidden prompts.
+3. Apply `schema.sql`, deploy the Worker, and confirm `/health` says `oxapay`.
+4. Create every static address and compare its network in OxaPay.
+5. Test a small real deposit on every enabled network.
+6. Test duplicate callbacks, invalid HMACs, wrong networks, XRP tags, and confirmed-credit idempotency.
+7. Test approved, rejected, failed, and ambiguous payout submissions.
+8. Reconcile D1 balances, OxaPay balances, fees, and blockchain transactions.
+9. Keep wagering disabled until bets and outcomes mutate balances only through an authoritative server.
 
-1. Create and install the replacement API key and a new IPN secret.
-2. Set the Emperor Firebase UID as the owner secret.
-3. Test a small real deposit for every enabled asset and network.
-4. Test invalid signatures, duplicate IPNs, underpayments, expired payments,
-   memo/tag currencies, rejected withdrawals and reconciliation.
-5. Confirm the NOWPayments destination wallets and allowlists.
-6. Keep wagering disabled until bets, outcomes and balance changes are handled
-   by an authoritative server rather than browser JavaScript.
-
-The browser QR display vendors `qrcode-generator` 1.4.4 (MIT, Kazuhiko Arase)
-under `dist/vendor/qrcode.js`; address generation and payment state remain on
-the Worker and NOWPayments.
-
-The previous Firebase Functions implementation remains in the repository as a
-reference, but the site wallet now targets the Cloudflare Worker above and does
-not require the Firebase Blaze plan.
+The previous Firebase Functions implementation remains in the repository as a reference only. The live site targets the Cloudflare Worker and does not require the Firebase Blaze plan.
