@@ -144,12 +144,23 @@ body[data-authenticated="true"] .auth-actions { display: none; }
 .section-heading .view-all-button:hover, .section-heading .carousel-arrow:not(:disabled):hover { border-color: rgba(103, 137, 158, .42); background: #0a1a26; color: #fff; }
 .section-heading .carousel-arrow:disabled { opacity: .3; cursor: default; box-shadow: none; }
 .card-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(130px, calc((100% - 55px) / 6)); gap: 11px; margin-top: 10px; padding-bottom: 2px; overflow-x: auto; scroll-behavior: smooth; scroll-snap-type: x proximity; overscroll-behavior-inline: contain; }
-.game-card { position: relative; min-width: 0; min-height: 118px; overflow: hidden; border: 2px solid #1a3c4e; border-radius: 10px; scroll-snap-align: start; background: #07141e; box-shadow: none; text-align: left; }
+.game-card { position: relative; min-width: 0; min-height: 118px; overflow: hidden; scroll-snap-align: start; text-align: left; background: transparent; }
 .originals-grid { --original-card-width: clamp(167px, 10.45vw, 209px); grid-auto-columns: var(--original-card-width); gap: 8px; }
-.game-card.original { width: 100%; aspect-ratio: 3 / 4; justify-self: start; border-color: #1a3c4e; border-radius: 10px; cursor: pointer; transition: transform .18s ease, border-color .18s ease; }
-.game-card.original:hover { border-color: #1a3c4e; box-shadow: none; filter: none; transform: translateY(-2px); }
-.game-card.original::after { position: absolute; z-index: 2; inset: 0; border: 1px solid #1a3c4e; border-radius: inherit; box-shadow: none; content: ""; pointer-events: none; }
-.original-card-art { display: block; width: 100%; height: 100%; aspect-ratio: 3 / 4; object-fit: fill; border-radius: 9px; transform: scale(1.09); transform-origin: center; }
+.game-card.original { width: 100%; aspect-ratio: 3 / 4; justify-self: start; border-radius: 7%; cursor: pointer; transition: transform .18s ease, filter .18s ease; }
+.game-card.original:hover { transform: translateY(-3px); filter: brightness(1.08); }
+.original-card-art { display: block; width: 100%; height: 100%; aspect-ratio: 3 / 4; object-fit: fill; border-radius: inherit; transform: translate(var(--art-x, 0), var(--art-y, 0)) scale(var(--art-sx, 1), var(--art-sy, 1)); transform-origin: center; }
+.original[data-name^="blackjack"] .original-card-art { --art-sx: .9592; --art-sy: .9598; --art-y: .07%; }
+.original[data-name^="coinflip"] .original-card-art { --art-sx: .9755; --art-sy: .9692; --art-x: -.09%; --art-y: -.14%; }
+.original[data-name^="crash"] .original-card-art { --art-sx: 1.0039; --art-sy: .9928; --art-y: .07%; }
+.original[data-name^="dice"] .original-card-art { --art-sx: .9737; --art-sy: .9692; }
+.original[data-name^="hi-lo"] .original-card-art { --art-sx: 1; --art-sy: 1.0014; --art-y: .21%; }
+.original[data-name^="keno"] .original-card-art { --art-sx: .9773; --art-sy: .976; --art-y: .07%; }
+.original[data-name^="limbo"] .original-card-art { --art-sx: 1.0039; --art-sy: .9957; --art-y: .07%; }
+.original[data-name^="mines"] .original-card-art { --art-sx: .9981; --art-sy: 1; --art-x: .09%; }
+.original[data-name^="plinko"] .original-card-art { --art-sx: .9981; --art-sy: .9943; --art-x: .09%; --art-y: .14%; }
+.original[data-name^="roulette"] .original-card-art { --art-sx: 1.0078; --art-sy: 1.0117; --art-y: .41%; }
+.original[data-name^="towers"] .original-card-art { --art-sx: 1.0039; --art-sy: 1.0044; --art-y: .07%; }
+.original[data-name^="wheel"] .original-card-art { --art-sx: .9923; --art-sy: .9971; --art-y: -.41%; }
 .game-section.expanded .card-row { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-columns: unset; overflow-x: visible; scroll-snap-type: none; }
 .game-section.expanded .originals-grid { grid-template-columns: repeat(auto-fill, var(--original-card-width)); justify-content: start; }
 .game-section.expanded .carousel-arrow { display: none; }
