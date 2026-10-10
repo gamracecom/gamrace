@@ -44,6 +44,8 @@ let depositPollTimer = null;
 const depositRequestIds = new Map();
 const depositCache = new Map();
 const depositLoadPromises = new Map();
+const allowedAssetsByContext = { deposit: [], withdraw: [] };
+const rememberedNetworkByContext = { deposit: new Map(), withdraw: new Map() };
 let preloadGeneration = 0;
 let busy = false;
 
@@ -52,16 +54,47 @@ function iconUrl(assetOrCode) {
   return `${ICON_ROOT}/${icon || "usdt"}.svg`;
 }
 
+function networkIconKey(asset) {
+  const network = String(asset?.network || "").toLowerCase();
+  if (network.includes("tron")) return "trx";
+  if (network.includes("bnb") || network.includes("bep20")) return "bnb";
+  if (network.includes("solana")) return "sol";
+  if (network.includes("polygon")) return "polygon";
+  if (network.includes("ethereum") || network.includes("erc20")) return "eth";
+  if (network.includes("base")) return "base";
+  if (network.includes("bitcoin")) return "btc";
+  if (network.includes("litecoin")) return "ltc";
+  if (network.includes("dogecoin")) return "doge";
+  if (network.includes("xrp")) return "xrp";
+  return asset?.icon || "usdt";
+}
+
+function networkIconUrl(asset) {
+  return `${ICON_ROOT}/${networkIconKey(asset)}.svg`;
+}
+
 function createAssetField(name, context) {
-  return `<div class="wallet-asset-control" data-asset-control="${context}">
+  return `<div class="wallet-choice-control wallet-asset-control" data-asset-control="${context}">
     <select class="wallet-native-select" name="${name}" aria-label="Currency" required tabindex="-1"></select>
-    <button class="wallet-asset-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" data-asset-trigger>
+    <button class="wallet-choice-trigger wallet-asset-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" data-choice-trigger>
       <img src="${iconUrl("usdt")}" alt="" data-asset-icon />
       <span class="wallet-asset-label" data-asset-label>Select currency</span>
       <span class="wallet-asset-balance" data-asset-balance></span>
       <span class="wallet-chevron" aria-hidden="true">⌄</span>
     </button>
-    <div class="wallet-asset-menu" role="listbox" aria-label="Choose currency" data-asset-menu hidden></div>
+    <div class="wallet-choice-menu wallet-asset-menu" role="listbox" aria-label="Choose currency" data-choice-menu hidden></div>
+  </div>`;
+}
+
+function createNetworkField(context) {
+  return `<div class="wallet-choice-control wallet-network-control" data-network-control="${context}">
+    <button class="wallet-choice-trigger wallet-asset-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" data-choice-trigger>
+      <img src="${iconUrl("trx")}" alt="" data-network-icon />
+      <span class="wallet-asset-label" data-network-label>Select network</span>
+      <span class="wallet-asset-balance" data-network-balance></span>
+      <span class="wallet-chevron" aria-hidden="true">⌄</span>
+    </button>
+    <div class="wallet-choice-menu wallet-asset-menu" role="listbox" aria-label="Choose network" data-choice-menu hidden></div>
   </div>`;
 }
 
@@ -85,7 +118,7 @@ function createWalletDialog() {
         <section class="wallet-panel" data-wallet-panel="deposit">
           <div class="wallet-stack" data-wallet-deposit-controls>
             <label><span>Currency</span>${createAssetField("payCurrency", "deposit")}</label>
-            <label><span>Network</span><div class="wallet-readonly-field" data-deposit-network>Tron (TRC20)</div></label>
+            <label><span>Network</span>${createNetworkField("deposit")}</label>
           </div>
           <div class="deposit-instructions" data-deposit-instructions>
             <div class="deposit-address-row"><span data-deposit-address-label>Deposit address</span><div><code data-deposit-address></code><button type="button" data-copy-address aria-label="Copy deposit address">Copy</button></div></div>
@@ -100,7 +133,7 @@ function createWalletDialog() {
         <section class="wallet-panel" data-wallet-panel="withdraw" hidden>
           <form class="wallet-stack" data-wallet-form="withdraw">
             <label><span>Balance</span>${createAssetField("payoutCurrency", "withdraw")}</label>
-            <label><span>Network</span><div class="wallet-readonly-field" data-withdraw-network>Tron (TRC20)</div></label>
+            <label><span>Network</span>${createNetworkField("withdraw")}</label>
             <label><span data-withdraw-address-label>Wallet address</span><input name="address" type="text" minlength="10" maxlength="256" autocomplete="off" spellcheck="false" placeholder="Enter destination address" required /></label>
             <label data-withdraw-memo-field hidden><span>Memo / destination tag</span><input name="extraId" type="text" maxlength="128" autocomplete="off" spellcheck="false" placeholder="Required for this currency" /></label>
             <label><span>Amount <small data-withdraw-available></small></span><span class="wallet-input-shell wallet-coin-input"><img src="${iconUrl("usdt")}" alt="" data-withdraw-amount-icon /><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" required /></span></label>
@@ -143,8 +176,6 @@ function createWalletDialog() {
     withdrawalForm: overlay.querySelector('[data-wallet-form="withdraw"]'),
     depositSelect: overlay.querySelector('[name="payCurrency"]'),
     withdrawalSelect: overlay.querySelector('[name="payoutCurrency"]'),
-    depositNetwork: overlay.querySelector("[data-deposit-network]"),
-    withdrawalNetwork: overlay.querySelector("[data-withdraw-network]"),
     withdrawalAvailable: overlay.querySelector("[data-withdraw-available]"),
     withdrawalMemoField: overlay.querySelector("[data-withdraw-memo-field]"),
     withdrawalAmountIcon: overlay.querySelector("[data-withdraw-amount-icon]"),
@@ -378,52 +409,115 @@ function friendlyStatus(status) {
   return labels[String(status || "").toLowerCase()] || String(status || "Pending").replaceAll("_", " ");
 }
 
-function fillAssetSelect(select, allowedAssets = currencies) {
-  const previous = select.value;
-  const control = select.closest(".wallet-asset-control");
-  const menu = control?.querySelector("[data-asset-menu]");
-  select.replaceChildren();
-  if (menu) menu.replaceChildren();
+function currencyGroups(allowedAssets) {
+  const groups = new Map();
   allowedAssets.forEach((asset) => {
-    const option = new Option(`${asset.name} (${asset.symbol}) · ${asset.network}`, asset.code);
-    select.append(option);
-    if (menu) {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "wallet-asset-option";
-      item.dataset.assetCode = asset.code;
-      item.setAttribute("role", "option");
-      item.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}</strong><small>${asset.name} · ${asset.network}</small></span><i aria-hidden="true">✓</i>`;
-      item.addEventListener("click", () => {
-        select.value = asset.code;
-        menu.hidden = true;
-        control.querySelector("[data-asset-trigger]").setAttribute("aria-expanded", "false");
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-      menu.append(item);
-    }
+    if (!groups.has(asset.symbol)) groups.set(asset.symbol, []);
+    groups.get(asset.symbol).push(asset);
+  });
+  return [...groups.values()];
+}
+
+function combinedAvailable(assets) {
+  return assets.reduce((total, asset) => total + Number(balanceFor(asset.code).available || 0), 0);
+}
+
+function fillAssetSelect(select, allowedAssets = currencies) {
+  const context = select === dialog.depositSelect ? "deposit" : "withdraw";
+  const previous = select.value;
+  allowedAssetsByContext[context] = allowedAssets;
+  select.replaceChildren();
+  allowedAssets.forEach((asset) => {
+    select.append(new Option(`${asset.name} (${asset.symbol}) · ${asset.network}`, asset.code));
   });
   const desired = allowedAssets.some((asset) => asset.code === previous) ? previous : walletSnapshot?.selectedCurrency;
   if (desired && [...select.options].some((option) => option.value === desired)) select.value = desired;
+  updateChoiceControls(context);
+}
+
+function updateChoiceControls(context) {
+  const select = context === "deposit" ? dialog.depositSelect : dialog.withdrawalSelect;
+  const allowedAssets = allowedAssetsByContext[context];
+  const asset = allowedAssets.find((item) => item.code === select.value) || assetFor(select.value);
+  if (!asset) return;
+
+  const currencyControl = dialog.overlay.querySelector(`[data-asset-control="${context}"]`);
+  const currencyMenu = currencyControl.querySelector("[data-choice-menu]");
+  const currencyTrigger = currencyControl.querySelector("[data-choice-trigger]");
+  currencyControl.querySelector("[data-asset-icon]").src = iconUrl(asset);
+  currencyControl.querySelector("[data-asset-label]").textContent = `${asset.name} (${asset.symbol})`;
+  const selectedGroup = allowedAssets.filter((item) => item.symbol === asset.symbol);
+  currencyControl.querySelector("[data-asset-balance]").textContent = context === "withdraw" ? `${cleanCryptoAmount(combinedAvailable(selectedGroup))} ${asset.symbol}` : "";
+  currencyMenu.replaceChildren();
+  currencyGroups(allowedAssets).forEach((group) => {
+    const representative = group[0];
+    const selected = representative.symbol === asset.symbol;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "wallet-asset-option";
+    item.dataset.assetSymbol = representative.symbol;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(selected));
+    item.classList.toggle("selected", selected);
+    const detail = group.length > 1 ? `${group.length} networks available` : representative.network;
+    item.innerHTML = `<img src="${iconUrl(representative)}" alt="" /><span><strong>${representative.name} (${representative.symbol})</strong><small>${detail}</small></span><i aria-hidden="true">✓</i>`;
+    item.addEventListener("click", () => {
+      const rememberedCode = rememberedNetworkByContext[context].get(representative.symbol);
+      const currentCode = asset.symbol === representative.symbol ? asset.code : null;
+      const walletCode = assetFor(walletSnapshot?.selectedCurrency)?.symbol === representative.symbol ? walletSnapshot.selectedCurrency : null;
+      const nextAsset = group.find((candidate) => candidate.code === rememberedCode)
+        || group.find((candidate) => candidate.code === currentCode)
+        || group.find((candidate) => candidate.code === walletCode)
+        || group[0];
+      select.value = nextAsset.code;
+      rememberedNetworkByContext[context].set(nextAsset.symbol, nextAsset.code);
+      closeAssetMenus();
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    currencyMenu.append(item);
+  });
+
+  const networkControl = dialog.overlay.querySelector(`[data-network-control="${context}"]`);
+  const networkMenu = networkControl.querySelector("[data-choice-menu]");
+  const networkTrigger = networkControl.querySelector("[data-choice-trigger]");
+  networkControl.querySelector("[data-network-icon]").src = networkIconUrl(asset);
+  networkControl.querySelector("[data-network-label]").textContent = asset.network;
+  networkControl.querySelector("[data-network-balance]").textContent = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(asset.code).available)} ${asset.symbol}` : "";
+  networkMenu.replaceChildren();
+  selectedGroup.forEach((networkAsset) => {
+    const selected = networkAsset.code === asset.code;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "wallet-asset-option wallet-network-option";
+    item.dataset.assetCode = networkAsset.code;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(selected));
+    item.classList.toggle("selected", selected);
+    const detail = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(networkAsset.code).available)} ${networkAsset.symbol} available` : `${networkAsset.symbol} network`;
+    item.innerHTML = `<img src="${networkIconUrl(networkAsset)}" alt="" /><span><strong>${networkAsset.network}</strong><small>${detail}</small></span><i aria-hidden="true">✓</i>`;
+    item.addEventListener("click", () => {
+      select.value = networkAsset.code;
+      rememberedNetworkByContext[context].set(networkAsset.symbol, networkAsset.code);
+      closeAssetMenus();
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    networkMenu.append(item);
+  });
+  const hasMultipleNetworks = selectedGroup.length > 1;
+  networkTrigger.classList.toggle("single-choice", !hasMultipleNetworks);
+  networkTrigger.querySelector(".wallet-chevron").hidden = !hasMultipleNetworks;
+  networkTrigger.setAttribute("aria-label", hasMultipleNetworks ? `Choose ${asset.symbol} network` : `${asset.network} is the only available network`);
+  currencyTrigger.setAttribute("aria-label", `Choose currency. ${asset.name} selected`);
 }
 
 function updateAssetControl(context) {
   const select = context === "deposit" ? dialog.depositSelect : dialog.withdrawalSelect;
   const asset = assetFor(select.value);
   if (!asset) return;
-  const control = dialog.overlay.querySelector(`[data-asset-control="${context}"]`);
-  control.querySelector("[data-asset-icon]").src = iconUrl(asset);
-  control.querySelector("[data-asset-label]").textContent = `${asset.name} (${asset.symbol}) · ${asset.network}`;
-  control.querySelector("[data-asset-balance]").textContent = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(asset.code).available)} ${asset.symbol}` : "";
-  control.querySelectorAll("[data-asset-code]").forEach((item) => {
-    const selected = item.dataset.assetCode === asset.code;
-    item.classList.toggle("selected", selected);
-    item.setAttribute("aria-selected", String(selected));
-  });
-  if (context === "deposit") dialog.depositNetwork.textContent = asset.network;
-  else {
+  rememberedNetworkByContext[context].set(asset.symbol, asset.code);
+  updateChoiceControls(context);
+  if (context === "withdraw") {
     const available = balanceFor(asset.code).available;
-    dialog.withdrawalNetwork.textContent = asset.network;
     dialog.withdrawalAvailable.textContent = `Available: ${cleanCryptoAmount(available)} ${asset.symbol}`;
     dialog.withdrawalAmountIcon.src = iconUrl(asset);
     dialog.withdrawalForm.elements.amount.min = asset.minimumWithdrawal || "0.00000001";
@@ -526,10 +620,10 @@ function closeWallet() {
 }
 
 function closeAssetMenus(exceptControl = null) {
-  dialog.overlay.querySelectorAll(".wallet-asset-control").forEach((control) => {
+  dialog.overlay.querySelectorAll(".wallet-choice-control").forEach((control) => {
     if (control === exceptControl) return;
-    const menu = control.querySelector("[data-asset-menu]");
-    const trigger = control.querySelector("[data-asset-trigger]");
+    const menu = control.querySelector("[data-choice-menu]");
+    const trigger = control.querySelector("[data-choice-trigger]");
     if (menu) menu.hidden = true;
     if (trigger) trigger.setAttribute("aria-expanded", "false");
   });
@@ -704,16 +798,17 @@ document.addEventListener("keydown", (event) => {
   if (!dialog.overlay.hidden) closeWallet();
 });
 dialog.tabs.forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.walletTab)));
-dialog.overlay.querySelectorAll("[data-asset-trigger]").forEach((trigger) => trigger.addEventListener("click", () => {
-  const control = trigger.closest(".wallet-asset-control");
-  const menu = control.querySelector("[data-asset-menu]");
+dialog.overlay.querySelectorAll("[data-choice-trigger]").forEach((trigger) => trigger.addEventListener("click", () => {
+  const control = trigger.closest(".wallet-choice-control");
+  const menu = control.querySelector("[data-choice-menu]");
+  if (!menu.children.length || trigger.classList.contains("single-choice")) return;
   const willOpen = menu.hidden;
   closeAssetMenus(willOpen ? control : null);
   menu.hidden = !willOpen;
   trigger.setAttribute("aria-expanded", String(willOpen));
 }));
 dialog.overlay.addEventListener("click", (event) => {
-  if (!event.target.closest(".wallet-asset-control")) closeAssetMenus();
+  if (!event.target.closest(".wallet-choice-control")) closeAssetMenus();
 });
 dialog.copyAddress.addEventListener("click", () => copyText(dialog.depositAddress.textContent, dialog.copyAddress));
 dialog.copyMemo.addEventListener("click", () => copyText(dialog.depositMemo.textContent, dialog.copyMemo));
