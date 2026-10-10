@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=wallet-network-picker-1" />
+    <link rel="stylesheet" href="styles.css?v=wallet-menu-controls-1" />
   </head>
   <body class="game-page" data-authenticated="false">
     <div class="app-shell">
@@ -65,7 +65,7 @@
                   </label>
                   <label class="mines-field">
                     <span><strong>Mines</strong><small>1–24</small></span>
-                    <span class="select-shell"><select id="mine-count" aria-label="Number of mines"></select><span aria-hidden="true">⌄</span></span>
+                    <span class="select-shell"><select id="mine-count" aria-label="Number of mines"></select></span>
                   </label>
                   <button class="mines-primary-button" id="mines-action" type="button" disabled>Bet</button>
                 </div>
@@ -75,7 +75,7 @@
                     <span><strong>Bet Amount</strong><small>Per round</small></span>
                     <span class="bet-input-shell"><span class="bet-currency">$</span><input id="auto-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Automatic bet amount" /><button type="button" data-auto-bet-action="half">½</button><button type="button" data-auto-bet-action="double">2×</button></span>
                   </label>
-                  <label class="mines-field"><span><strong>Mines</strong><small>1–24</small></span><span class="select-shell"><select id="auto-mine-count" aria-label="Automatic number of mines"></select><span aria-hidden="true">⌄</span></span></label>
+                  <label class="mines-field"><span><strong>Mines</strong><small>1–24</small></span><span class="select-shell"><select id="auto-mine-count" aria-label="Automatic number of mines"></select></span></label>
                   <div class="auto-selection-summary"><span>Selected Tiles</span><strong id="auto-selected-count">0 / 22</strong></div>
                   <label class="mines-field">
                     <span><strong>Number of Bets</strong><small>1–100</small></span>
@@ -180,10 +180,11 @@
       <button class="mobile-tab-action" type="button" data-mobile-action="rewards"><img class="mobile-tab-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" /><strong>Rewards</strong></button>
       <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" aria-hidden="true" /><strong>Chat</strong></button>
     </nav>
+    <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="mines.js?v=mines-tools-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=rank-badges-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=wallet-network-picker-1"></script>
+    <script type="module" src="wallet.js?v=wallet-menu-controls-1"></script>
   </body>
 </html>

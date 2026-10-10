@@ -42,7 +42,7 @@ function allowedOrigins(env) {
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");
   const headers = {
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Request-Id, X-Admin-Session",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Request-Id, X-Admin-Session, X-Session-Id",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Cache-Control": "no-store",
     "Content-Type": "application/json; charset=utf-8",
@@ -137,6 +137,95 @@ async function requireUser(request, env) {
   const match = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/i);
   if (!match) throw httpError(401, "Sign in to use the wallet");
   return verifyFirebaseToken(match[1], env.FIREBASE_PROJECT_ID || "gamrace");
+}
+
+function requestGeo(request) {
+  const cf = request.cf || {};
+  return {
+    countryCode: String(cf.country || request.headers.get("CF-IPCountry") || "XX").toUpperCase().slice(0, 2),
+    region: String(cf.region || "").slice(0, 120),
+    city: String(cf.city || "").slice(0, 120),
+    timezone: String(cf.timezone || "").slice(0, 80),
+  };
+}
+
+function maskedIp(request) {
+  const value = String(request.headers.get("CF-Connecting-IP") || "").trim();
+  if (!value) return "Unavailable";
+  if (value.includes(".")) {
+    const pieces = value.split(".");
+    return pieces.length === 4 ? `${pieces[0]}.${pieces[1]}.${pieces[2]}.xxx` : "Hidden";
+  }
+  if (value.includes(":")) return `${value.split(":").filter(Boolean).slice(0, 3).join(":")}::`;
+  return "Hidden";
+}
+
+function clientDetails(request) {
+  const agent = String(request.headers.get("User-Agent") || "");
+  const browser = /Edg\//.test(agent) ? "Edge" : /Firefox\//.test(agent) ? "Firefox" : /Chrome\//.test(agent) ? "Chrome" : /Safari\//.test(agent) ? "Safari" : "Other browser";
+  const operatingSystem = /Windows NT/.test(agent) ? "Windows" : /iPhone|iPad/.test(agent) ? "iOS / iPadOS" : /Android/.test(agent) ? "Android" : /Mac OS X/.test(agent) ? "macOS" : /Linux/.test(agent) ? "Linux" : "Unknown OS";
+  const device = /iPad|Tablet/.test(agent) ? "Tablet" : /Mobi|iPhone|Android/.test(agent) ? "Mobile device" : "Desktop computer";
+  return { browser, operatingSystem, device };
+}
+
+async function countryAccess(env, countryCode) {
+  const normalized = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "XX";
+  if (normalized === "XX") return { allowed: true, countryCode: normalized };
+  const row = await env.DB.prepare("SELECT allowed FROM country_access WHERE country_code = ?").bind(normalized).first();
+  return { allowed: row ? Boolean(row.allowed) : true, countryCode: normalized };
+}
+
+async function requireAllowedRegion(request, env) {
+  const geo = requestGeo(request);
+  const access = await countryAccess(env, geo.countryCode);
+  if (!access.allowed) throw httpError(451, "GamRace is not available in your region. If you are using a VPN or proxy, try disabling it and refresh.", "REGION_BLOCKED");
+  return geo;
+}
+
+async function touchUserSession(request, env, user, geo = requestGeo(request)) {
+  const sessionId = String(request.headers.get("X-Session-Id") || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(sessionId)) return;
+  const details = clientDetails(request);
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO user_sessions(uid, session_id, device, operating_system, browser, country_code, region, city, timezone, ip_masked, first_seen_at, last_seen_at, is_active)
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ON CONFLICT(uid, session_id) DO UPDATE SET
+      device = excluded.device, operating_system = excluded.operating_system, browser = excluded.browser,
+      country_code = excluded.country_code, region = excluded.region, city = excluded.city,
+      timezone = excluded.timezone, ip_masked = excluded.ip_masked, last_seen_at = excluded.last_seen_at, is_active = 1
+  `).bind(user.sub, sessionId, details.device, details.operatingSystem, details.browser, geo.countryCode, geo.region, geo.city, geo.timezone, maskedIp(request), timestamp, timestamp).run();
+}
+
+async function handleRegionAccess(request, env) {
+  const geo = requestGeo(request);
+  const access = await countryAccess(env, geo.countryCode);
+  return json(request, env, 200, { ...access, region: geo.region, city: geo.city, timezone: geo.timezone });
+}
+
+async function handleSessions(request, env, user) {
+  const currentSessionId = String(request.headers.get("X-Session-Id") || "");
+  const result = await env.DB.prepare(`
+    SELECT session_id, device, operating_system, browser, country_code, region, city, timezone, ip_masked, first_seen_at, last_seen_at, is_active
+    FROM user_sessions WHERE uid = ? ORDER BY last_seen_at DESC LIMIT 30
+  `).bind(user.sub).all();
+  return json(request, env, 200, {
+    sessions: (result.results || []).map((row) => ({
+      id: row.session_id,
+      device: row.device,
+      operatingSystem: row.operating_system,
+      browser: row.browser,
+      countryCode: row.country_code,
+      region: row.region,
+      city: row.city,
+      timezone: row.timezone,
+      ipAddress: row.ip_masked,
+      firstLogin: new Date(Number(row.first_seen_at)).toISOString(),
+      lastActive: new Date(Number(row.last_seen_at)).toISOString(),
+      current: row.session_id === currentSessionId,
+      active: Boolean(row.is_active),
+    })),
+  });
 }
 
 function requireOwner(user, env) {
@@ -327,18 +416,16 @@ async function walletResponse(env, uid) {
       lifetimeWithdrawn: assetUnitsToString(Number(row.lifetime_withdrawn_units || 0), false),
     };
   });
-  const selected = balances.find((balance) => balance.code === selectedCurrency) || balances[0];
-  let selectedUsdCents = 0;
-  if (Number(selected.available) > 0) {
-    try {
-      const asset = requireWalletAsset(selected.code);
-      const prices = await providerPrices(env);
-      selectedUsdCents = Math.max(0, Math.round(Number(selected.available) * Number(prices?.[asset.providerCurrency] || 0) * 100));
-    } catch {
-      selectedUsdCents = 0;
-    }
+  let prices = {};
+  if (balances.some((balance) => Number(balance.available) > 0)) {
+    try { prices = await providerPrices(env); } catch { prices = {}; }
   }
-  return { selectedCurrency, selectedUsdCents, balances };
+  const pricedBalances = balances.map((balance) => ({
+    ...balance,
+    usdCents: Math.max(0, Math.round(Number(balance.available) * Number(prices?.[balance.providerCurrency] || 0) * 100)),
+  }));
+  const selected = pricedBalances.find((balance) => balance.code === selectedCurrency) || pricedBalances[0];
+  return { selectedCurrency, selectedUsdCents: selected?.usdCents || 0, balances: pricedBalances };
 }
 
 function depositResponse(row) {
@@ -1058,6 +1145,31 @@ async function handleAdminWithdrawalDecision(request, env, user, withdrawalId, d
   return json(request, env, 200, { withdrawal: withdrawalResponse(updated) });
 }
 
+async function handleAdminCountryAccess(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const result = await env.DB.prepare("SELECT country_code, allowed, updated_at FROM country_access ORDER BY country_code").all();
+  return json(request, env, 200, {
+    defaultAllowed: true,
+    overrides: (result.results || []).map((row) => ({ countryCode: row.country_code, allowed: Boolean(row.allowed), updatedAt: new Date(Number(row.updated_at)).toISOString() })),
+  });
+}
+
+async function handleAdminSetCountryAccess(request, env, user, countryCode) {
+  await requireAdminSession(request, env, user);
+  const normalized = String(countryCode || "").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) throw httpError(400, "Choose a valid country");
+  const body = await requestJson(request);
+  if (typeof body.allowed !== "boolean") throw httpError(400, "Allowed must be true or false");
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO country_access(country_code, allowed, updated_at, updated_by)
+    VALUES(?, ?, ?, ?)
+    ON CONFLICT(country_code) DO UPDATE SET allowed = excluded.allowed, updated_at = excluded.updated_at, updated_by = excluded.updated_by
+  `).bind(normalized, body.allowed ? 1 : 0, timestamp, user.sub).run();
+  await writeAdminAudit(env, user, body.allowed ? "country.allowed" : "country.blocked", normalized);
+  return json(request, env, 200, { countryCode: normalized, allowed: body.allowed, updatedAt: new Date(timestamp).toISOString() });
+}
+
 function pathFrom(request) {
   return new URL(request.url).pathname.replace(/\/+$/, "") || "/";
 }
@@ -1066,6 +1178,7 @@ async function route(request, env) {
   const path = pathFrom(request);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
   if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
+  if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
 
@@ -1078,6 +1191,15 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/deposits") return handleAdminDeposits(request, env, user);
   if (request.method === "GET" && path === "/admin/audit") return handleAdminAudit(request, env, user);
   if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
+  if (request.method === "GET" && path === "/admin/country-access") return handleAdminCountryAccess(request, env, user);
+  const countryAccessMatch = path.match(/^\/admin\/country-access\/([A-Za-z]{2})$/);
+  if (request.method === "POST" && countryAccessMatch) return handleAdminSetCountryAccess(request, env, user, countryAccessMatch[1]);
+  if (!path.startsWith("/admin/")) {
+    const geo = await requireAllowedRegion(request, env);
+    try { await touchUserSession(request, env, user, geo); }
+    catch (error) { console.error("Session activity write failed", { message: error?.message }); }
+  }
+  if (request.method === "GET" && path === "/sessions") return handleSessions(request, env, user);
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/currencies") return handleCurrencies(request, env);

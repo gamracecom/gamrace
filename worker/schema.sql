@@ -292,6 +292,35 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 
 CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit_log(created_at DESC);
 
+-- Approximate Cloudflare session geography. Raw IP addresses are deliberately
+-- not stored; only a masked value is retained for the user's session screen.
+CREATE TABLE IF NOT EXISTS user_sessions (
+  uid TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  device TEXT NOT NULL,
+  operating_system TEXT NOT NULL,
+  browser TEXT NOT NULL,
+  country_code TEXT,
+  region TEXT,
+  city TEXT,
+  timezone TEXT,
+  ip_masked TEXT NOT NULL,
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY(uid, session_id)
+);
+
+CREATE INDEX IF NOT EXISTS user_sessions_uid_active_idx ON user_sessions(uid, last_seen_at DESC);
+
+-- Countries are allowed by default. A row records an explicit owner decision.
+CREATE TABLE IF NOT EXISTS country_access (
+  country_code TEXT PRIMARY KEY,
+  allowed INTEGER NOT NULL CHECK(allowed IN (0, 1)),
+  updated_at INTEGER NOT NULL,
+  updated_by TEXT NOT NULL
+);
+
 CREATE TRIGGER IF NOT EXISTS credit_finished_crypto_deposit_after_insert
 AFTER INSERT ON crypto_deposits
 WHEN NEW.status = 'finished' AND NEW.credited = 0 AND NEW.credit_units > 0

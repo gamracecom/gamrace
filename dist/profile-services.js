@@ -1,4 +1,6 @@
 const PREFERENCE_KEY = "gamrace-account-preferences-v1";
+const CLIENT_SESSION_KEY = "gamrace-client-session-v1";
+const API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
 
 const DEFAULT_PREFERENCES = Object.freeze({
   profilePublic: true,
@@ -17,6 +19,19 @@ function readStoredPreferences() {
     return JSON.parse(localStorage.getItem(PREFERENCE_KEY) || "{}");
   } catch {
     return {};
+  }
+}
+
+function clientSessionId() {
+  try {
+    let value = localStorage.getItem(CLIENT_SESSION_KEY);
+    if (!value) {
+      value = crypto.randomUUID();
+      localStorage.setItem(CLIENT_SESSION_KEY, value);
+    }
+    return value;
+  } catch {
+    return "browser-session";
   }
 }
 
@@ -44,23 +59,15 @@ export const profileServices = Object.freeze({
     },
   }),
   sessions: Object.freeze({
-    async list() {
-      return {
-        sessions: [
-          {
-            id: "current",
-            device: "Current device",
-            operatingSystem: "Detected securely at sign-in",
-            browser: "Current browser",
-            location: "Approximate location unavailable",
-            ipAddress: "Hidden until the session service is connected",
-            firstLogin: "Current session",
-            lastActive: "Now",
-            current: true,
-          },
-        ],
-        loginHistory: [],
-      };
+    async list(token) {
+      if (!token) return { sessions: [], loginHistory: [] };
+      const response = await fetch(`${API_BASE}/sessions`, {
+        headers: { Authorization: `Bearer ${token}`, "X-Session-Id": clientSessionId() },
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Session history is temporarily unavailable");
+      const body = await response.json();
+      return { sessions: body.sessions || [], loginHistory: [] };
     },
   }),
   activity: Object.freeze({

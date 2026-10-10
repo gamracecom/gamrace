@@ -19,6 +19,7 @@ const firebaseConfig = {
 
 const API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
 const SESSION_KEY = "gamrace-admin-session-v1";
+const ISO_COUNTRY_CODES = "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW".split(" ");
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
@@ -44,6 +45,7 @@ let reviewDecision = "complete";
 let activeWithdrawal = null;
 let overviewCache = null;
 let systemCache = null;
+let countryAccessCache = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -312,9 +314,56 @@ async function loadView(view, force = false) {
   if (view === "deposits") return loadDeposits();
   if (view === "withdrawals") return loadWithdrawals();
   if (view === "audit") return loadAudit();
+  if (view === "risk") return loadCountryAccess(force);
   if (view === "system" || view === "integrations") return loadSystem(force);
   setLastRefresh();
 }
+
+function displayCountryName(code) {
+  try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(code) || code; } catch { return code; }
+}
+
+function countryAccessMap(data) {
+  return new Map((data?.overrides || []).map((entry) => [entry.countryCode, Boolean(entry.allowed)]));
+}
+
+function renderCountryAccess() {
+  const container = document.querySelector("#country-access-grid");
+  if (!container || !countryAccessCache) return;
+  const query = document.querySelector("#country-search").value.trim().toLowerCase();
+  const overrides = countryAccessMap(countryAccessCache);
+  const countries = ISO_COUNTRY_CODES
+    .map((code) => ({ code, name: displayCountryName(code), allowed: overrides.has(code) ? overrides.get(code) : true }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const shown = countries.filter((country) => !query || country.name.toLowerCase().includes(query) || country.code.toLowerCase().includes(query));
+  document.querySelector("#country-allowed-count").textContent = countries.filter((country) => country.allowed).length;
+  document.querySelector("#country-blocked-count").textContent = countries.filter((country) => !country.allowed).length;
+  container.innerHTML = shown.length ? shown.map((country) => `<div class="country-access-row ${country.allowed ? "" : "blocked"}" data-country-code="${country.code}"><b>${country.code}</b><span title="${country.name}">${country.name}</span><button type="button" aria-label="${country.allowed ? `Block ${country.name}` : `Allow ${country.name}`}" title="${country.allowed ? "Allowed — click to block" : "Blocked — click to allow"}">${country.allowed ? "✓" : "×"}</button></div>`).join("") : "<p>No countries match that search.</p>";
+  container.querySelectorAll("[data-country-code] button").forEach((button) => button.addEventListener("click", async () => {
+    const row = button.closest("[data-country-code]");
+    const code = row.dataset.countryCode;
+    const currentAllowed = overrides.has(code) ? overrides.get(code) : true;
+    button.disabled = true;
+    try {
+      const updated = await api(`/admin/country-access/${code}`, { method: "POST", body: JSON.stringify({ allowed: !currentAllowed }) });
+      countryAccessCache.overrides = [...countryAccessMap(countryAccessCache).entries()].filter(([countryCode]) => countryCode !== code).map(([countryCode, allowed]) => ({ countryCode, allowed }));
+      countryAccessCache.overrides.push(updated);
+      renderCountryAccess();
+      showToast(`${displayCountryName(code)} is now ${updated.allowed ? "allowed" : "blocked"}`);
+    } catch (error) {
+      button.disabled = false;
+      showToast(error.message, "error");
+    }
+  }));
+}
+
+async function loadCountryAccess(force = false) {
+  countryAccessCache = countryAccessCache && !force ? countryAccessCache : await api("/admin/country-access");
+  renderCountryAccess();
+  setLastRefresh();
+}
+
+document.querySelector("#country-search")?.addEventListener("input", renderCountryAccess);
 
 async function loadOverview(force = false) {
   const [overview, system] = await Promise.all([

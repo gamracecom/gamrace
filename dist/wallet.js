@@ -12,6 +12,8 @@ const firebaseConfig = {
 
 const WALLET_API_BASE_URL = "https://gamrace-wallet-api.gamracecom.workers.dev";
 const ICON_ROOT = "assets/icons/crypto";
+const BALANCE_PREFERENCES_KEY = "gamrace-balance-preferences-v1";
+const CLIENT_SESSION_KEY = "gamrace-client-session-v1";
 const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).has("wallet-preview");
 const PREVIEW_ASSETS = [
   ["usdttrc20", "USDT", "Tether", "Tron (TRC20)", "usdt", false, "0.01"],
@@ -48,6 +50,32 @@ const allowedAssetsByContext = { deposit: [], withdraw: [] };
 const rememberedNetworkByContext = { deposit: new Map(), withdraw: new Map() };
 let preloadGeneration = 0;
 let busy = false;
+let balancePreferences = loadBalancePreferences();
+
+function loadBalancePreferences() {
+  try {
+    return { displayFiat: true, hideZeroBalances: false, ...JSON.parse(localStorage.getItem(BALANCE_PREFERENCES_KEY) || "{}") };
+  } catch {
+    return { displayFiat: true, hideZeroBalances: false };
+  }
+}
+
+function saveBalancePreferences() {
+  try { localStorage.setItem(BALANCE_PREFERENCES_KEY, JSON.stringify(balancePreferences)); } catch { /* Storage can be unavailable in privacy mode. */ }
+}
+
+function clientSessionId() {
+  try {
+    let value = localStorage.getItem(CLIENT_SESSION_KEY);
+    if (!value) {
+      value = crypto.randomUUID();
+      localStorage.setItem(CLIENT_SESSION_KEY, value);
+    }
+    return value;
+  } catch {
+    return "browser-session";
+  }
+}
 
 function iconUrl(assetOrCode) {
   const icon = typeof assetOrCode === "object" ? assetOrCode?.icon : assetOrCode;
@@ -80,7 +108,6 @@ function createAssetField(name, context) {
       <img src="${iconUrl("usdt")}" alt="" data-asset-icon />
       <span class="wallet-asset-label" data-asset-label>Select currency</span>
       <span class="wallet-asset-balance" data-asset-balance></span>
-      <span class="wallet-chevron" aria-hidden="true">⌄</span>
     </button>
     <div class="wallet-choice-menu wallet-asset-menu" role="listbox" aria-label="Choose currency" data-choice-menu hidden></div>
   </div>`;
@@ -92,7 +119,6 @@ function createNetworkField(context) {
       <img src="${iconUrl("trx")}" alt="" data-network-icon />
       <span class="wallet-asset-label" data-network-label>Select network</span>
       <span class="wallet-asset-balance" data-network-balance></span>
-      <span class="wallet-chevron" aria-hidden="true">⌄</span>
     </button>
     <div class="wallet-choice-menu wallet-asset-menu" role="listbox" aria-label="Choose network" data-choice-menu hidden></div>
   </div>`;
@@ -253,7 +279,7 @@ async function api(path, options = {}) {
   const token = await currentUser.getIdToken();
   const response = await fetch(`${WALLET_API_BASE_URL}${path}`, {
     ...options,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-Session-Id": clientSessionId(), ...(options.headers || {}) },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -306,13 +332,6 @@ function ensureHeaderControls() {
       icon.alt = "";
       button.prepend(icon);
     }
-    if (!button.querySelector(".balance-caret")) {
-      const caret = document.createElement("span");
-      caret.className = "balance-caret";
-      caret.textContent = "⌄";
-      caret.setAttribute("aria-hidden", "true");
-      button.append(caret);
-    }
     if (!button.parentElement?.classList.contains("balance-control")) {
       const wrapper = document.createElement("div");
       wrapper.className = "balance-control";
@@ -321,8 +340,19 @@ function ensureHeaderControls() {
       const menu = document.createElement("div");
       menu.className = "balance-menu";
       menu.hidden = true;
-      menu.setAttribute("role", "listbox");
-      menu.setAttribute("aria-label", "Choose balance");
+      menu.innerHTML = `<div class="balance-menu-list" role="listbox" aria-label="Choose balance"></div>
+        <div class="balance-menu-footer">
+          <label><span>Display in fiat</span><input type="checkbox" data-balance-preference="displayFiat" /><i aria-hidden="true"></i></label>
+          <label><span>Hide zero balances</span><input type="checkbox" data-balance-preference="hideZeroBalances" /><i aria-hidden="true"></i></label>
+        </div>`;
+      menu.querySelectorAll("[data-balance-preference]").forEach((input) => {
+        input.checked = Boolean(balancePreferences[input.dataset.balancePreference]);
+        input.addEventListener("change", () => {
+          balancePreferences = { ...balancePreferences, [input.dataset.balancePreference]: input.checked };
+          saveBalancePreferences();
+          updateHeader();
+        });
+      });
       wrapper.append(menu);
       button.setAttribute("aria-haspopup", "listbox");
       button.setAttribute("aria-expanded", "false");
@@ -363,10 +393,17 @@ function broadcastWalletSelection() {
 
 function updateBalanceMenus() {
   balanceButtons.forEach((button) => {
-    const menu = button.parentElement?.querySelector(".balance-menu");
-    if (!menu) return;
-    menu.replaceChildren();
-    currencies.forEach((asset) => {
+    const list = button.parentElement?.querySelector(".balance-menu-list");
+    if (!list) return;
+    list.replaceChildren();
+    const visibleAssets = currencies.filter((asset) => !balancePreferences.hideZeroBalances || Number(balanceFor(asset.code).available) > 0);
+    if (!visibleAssets.length) {
+      const empty = document.createElement("p");
+      empty.className = "balance-menu-empty";
+      empty.textContent = "No funded balances";
+      list.append(empty);
+    }
+    visibleAssets.forEach((asset) => {
       const balance = balanceFor(asset.code);
       const selected = walletSnapshot?.selectedCurrency === asset.code;
       const option = document.createElement("button");
@@ -376,12 +413,13 @@ function updateBalanceMenus() {
       option.dataset.currency = asset.code;
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(selected));
-      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${cleanCryptoAmount(balance.available)} ${asset.symbol}</em></span><i aria-hidden="true">✓</i>`;
+      const shownBalance = balancePreferences.displayFiat ? money(balance.usdCents || 0) : `${cleanCryptoAmount(balance.available)} ${asset.symbol}`;
+      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${shownBalance}</em></span><i aria-hidden="true">✓</i>`;
       option.addEventListener("click", async () => {
         closeBalanceMenus();
         try { await selectWalletCurrency(asset.code); } catch (error) { setStatus(error.message, "error"); }
       });
-      menu.append(option);
+      list.append(option);
     });
   });
 }
@@ -394,7 +432,9 @@ function updateHeader() {
     const icon = button.querySelector(".balance-coin-icon");
     const value = button.querySelector(".balance-value");
     if (icon) { icon.src = iconUrl(asset); icon.alt = asset.symbol || ""; }
-    if (value) value.textContent = money(walletSnapshot?.selectedUsdCents || 0);
+    if (value) value.textContent = balancePreferences.displayFiat
+      ? money(walletSnapshot?.selectedUsdCents || 0)
+      : `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
     button.title = `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
   });
   updateBalanceMenus();
@@ -505,7 +545,6 @@ function updateChoiceControls(context) {
   });
   const hasMultipleNetworks = selectedGroup.length > 1;
   networkTrigger.classList.toggle("single-choice", !hasMultipleNetworks);
-  networkTrigger.querySelector(".wallet-chevron").hidden = !hasMultipleNetworks;
   networkTrigger.setAttribute("aria-label", hasMultipleNetworks ? `Choose ${asset.symbol} network` : `${asset.network} is the only available network`);
   currencyTrigger.setAttribute("aria-label", `Choose currency. ${asset.name} selected`);
 }
@@ -864,7 +903,7 @@ if (LOCAL_PREVIEW) {
   walletSnapshot = {
     selectedCurrency: "usdttrc20",
     selectedUsdCents: 128450,
-    balances: PREVIEW_ASSETS.map((asset) => ({ ...asset, available: asset.code === "usdttrc20" ? "1284.50000000" : "0.00000000", held: "0.00000000" })),
+    balances: PREVIEW_ASSETS.map((asset) => ({ ...asset, available: asset.code === "usdttrc20" ? "1284.50000000" : "0.00000000", held: "0.00000000", usdCents: asset.code === "usdttrc20" ? 128450 : 0 })),
   };
   refreshControls();
   openWallet("deposit");

@@ -239,10 +239,24 @@ function setProfileStatus(message = "", state = "") {
   else delete profileDialog.status.dataset.state;
 }
 
+function escapeMarkup(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+}
+
 async function loadMockAccountData() {
-  const [verification, sessions, summary] = await Promise.all([profileServices.verification.getStatus(), profileServices.sessions.list(), profileServices.activity.getSummary()]);
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  const [verification, sessions, summary] = await Promise.all([
+    profileServices.verification.getStatus(),
+    profileServices.sessions.list(token).catch(() => ({ sessions: [], loginHistory: [] })),
+    profileServices.activity.getSummary(),
+  ]);
   profileDialog.verificationLevels.innerHTML = verification.levels.map((level) => `<article><span>LEVEL ${level.level}</span><div><strong>${level.name}</strong><small>${level.level === 2 ? "Government ID and selfie / liveness" : level.level === 3 ? "Proof of address" : "Basic account information"}</small></div><b class="${level.status === "Approved" ? "approved" : ""}">${level.status}</b></article>`).join("");
-  profileDialog.sessionList.innerHTML = sessions.sessions.map((session) => `<article class="session-row"><span class="session-device-mark">${session.current ? "THIS" : "DEV"}</span><div><strong>${session.device}</strong><small>${session.operatingSystem} · ${session.browser}</small><small>${session.location} · ${session.ipAddress}</small><small>First login: ${session.firstLogin} · Last active: ${session.lastActive}</small></div><b>${session.current ? "CURRENT SESSION" : "RECENT"}</b></article>`).join("");
+  profileDialog.sessionList.innerHTML = sessions.sessions.length ? sessions.sessions.map((session) => {
+    const location = [session.city, session.region, session.countryCode].filter(Boolean).join(", ") || "Approximate location unavailable";
+    const firstLogin = new Date(session.firstLogin).toLocaleString();
+    const lastActive = session.current ? "Now" : new Date(session.lastActive).toLocaleString();
+    return `<article class="session-row"><span class="session-device-mark">${session.current ? "THIS" : "DEV"}</span><div><strong>${escapeMarkup(session.device)}</strong><small>${escapeMarkup(session.operatingSystem)} · ${escapeMarkup(session.browser)}</small><small>${escapeMarkup(location)} · IP: ${escapeMarkup(session.ipAddress)}</small><small>First login: ${escapeMarkup(firstLogin)} · Last active: ${escapeMarkup(lastActive)}</small></div><b>${session.current ? "CURRENT SESSION" : "RECENT"}</b></article>`;
+  }).join("") : '<div class="account-empty compact"><strong>No session history yet</strong><span>Your current device will appear after the next secure account request.</span></div>';
   const labels = { totalWagered: "Total wagered", totalBets: "Total bets", wins: "Wins", losses: "Losses", winRate: "Win rate", netProfitLoss: "Net profit / loss", biggestWin: "Biggest win", highestMultiplier: "Highest multiplier", favouriteGame: "Favourite game", mostPlayedGame: "Most played game", pvpWins: "PvP wins", pvpLosses: "PvP losses", pvpWinRate: "PvP win rate" };
   profileDialog.statisticsGrid.innerHTML = Object.entries(summary).map(([key, value]) => `<article><span>${labels[key]}</span><strong>${["totalWagered", "netProfitLoss", "biggestWin"].includes(key) ? formatMoney(value) : ["winRate", "pvpWinRate"].includes(key) ? `${value}%` : key === "highestMultiplier" ? `${value}×` : value}</strong></article>`).join("");
 }
