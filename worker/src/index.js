@@ -1193,6 +1193,82 @@ function adminAssetAmount(row, field = "amount_units") {
   }
 }
 
+const LEADERBOARD_CADENCES = ["daily", "biweekly"];
+
+function parsePrizeUsdCents(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw httpError(400, "Enter a valid prize amount");
+  const [whole, fraction = ""] = text.split(".");
+  const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  if (!Number.isSafeInteger(cents) || cents < 1 || cents > 10_000_000_000) throw httpError(400, "Prize amount must be between $0.01 and $100,000,000");
+  return cents;
+}
+
+function leaderboardResponse(row, cadence) {
+  if (!row) return { cadence, prizeUsdCents: 0, status: "scheduled", startsAt: null, endsAt: null, durationSeconds: 0 };
+  const ended = Number(row.ends_at) <= now();
+  return {
+    cadence,
+    prizeUsdCents: Number(row.prize_usd_cents),
+    status: ended ? "ended" : row.status,
+    startsAt: new Date(Number(row.starts_at)).toISOString(),
+    endsAt: new Date(Number(row.ends_at)).toISOString(),
+    durationSeconds: Number(row.duration_seconds),
+    updatedAt: new Date(Number(row.updated_at)).toISOString(),
+  };
+}
+
+async function readLeaderboards(env) {
+  const result = await env.DB.prepare(`
+    SELECT cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at
+    FROM leaderboard_campaigns WHERE cadence IN ('daily', 'biweekly')
+  `).all();
+  const rows = new Map((result.results || []).map((row) => [row.cadence, row]));
+  return LEADERBOARD_CADENCES.map((cadence) => leaderboardResponse(rows.get(cadence), cadence));
+}
+
+async function handleLeaderboards(request, env) {
+  return json(request, env, 200, { leaderboards: await readLeaderboards(env), generatedAt: new Date(now()).toISOString() });
+}
+
+async function handleAdminLeaderboards(request, env, user) {
+  await requireAdminSession(request, env, user);
+  return handleLeaderboards(request, env);
+}
+
+async function handleAdminStartLeaderboard(request, env, user, cadence) {
+  await requireAdminSession(request, env, user);
+  const normalizedCadence = String(cadence || "").toLowerCase();
+  if (!LEADERBOARD_CADENCES.includes(normalizedCadence)) throw httpError(400, "Choose a valid leaderboard");
+  const body = await requestJson(request);
+  const prizeUsdCents = parsePrizeUsdCents(body.prizeUsd);
+  const durationSeconds = Number(body.durationSeconds);
+  if (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 7_776_000) {
+    throw httpError(400, "Countdown must be between one minute and 90 days");
+  }
+  const startsAt = now();
+  const endsAt = startsAt + durationSeconds * 1000;
+  await env.DB.prepare(`
+    INSERT INTO leaderboard_campaigns(
+      cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at, updated_by
+    ) VALUES(?, ?, 'active', ?, ?, ?, ?, ?)
+    ON CONFLICT(cadence) DO UPDATE SET
+      prize_usd_cents = excluded.prize_usd_cents,
+      status = 'active',
+      duration_seconds = excluded.duration_seconds,
+      starts_at = excluded.starts_at,
+      ends_at = excluded.ends_at,
+      updated_at = excluded.updated_at,
+      updated_by = excluded.updated_by
+  `).bind(normalizedCadence, prizeUsdCents, durationSeconds, startsAt, endsAt, startsAt, user.sub).run();
+  await writeAdminAudit(env, user, "leaderboard.started", normalizedCadence, JSON.stringify({ prizeUsdCents, durationSeconds, endsAt }));
+  const row = await env.DB.prepare(`
+    SELECT cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at
+    FROM leaderboard_campaigns WHERE cadence = ?
+  `).bind(normalizedCadence).first();
+  return json(request, env, 201, { leaderboard: leaderboardResponse(row, normalizedCadence) });
+}
+
 async function handleAdminOverview(request, env, user) {
   await requireAdminSession(request, env, user);
   const timestamp = now();
@@ -1451,7 +1527,7 @@ async function handleAdminSystem(request, env, user) {
       multiAssetBalances: true,
       playerProfiles: false,
       gameManagement: false,
-      promotions: false,
+      promotions: true,
     },
   });
 }
@@ -1576,6 +1652,7 @@ async function route(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
   if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
+  if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
 
@@ -1591,6 +1668,9 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/audit") return handleAdminAudit(request, env, user);
   if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
   if (request.method === "GET" && path === "/admin/country-access") return handleAdminCountryAccess(request, env, user);
+  if (request.method === "GET" && path === "/admin/leaderboards") return handleAdminLeaderboards(request, env, user);
+  const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(daily|biweekly)\/start$/);
+  if (request.method === "POST" && leaderboardStartMatch) return handleAdminStartLeaderboard(request, env, user, leaderboardStartMatch[1]);
   const countryAccessMatch = path.match(/^\/admin\/country-access\/([A-Za-z]{2})$/);
   if (request.method === "POST" && countryAccessMatch) return handleAdminSetCountryAccess(request, env, user, countryAccessMatch[1]);
   if (!path.startsWith("/admin/")) {

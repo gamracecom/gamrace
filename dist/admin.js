@@ -49,6 +49,7 @@ let systemCache = null;
 let countryAccessCache = null;
 let playersCache = [];
 let activePlayer = null;
+let leaderboardCache = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -323,6 +324,7 @@ async function loadView(view, force = false) {
   if (view === "players") return loadPlayers();
   if (view === "deposits") return loadDeposits();
   if (view === "withdrawals") return loadWithdrawals();
+  if (view === "promotions") return loadLeaderboards(force);
   if (view === "audit") return loadAudit();
   if (view === "risk") return loadCountryAccess(force);
   if (view === "system" || view === "integrations") return loadSystem(force);
@@ -600,6 +602,83 @@ function renderRanks() {
     <article class="rank-admin-card"><span class="rank-number">STAGE ${String(index + 1).padStart(2, "0")}</span><h3>${rank.name}</h3><p>${rank.subtitle}</p><div class="rank-tiers"><span>I</span><span>II</span><span>III</span></div><small class="rank-threshold">Starts at $${rank.thresholds[0].toLocaleString()}</small></article>
   `).join("");
 }
+
+function adminPrize(cents) {
+  const amount = Number(cents || 0) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) return "Prize TBA";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function adminLeaderboardCountdown(leaderboard) {
+  if (!leaderboard?.endsAt) return "Not started";
+  const remaining = Math.max(0, Math.floor((Date.parse(leaderboard.endsAt) - Date.now()) / 1000));
+  if (!remaining) return "Finished";
+  const days = Math.floor(remaining / 86400);
+  const hours = Math.floor((remaining % 86400) / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  return `${String(days).padStart(2, "0")}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function renderLeaderboards() {
+  const container = document.querySelector("#leaderboard-status-grid");
+  if (!container || !leaderboardCache) return;
+  container.innerHTML = leaderboardCache.map((leaderboard) => {
+    const active = leaderboard.status === "active" && leaderboard.endsAt && Date.parse(leaderboard.endsAt) > Date.now();
+    const status = active ? "live" : leaderboard.endsAt ? "ended" : "scheduled";
+    const label = leaderboard.cadence === "biweekly" ? "BiWeekly" : "Daily";
+    return `<article class="panel-card leaderboard-status-card" data-leaderboard-admin-cadence="${leaderboard.cadence}"><div class="leaderboard-status-head"><span>${label.toUpperCase()} RACE</span><span class="status-pill ${status}">${active ? "LIVE" : leaderboard.endsAt ? "ENDED" : "NOT STARTED"}</span></div><h3>King of the Track</h3><strong class="leaderboard-status-prize">${escapeHtml(adminPrize(leaderboard.prizeUsdCents))}</strong><b class="leaderboard-status-countdown">${escapeHtml(adminLeaderboardCountdown(leaderboard))}</b><small>${leaderboard.endsAt ? `Ends ${escapeHtml(formatDate(leaderboard.endsAt))}` : "Set the prize and duration to put this race live."}</small></article>`;
+  }).join("");
+}
+
+async function loadLeaderboards(force = false) {
+  if (!leaderboardCache || force) {
+    const result = await api("/admin/leaderboards");
+    leaderboardCache = result.leaderboards || [];
+  }
+  renderLeaderboards();
+  setLastRefresh();
+}
+
+document.querySelector("#leaderboard-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const cadence = document.querySelector("#leaderboard-cadence").value;
+  const prizeUsd = document.querySelector("#leaderboard-prize").value.trim();
+  const days = Number(document.querySelector("#leaderboard-days").value || 0);
+  const hours = Number(document.querySelector("#leaderboard-hours").value || 0);
+  const minutes = Number(document.querySelector("#leaderboard-minutes").value || 0);
+  const durationSeconds = Math.round(days * 86400 + hours * 3600 + minutes * 60);
+  const status = document.querySelector("#leaderboard-form-status");
+  const button = document.querySelector("#start-leaderboard");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(prizeUsd) || Number(prizeUsd) <= 0) { status.textContent = "Enter a valid prize amount."; return; }
+  if (!Number.isInteger(durationSeconds) || durationSeconds < 60) { status.textContent = "Set a countdown of at least one minute."; return; }
+  button.disabled = true;
+  button.textContent = "Starting race…";
+  status.textContent = "";
+  try {
+    const result = await api(`/admin/leaderboards/${cadence}/start`, {
+      method: "POST",
+      body: JSON.stringify({ prizeUsd, durationSeconds }),
+    });
+    leaderboardCache = (leaderboardCache || []).map((item) => item.cadence === result.leaderboard.cadence ? result.leaderboard : item);
+    renderLeaderboards();
+    showToast(`${cadence === "biweekly" ? "BiWeekly" : "Daily"} King of the Track is live`);
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Start leaderboard";
+  }
+});
+
+setInterval(() => {
+  if (activeView === "promotions" && leaderboardCache) renderLeaderboards();
+}, 1000);
 
 async function loadAudit() {
   const result = await api("/admin/audit");

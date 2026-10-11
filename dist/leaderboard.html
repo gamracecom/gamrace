@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#03111b" />
+    <meta name="description" content="GamRace King of the Track leaderboard." />
+    <title>King of the Track | GamRace</title>
+    <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { min-width: 320px; min-height: 100%; margin: 0; background: #03111b; }
+      body { min-height: 100vh; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      header { height: 82px; display: flex; align-items: center; padding: 0 clamp(18px, 4vw, 58px); border-bottom: 1px solid #102737; background: #04101a; }
+      a { display: inline-flex; align-items: center; }
+      img { width: 156px; height: 45px; display: block; object-fit: contain; object-position: left center; }
+      main { min-height: calc(100vh - 82px); }
+      @media (max-width: 560px) { header { height: 68px; padding-inline: 14px; } img { width: 64px; height: 52px; object-fit: cover; object-position: left; } main { min-height: calc(100vh - 68px); } }
+    </style>
+  </head>
+  <body>
+    <header><a href="index.html" aria-label="Return to GamRace"><img src="assets/brand/gamrace-logo-large.png" alt="GamRace" /></a></header>
+    <main aria-label="King of the Track leaderboard"></main>
+  </body>
+</html>

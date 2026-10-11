@@ -15,6 +15,71 @@ let currentFilter = "all";
 let currentMode = "house";
 let selectedPlayMode = "house";
 
+const LEADERBOARD_API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
+const leaderboardBanner = document.querySelector("[data-leaderboard-banner]");
+const leaderboardSlides = leaderboardBanner ? [...leaderboardBanner.querySelectorAll("[data-leaderboard-cadence]")] : [];
+const leaderboardIndicators = leaderboardBanner ? [...leaderboardBanner.querySelectorAll(".leaderboard-slide-indicators i")] : [];
+const leaderboardState = new Map();
+let leaderboardSlideIndex = 0;
+
+function leaderboardPrize(cents) {
+  const amount = Number(cents || 0) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) return "Prize TBA";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function leaderboardCountdown(campaign) {
+  if (!campaign?.endsAt) return "Race opens soon";
+  const remainingSeconds = Math.max(0, Math.floor((Date.parse(campaign.endsAt) - Date.now()) / 1000));
+  if (remainingSeconds <= 0) return "Race finished";
+  const days = Math.floor(remainingSeconds / 86400);
+  const hours = Math.floor((remainingSeconds % 86400) / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
+  const seconds = remainingSeconds % 60;
+  return `${String(days).padStart(2, "0")}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function renderLeaderboardBanner() {
+  leaderboardSlides.forEach((slide) => {
+    const campaign = leaderboardState.get(slide.dataset.leaderboardCadence);
+    slide.querySelector("[data-leaderboard-prize]").textContent = leaderboardPrize(campaign?.prizeUsdCents);
+    slide.querySelector("[data-leaderboard-countdown]").textContent = leaderboardCountdown(campaign);
+  });
+}
+
+function showLeaderboardSlide(index) {
+  if (!leaderboardBanner || !leaderboardSlides.length) return;
+  leaderboardSlideIndex = ((index % leaderboardSlides.length) + leaderboardSlides.length) % leaderboardSlides.length;
+  leaderboardBanner.style.setProperty("--leaderboard-index", String(leaderboardSlideIndex));
+  leaderboardIndicators.forEach((indicator, itemIndex) => indicator.classList.toggle("active", itemIndex === leaderboardSlideIndex));
+}
+
+async function loadLeaderboardBanner() {
+  if (!leaderboardBanner) return;
+  try {
+    const response = await fetch(`${LEADERBOARD_API_BASE}/leaderboards`, { cache: "no-store" });
+    if (!response.ok) return;
+    const body = await response.json();
+    (body.leaderboards || []).forEach((campaign) => leaderboardState.set(campaign.cadence, campaign));
+    renderLeaderboardBanner();
+  } catch {
+    // Keep the polished scheduled-state copy if the public campaign service is temporarily unavailable.
+  }
+}
+
+if (leaderboardBanner) {
+  loadLeaderboardBanner();
+  setInterval(renderLeaderboardBanner, 1000);
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setInterval(() => showLeaderboardSlide(leaderboardSlideIndex + 1), 3000);
+  }
+}
+
 function captureViewport() {
   return { left: window.scrollX, top: window.scrollY };
 }
