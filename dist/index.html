@@ -10,9 +10,12 @@
     />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=leaderboard-banner-2" />
+    <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
+    <link rel="preload" as="image" href="ranks/rookie-i.png" />
+    <script src="shell-state.js?v=shell-stability-1"></script>
+    <link rel="stylesheet" href="styles.css?v=shell-stability-1" />
   </head>
-  <body data-authenticated="false">
+  <body data-authenticated="pending">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Primary navigation">
         <div class="mobile-menu-header">
@@ -43,7 +46,7 @@
             </a>
             <div class="account-actions">
               <button class="utility rewards" type="button" aria-label="Rewards"><img class="utility-icon" src="assets/icons/navigation/rewards.png" alt="" aria-hidden="true" /></button>
-              <button class="utility balance" type="button" aria-label="Balance"><span class="balance-value">$0.00</span></button>
+              <button class="utility balance" type="button" aria-label="Balance"><img class="balance-coin-icon" src="assets/icons/crypto/usdt.svg" alt="" /><span class="balance-value">$0.00</span></button>
               <button class="utility wallet" type="button"><span class="utility-label">Wallet</span></button>
             </div>
             <div class="auth-actions">
@@ -71,9 +74,6 @@
                   </div>
                   <div class="leaderboard-scene" aria-hidden="true">
                     <img class="leaderboard-artwork" src="assets/banners/leaderboard-track-monument.png" alt="" />
-                    <span class="leaderboard-coin coin-one"><img src="assets/brand/gamrace-icon.png" alt="" /></span>
-                    <span class="leaderboard-coin coin-two"><img src="assets/brand/gamrace-icon.png" alt="" /></span>
-                    <span class="leaderboard-coin coin-three"><img src="assets/brand/gamrace-icon.png" alt="" /></span>
                   </div>
                 </article>
                 <article class="leaderboard-slide" data-leaderboard-cadence="biweekly">
@@ -85,9 +85,6 @@
                   </div>
                   <div class="leaderboard-scene" aria-hidden="true">
                     <img class="leaderboard-artwork" src="assets/banners/leaderboard-track-monument.png" alt="" />
-                    <span class="leaderboard-coin coin-one"><img src="assets/brand/gamrace-icon.png" alt="" /></span>
-                    <span class="leaderboard-coin coin-two"><img src="assets/brand/gamrace-icon.png" alt="" /></span>
-                    <span class="leaderboard-coin coin-three"><img src="assets/brand/gamrace-icon.png" alt="" /></span>
                   </div>
                 </article>
               </div>
@@ -331,8 +328,8 @@
     <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="script.js?v=leaderboard-banner-1"></script>
     <script src="mobile-nav.js?v=navigation-icons-1"></script>
-    <script type="module" src="firebase-auth.js?v=player-profile-sync-1"></script>
+    <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=game-ledger-1"></script>
+    <script type="module" src="wallet.js?v=shell-stability-1"></script>
   </body>
 </html>

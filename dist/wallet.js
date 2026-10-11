@@ -442,15 +442,18 @@ function updateHeader() {
   const selectedCode = walletSnapshot?.selectedCurrency || "usdttrc20";
   const asset = assetFor(selectedCode) || { icon: "usdt", symbol: "USDT" };
   const balance = balanceFor(selectedCode);
+  let balanceText = "$0.00";
   balanceButtons.forEach((button) => {
     const icon = button.querySelector(".balance-coin-icon");
     const value = button.querySelector(".balance-value");
     if (icon) { icon.src = iconUrl(asset); icon.alt = asset.symbol || ""; }
-    if (value) value.textContent = balancePreferences.displayFiat
+    balanceText = balancePreferences.displayFiat
       ? money(walletSnapshot?.selectedUsdCents || 0)
       : `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
+    if (value) value.textContent = balanceText;
     button.title = `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
   });
+  if (currentUser) window.GamRaceShellState?.write({ signedIn: true, balanceText, selectedCurrency: selectedCode, selectedIcon: iconUrl(asset) });
   updateBalanceMenus();
   broadcastWalletSelection();
 }

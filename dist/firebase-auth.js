@@ -232,9 +232,12 @@ function renderRank(source) {
   const headerMark = profileButton?.querySelector(".profile-rank-mark");
   const headerImage = profileButton?.querySelector(".profile-rank-image");
   const headerFallback = profileButton?.querySelector(".profile-rank-fallback");
-  headerMark?.classList.remove("has-image");
-  if (headerImage) headerImage.src = rankDefinition.badgePath;
+  const sameLoadedBadge = headerImage?.getAttribute("src") === rankDefinition.badgePath && headerImage.complete && headerImage.naturalWidth;
+  if (!sameLoadedBadge) headerMark?.classList.remove("has-image");
+  if (headerImage && headerImage.getAttribute("src") !== rankDefinition.badgePath) headerImage.src = rankDefinition.badgePath;
+  if (sameLoadedBadge) headerMark?.classList.add("has-image");
   if (headerFallback) headerFallback.textContent = fallback;
+  window.GamRaceShellState?.write({ signedIn: true, rankBadgePath: rankDefinition.badgePath, rankFallback: fallback });
   profileDialog.inlineRank.textContent = rankDefinition.label;
 }
 
@@ -294,6 +297,7 @@ function refreshProfileDialog() {
   profileDialog.preferenceInputs.forEach((input) => { input.checked = Boolean(preferences[input.dataset.preference]); });
   const label = profileButton?.querySelector(".profile-label");
   if (label) label.textContent = username;
+  window.GamRaceShellState?.write({ signedIn: true, username });
   renderRank(currentProfile);
 }
 
@@ -392,12 +396,22 @@ function signedInLabel(user) { return currentProfile?.username || user?.displayN
 function renderUser(user) {
   const signedIn = Boolean(user);
   document.body.dataset.authenticated = String(signedIn);
+  document.documentElement.dataset.sessionState = signedIn ? "signed-in" : "signed-out";
   headerSignIn.textContent = "Sign In";
   headerSignIn.setAttribute("aria-label", "Sign in");
   headerRegister.textContent = "Sign Up";
   profileButton?.setAttribute("aria-label", signedIn ? `Account menu for ${signedInLabel(user)}` : "Account menu");
-  if (signedIn) { if (authModal) authModal.hidden = true; if (profileDialog.overlay.hidden) document.body.classList.remove("modal-open"); setStatus(); }
-  else { currentProfile = null; closeAccountMenu(); closeProfileDialog(); }
+  if (signedIn) {
+    window.GamRaceShellState?.write({ signedIn: true, username: signedInLabel(user) });
+    if (authModal) authModal.hidden = true;
+    if (profileDialog.overlay.hidden) document.body.classList.remove("modal-open");
+    setStatus();
+  } else {
+    window.GamRaceShellState?.clear();
+    currentProfile = null;
+    closeAccountMenu();
+    closeProfileDialog();
+  }
 }
 
 function friendlyAuthError(error) {
