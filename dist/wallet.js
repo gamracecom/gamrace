@@ -129,7 +129,7 @@ function createWalletDialog() {
   overlay.className = "wallet-overlay";
   overlay.hidden = true;
   overlay.innerHTML = `
-    <section class="wallet-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+    <section class="wallet-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title" tabindex="-1">
       <h2 class="sr-only" id="wallet-title">GamRace Wallet</h2>
       <div class="wallet-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet-tab="deposit">Deposit</button>
@@ -194,6 +194,7 @@ function createWalletDialog() {
   document.body.append(overlay);
   return {
     overlay,
+    modal: overlay.querySelector(".wallet-modal"),
     tabs: [...overlay.querySelectorAll("[data-wallet-tab]")],
     panels: [...overlay.querySelectorAll("[data-wallet-panel]")],
     withdrawalForm: overlay.querySelector('[data-wallet-form="withdraw"]'),
@@ -650,6 +651,7 @@ async function openWallet(defaultTab = "deposit") {
   selectTab(defaultTab);
   dialog.overlay.hidden = false;
   document.body.classList.add("modal-open");
+  dialog.modal.focus({ preventScroll: true });
   setStatus("Loading wallet…");
   try {
     await Promise.all([loadWallet(), loadCurrencies()]);
@@ -657,7 +659,6 @@ async function openWallet(defaultTab = "deposit") {
     setStatus();
     if (defaultTab === "deposit") await ensureDepositAddress(dialog.depositSelect.value);
   } catch (error) { setStatus(error.message, "error"); }
-  dialog.tabs.find((tab) => tab.classList.contains("active"))?.focus();
 }
 
 function closeWallet() {

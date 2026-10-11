@@ -1099,6 +1099,7 @@ body.modal-open { overflow: hidden; }
 
 .wallet-overlay { background: rgba(0, 6, 11, .86); backdrop-filter: blur(5px); }
 .wallet-modal { width: min(620px, calc(100vw - 32px)); max-height: min(820px, calc(100dvh - 32px)); border: 1px solid #173548; border-radius: 12px; background: #071018; box-shadow: 0 28px 90px rgba(0, 0, 0, .76); }
+.wallet-modal:focus { outline: 0; }
 .wallet-tabs { position: sticky; z-index: 20; top: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 15px 22px 0; border-bottom: 1px solid #20313d; background: #071018; }
 .wallet-tab { min-height: 46px; padding: 0 8px; border-radius: 0; position: relative; color: #a3b3bf; font-size: .78rem; font-weight: 680; white-space: nowrap; }
 .wallet-tab-mobile { display: none; }
