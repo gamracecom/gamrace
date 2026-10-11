@@ -40,14 +40,18 @@
   const toolButtons = [...diceGame.querySelectorAll("[data-dice-game-tool]")];
   const toolPanels = [...diceGame.querySelectorAll("[data-dice-game-tool-panel]")];
   const favoriteButton = diceGame.querySelector('[data-dice-game-favorite="dice"]');
+  const resultStrip = document.querySelector("[data-game-result-strip]");
 
   let direction = "over";
   let currentMode = "manual";
   let autoplayRunning = false;
   let stopAutoplayRequested = false;
+  let selectedCurrency = "";
   let selectedSymbol = "COIN";
   let displayFiat = true;
   let availableBalance = 0;
+  let betPending = false;
+  let wagerError = "";
   const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0, cumulativeProfit: [] };
 
   function readStoredJson(key, fallback) {
@@ -79,6 +83,10 @@
 
   function availableText() {
     return formatAmount(availableBalance);
+  }
+
+  function minimumWager() {
+    return displayFiat ? 0.01 : 0.00000001;
   }
 
   function chanceValue() {
@@ -114,24 +122,22 @@
   function updateWagerAvailability() {
     const manualAmount = cleanAmount(betInput);
     const autoAmount = cleanAmount(autoBetInput);
-    actionButton.disabled = autoplayRunning || manualAmount < 0.01 || manualAmount > availableBalance;
-    autoActionButton.disabled = !autoplayRunning && (autoAmount < 0.01 || autoAmount > availableBalance);
+    const minimum = minimumWager();
+    actionButton.disabled = betPending || autoplayRunning || manualAmount < minimum || manualAmount > availableBalance;
+    autoActionButton.disabled = betPending || (!autoplayRunning && (autoAmount < minimum || autoAmount > availableBalance));
     balanceLabel.textContent = availableText();
     updateProfit();
 
     const activeAmount = currentMode === "auto" ? autoAmount : manualAmount;
-    if (activeAmount > availableBalance && activeAmount > 0) {
+    if (wagerError) {
+      balanceMessage.textContent = wagerError;
+      balanceMessage.hidden = false;
+    } else if (activeAmount > availableBalance && activeAmount > 0) {
       balanceMessage.textContent = `Insufficient ${selectedSymbol} balance.`;
       balanceMessage.hidden = false;
     } else {
       balanceMessage.hidden = true;
     }
-  }
-
-  function secureRoll() {
-    const values = new Uint32Array(1);
-    crypto.getRandomValues(values);
-    return (values[0] % 10000) / 100;
   }
 
   function delay(milliseconds) {
@@ -151,6 +157,17 @@
     sliderShell.classList.add("show-result", won ? "result-win" : "result-loss");
   }
 
+  function addMultiplierResult(multiplier, won) {
+    if (!resultStrip) return;
+    resultStrip.hidden = false;
+    const pill = document.createElement("span");
+    pill.className = `game-result-pill${won ? " win" : ""}`;
+    pill.textContent = `${Number(multiplier).toFixed(2)}×`;
+    resultStrip.append(pill);
+    while (resultStrip.children.length > 9) resultStrip.firstElementChild.remove();
+    resultStrip.scrollLeft = resultStrip.scrollWidth;
+  }
+
   function recordRoll(amount, profit) {
     sessionStats.wagered += amount;
     sessionStats.profit += profit;
@@ -160,26 +177,51 @@
     renderSessionStats();
   }
 
-  function runRoll(amount) {
-    if (!Number.isFinite(amount) || amount < 0.01 || amount > availableBalance) {
+  async function runRoll(amount) {
+    wagerError = "";
+    if (!Number.isFinite(amount) || amount < minimumWager() || amount > availableBalance) {
       updateWagerAvailability();
       return null;
     }
-    const roll = secureRoll();
-    const target = Number(slider.value);
-    const won = direction === "over" ? roll > target : roll < target;
-    const profit = won ? amount * (multiplierValue() - 1) : -amount;
-    availableBalance = Math.max(0, availableBalance + profit);
-    renderResult(roll, won);
-    recordRoll(amount, profit);
+    if (!selectedCurrency || !window.gamraceWallet?.request) {
+      balanceMessage.textContent = "Sign in and wait for your wallet to load before betting.";
+      balanceMessage.hidden = false;
+      return null;
+    }
+    betPending = true;
     updateWagerAvailability();
-    return { won, profit };
+    try {
+      const response = await window.gamraceWallet.request("/games/dice/bets", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId: crypto.randomUUID().replaceAll("-", ""),
+          currency: selectedCurrency,
+          wager: amount.toFixed(displayFiat ? 2 : 8),
+          displayFiat,
+          target: Number(slider.value),
+          direction,
+        }),
+      });
+      window.gamraceWallet.applyGameResult(response);
+      const won = response.bet.outcome === "win";
+      const profit = won ? amount * (Number(response.bet.multiplier) - 1) : -amount;
+      renderResult(Number(response.bet.roll), won);
+      addMultiplierResult(response.bet.multiplier, won);
+      recordRoll(amount, profit);
+      return { won, profit };
+    } catch (error) {
+      wagerError = error.message || "The bet could not be completed.";
+      return null;
+    } finally {
+      betPending = false;
+      updateWagerAvailability();
+    }
   }
 
   async function runManualRoll() {
     actionButton.disabled = true;
     if (!settings.turbo) await delay(220);
-    runRoll(cleanAmount(betInput));
+    await runRoll(cleanAmount(betInput));
   }
 
   async function runAutoplay() {
@@ -190,7 +232,7 @@
     }
     const rounds = Math.round(clamp(autoRoundInput.value, 1, 100));
     let amount = cleanAmount(autoBetInput);
-    if (amount < 0.01 || amount > availableBalance) return updateWagerAvailability();
+    if (amount < minimumWager() || amount > availableBalance) return updateWagerAvailability();
 
     autoplayRunning = true;
     stopAutoplayRequested = false;
@@ -199,7 +241,7 @@
     actionButton.disabled = true;
 
     for (let index = 0; index < rounds && !stopAutoplayRequested; index += 1) {
-      const result = runRoll(amount);
+      const result = await runRoll(amount);
       if (!result) break;
       const change = result.won ? clamp(autoWinInput.value, 0, 1000) : clamp(autoLossInput.value, 0, 1000);
       if (change > 0) amount = Math.round(amount * (1 + change / 100) * 100000000) / 100000000;
@@ -230,19 +272,30 @@
 
   function applyWalletSelection(detail) {
     if (!detail?.asset || !detail?.balance) return;
+    const selectionChanged = selectedCurrency !== detail.currency || displayFiat !== (detail.displayFiat !== false);
+    selectedCurrency = detail.currency;
     selectedSymbol = detail.asset.symbol || "COIN";
     displayFiat = detail.displayFiat !== false;
     const coinAmount = Number(detail.balance.available || 0);
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : coinAmount;
+    const minimum = minimumWager();
+    [betInput, autoBetInput].forEach((input) => {
+      input.min = minimum.toFixed(displayFiat ? 2 : 8);
+      input.step = input.min;
+    });
     diceGame.querySelectorAll("[data-dice-currency]").forEach((field) => { field.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
-    betInput.value = "0.00";
-    autoBetInput.value = "0.00";
-    sessionStats.profit = 0;
-    sessionStats.wagered = 0;
-    sessionStats.wins = 0;
-    sessionStats.losses = 0;
-    sessionStats.cumulativeProfit = [];
-    renderSessionStats();
+    if (selectionChanged) {
+      wagerError = "";
+      betInput.value = displayFiat ? "0.00" : "0.00000000";
+      autoBetInput.value = displayFiat ? "0.00" : "0.00000000";
+      sessionStats.profit = 0;
+      sessionStats.wagered = 0;
+      sessionStats.wins = 0;
+      sessionStats.losses = 0;
+      sessionStats.cumulativeProfit = [];
+      renderSessionStats();
+      if (resultStrip) resultStrip.replaceChildren();
+    }
     updateWagerAvailability();
   }
 
@@ -353,8 +406,8 @@
     direction = direction === "over" ? "under" : "over";
     setTargetFromChance(chance);
   });
-  betInput.addEventListener("input", updateWagerAvailability);
-  autoBetInput.addEventListener("input", updateWagerAvailability);
+  betInput.addEventListener("input", () => { wagerError = ""; updateWagerAvailability(); });
+  autoBetInput.addEventListener("input", () => { wagerError = ""; updateWagerAvailability(); });
   actionButton.addEventListener("click", runManualRoll);
   autoActionButton.addEventListener("click", runAutoplay);
   diceGame.querySelectorAll("[data-dice-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(betInput, button.dataset.diceBetAction)));

@@ -348,7 +348,7 @@ function renderCountryAccess() {
   const shown = countries.filter((country) => !query || country.name.toLowerCase().includes(query) || country.code.toLowerCase().includes(query));
   document.querySelector("#country-allowed-count").textContent = countries.filter((country) => country.allowed).length;
   document.querySelector("#country-blocked-count").textContent = countries.filter((country) => !country.allowed).length;
-  container.innerHTML = shown.length ? shown.map((country) => `<div class="country-access-row ${country.allowed ? "" : "blocked"}" data-country-code="${country.code}"><b>${country.code}</b><span title="${country.name}">${country.name}</span><button type="button" aria-label="${country.allowed ? `Block ${country.name}` : `Allow ${country.name}`}" title="${country.allowed ? "Allowed — click to block" : "Blocked — click to allow"}">${country.allowed ? "✓" : "×"}</button></div>`).join("") : "<p>No countries match that search.</p>";
+  container.innerHTML = shown.length ? shown.map((country) => `<div class="country-access-row ${country.allowed ? "" : "blocked"}" data-country-code="${country.code}"><b>${country.code}</b><span title="${country.name}">${country.name}</span><button type="button" aria-label="${country.allowed ? `Block ${country.name}` : `Allow ${country.name}`}" title="${country.allowed ? "Allowed — click to block" : "Blocked — click to allow"}">${country.allowed ? "On" : "Off"}</button></div>`).join("") : "<p>No countries match that search.</p>";
   container.querySelectorAll("[data-country-code] button").forEach((button) => button.addEventListener("click", async () => {
     const row = button.closest("[data-country-code]");
     const code = row.dataset.countryCode;
@@ -447,7 +447,7 @@ function renderAttention(pending) {
   const container = document.querySelector("#attention-list");
   container.innerHTML = pending
     ? `<div class="attention-item"><span>!</span><div><strong>${pending} withdrawal${pending === 1 ? "" : "s"} awaiting review</strong><small>Funds are held until you decide.</small></div><b>REVIEW</b></div>`
-    : '<div class="empty-compact"><span>✓</span><strong>Nothing waiting</strong><small>Your review queue is clear.</small></div>';
+    : '<div class="empty-compact"><span aria-hidden="true">•</span><strong>Nothing waiting</strong><small>Your review queue is clear.</small></div>';
 }
 
 async function loadPlayers() {
@@ -545,7 +545,7 @@ async function loadWithdrawals() {
   const navCount = document.querySelector("#withdrawal-nav-count");
   navCount.textContent = count;
   navCount.hidden = count === 0;
-  if (!count) container.innerHTML = '<div class="empty-state-card"><div><span>✓</span><strong>No withdrawals waiting for review</strong><p>New requests will appear here with funds already held.</p></div></div>';
+  if (!count) container.innerHTML = '<div class="empty-state-card"><div><span aria-hidden="true">•</span><strong>No withdrawals waiting for review</strong><p>New requests will appear here with funds already held.</p></div></div>';
   else container.innerHTML = result.withdrawals.map((withdrawal) => `
     <article class="withdrawal-card"><div><label>Request</label><strong>${shortId(withdrawal.id, 7)}</strong></div><div><label>Amount</label><strong class="amount">${withdrawal.payoutAmount} ${formatAsset(withdrawal.payoutCurrency)}</strong></div><div><label>Status</label><strong><span class="status-pill ${statusClass(withdrawal.status)}">${withdrawal.status.replaceAll("_", " ")}</span></strong></div><div><label>Submitted</label><strong>${formatDate(withdrawal.createdAt, true)}</strong></div>${withdrawal.status === "pending_review" ? `<button type="button" data-review-withdrawal="${withdrawal.id}">Review</button>` : ""}</article>
   `).join("");

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#020b12" />
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=home-cards-restored-1" />
+    <link rel="stylesheet" href="styles.css?v=game-ledger-1" />
   </head>
   <body class="game-page" data-authenticated="false">
     <div class="app-shell">
@@ -50,6 +50,7 @@
         </header>
 
         <div class="game-rail">
+          <div class="game-result-strip" data-game-result-strip aria-label="Recent bet multipliers" aria-live="polite" hidden></div>
           <section class="mines-game" id="mines-game" hidden aria-label="Mines">
             <div class="mines-stage">
               <section class="mines-controls" aria-label="Mines controls">
@@ -283,11 +284,11 @@
       <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" aria-hidden="true" /><strong>Chat</strong></button>
     </nav>
     <script type="module" src="region-access.js?v=region-access-1"></script>
-    <script src="mines.js?v=mines-tools-1" defer></script>
-    <script src="dice.js?v=dice-1" defer></script>
+    <script src="mines.js?v=game-ledger-1" defer></script>
+    <script src="dice.js?v=game-ledger-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=player-profile-sync-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=wallet-menu-controls-1"></script>
+    <script type="module" src="wallet.js?v=game-ledger-1"></script>
   </body>
 </html>

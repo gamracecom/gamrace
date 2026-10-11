@@ -674,6 +674,12 @@ body.modal-open { overflow: hidden; }
 .game-page { min-height: 100dvh; background: radial-gradient(circle at 74% 16%, rgba(0, 126, 211, .08), transparent 34%), var(--bg); }
 .game-main { padding-top: 106px; padding-bottom: 54px; }
 .game-rail { width: min(100%, var(--content-max)); margin-inline: auto; }
+.game-result-strip { min-height: 43px; display: flex; justify-content: flex-end; gap: 7px; margin-bottom: 8px; padding: 5px 0; overflow-x: auto; scrollbar-width: none; }
+.game-result-strip::-webkit-scrollbar { display: none; }
+.game-result-strip[hidden] { display: none; }
+.game-result-pill { min-width: 82px; height: 33px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(255, 82, 94, .2); border-radius: 8px; background: rgba(54, 12, 17, .58); color: #ff5a65; font-size: .76rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.game-result-pill.win { border-color: rgba(43, 209, 126, .22); background: rgba(7, 54, 34, .64); color: #35dc8a; }
+@media (max-width: 700px) { .game-result-strip { justify-content: flex-start; padding-inline: 4px; }.game-result-pill { min-width: 72px; } }
 .game-blank-state { min-height: calc(100dvh - 76px); }
 .game-blank-state[hidden], .mines-game[hidden], .dice-game[hidden] { display: none; }
 .mines-game { width: 100%; }
@@ -806,7 +812,7 @@ body.modal-open { overflow: hidden; }
 .mine-tile { border-radius: 9px; box-shadow: 0 5px 0 #07141d, inset 0 1px rgba(255, 255, 255, .045); }
 .mine-tile.auto-selectable { cursor: pointer; }
 .mine-tile.auto-selected { border-color: #23d6fa; background: radial-gradient(circle, rgba(35, 214, 250, .2), transparent 68%), #0b2635; box-shadow: 0 5px 0 #07141d, inset 0 0 0 2px rgba(35, 214, 250, .22), 0 0 15px rgba(35, 214, 250, .12); }
-.mine-tile.auto-selected::after { content: "✓"; width: 26%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #22caed; color: #00141e; font-size: clamp(.6rem, 1vw, .85rem); font-weight: 950; }
+.mine-tile.auto-selected::after { width: 13%; aspect-ratio: 1; display: block; border-radius: 50%; background: #22caed; content: ""; }
 .mines-stage-footer { padding-inline: 20px; }
 .mines-stage-footer > span:not(.fairness-label) { color: #315268; font-size: .95rem; font-weight: 900; letter-spacing: .05em; }
 .mines-stage-footer .fairness-label { justify-self: end; color: #8299a8; font-size: .63rem; text-decoration: underline; }
@@ -1052,8 +1058,8 @@ body.modal-open { overflow: hidden; }
 .balance-option strong { min-width: 0; display: grid; gap: 2px; font-size: .78rem; }
 .balance-option strong small { overflow: hidden; color: #7f96a5; font-size: .62rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .balance-option em { color: #d8e8ef; font-size: .7rem; font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.balance-option > i { color: transparent; font-size: .76rem; font-style: normal; }
-.balance-option.selected > i { color: #4bd2ff; }
+.balance-option > i { width: 7px; height: 7px; justify-self: center; border-radius: 50%; background: transparent; }
+.balance-option.selected > i { background: #4bd2ff; }
 .wallet-button-icon { width: 19px; height: 17px; display: inline-block; border: 1.8px solid currentColor; border-radius: 3px; position: relative; }
 .wallet-button-icon::after { width: 7px; height: 5px; border: 1.6px solid currentColor; border-radius: 2px; position: absolute; right: -4px; top: 4px; background: inherit; content: ""; }
 .utility.wallet { border-color: #087ebe; background: #087ac0; color: #fff; }
@@ -1096,8 +1102,8 @@ body.modal-open { overflow: hidden; }
 .wallet-asset-option strong { color: inherit; font-size: .78rem; }
 .wallet-asset-option small { overflow: hidden; color: #8197a5; font-size: .68rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .wallet-asset-option.selected small { color: #93c8df; }
-.wallet-asset-option i { color: transparent; font-size: .78rem; font-style: normal; }
-.wallet-asset-option.selected i { color: #4bcfff; }
+.wallet-asset-option i { width: 7px; height: 7px; justify-self: center; border-radius: 50%; background: transparent; }
+.wallet-asset-option.selected i { background: #4bcfff; }
 .wallet-network-option img, .wallet-network-control [data-network-icon] { padding: 1px; border-radius: 50%; background: #071018; }
 .wallet-input-shell { min-height: 48px; border-color: #1a3344; border-radius: 7px; background: #0b1822; }
 .wallet-input-shell:focus-within { border-color: #278bb7; box-shadow: none; }

@@ -112,6 +112,44 @@ export function providerAmountToUnits(value) {
   return units;
 }
 
+export function dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPoints) {
+  const wager = Number(wagerUnits);
+  const target = Number(targetBasisPoints);
+  const roll = Number(rollBasisPoints);
+  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Dice wager");
+  if (!Number.isInteger(target) || target < 100 || target > 9800) throw new Error("Invalid Dice target");
+  if (!Number.isInteger(roll) || roll < 1 || roll > 10_000) throw new Error("Invalid Dice roll");
+  if (!["over", "under"].includes(direction)) throw new Error("Invalid Dice direction");
+  const chanceBasisPoints = direction === "over" ? 10_000 - target : target;
+  const won = direction === "over" ? roll > target : roll < target;
+  const multiplierMicros = Math.floor(9_900 * 1_000_000 / chanceBasisPoints);
+  const payoutUnits = won ? Number(BigInt(wager) * BigInt(multiplierMicros) / 1_000_000n) : 0;
+  if (!Number.isSafeInteger(payoutUnits)) throw new Error("Dice payout is too large");
+  return { won, chanceBasisPoints, multiplierMicros, payoutUnits };
+}
+
+export function minesMultiplierMicros(mineCount, revealedCount) {
+  const mines = Number(mineCount);
+  const revealed = Number(revealedCount);
+  if (!Number.isInteger(mines) || mines < 1 || mines > 24) throw new Error("Invalid mine count");
+  if (!Number.isInteger(revealed) || revealed < 0 || revealed > 25 - mines) throw new Error("Invalid revealed count");
+  if (revealed === 0) return 1_000_000;
+  let survivalProbability = 1;
+  for (let pick = 0; pick < revealed; pick += 1) {
+    survivalProbability *= (25 - mines - pick) / (25 - pick);
+  }
+  return Math.max(1_000_000, Math.floor((0.99 / survivalProbability) * 1_000_000));
+}
+
+export function payoutFromMultiplier(wagerUnits, multiplierMicros) {
+  const wager = Number(wagerUnits);
+  const multiplier = Number(multiplierMicros);
+  if (!Number.isSafeInteger(wager) || wager <= 0 || !Number.isSafeInteger(multiplier) || multiplier < 0) throw new Error("Invalid game payout");
+  const payout = Number(BigInt(wager) * BigInt(multiplier) / 1_000_000n);
+  if (!Number.isSafeInteger(payout)) throw new Error("Game payout is too large");
+  return payout;
+}
+
 export function normalizeAddress(value) {
   const address = String(value || "").trim();
   if (address.length < 10 || address.length > 256 || /\s/.test(address)) throw new Error("Enter a valid wallet address");

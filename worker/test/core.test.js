@@ -4,16 +4,19 @@ import test from "node:test";
 import {
   createIpnSignature,
   createRawHmacSignature,
+  dicePayout,
   assetUnitsToString,
   maskAddress,
   normalizeAddress,
   normalizeCurrency,
   normalizeRequestId,
+  minesMultiplierMicros,
   parseAssetUnits,
   parseNonNegativeAssetUnits,
   providerAmountToUnits,
   parseUsdCents,
   paymentCanCredit,
+  payoutFromMultiplier,
   oxaDepositStatus,
   oxaPayoutStatus,
   signaturesMatch,
@@ -75,4 +78,18 @@ test("asset balances use exact eight-decimal integer units", () => {
   assert.equal(parseNonNegativeAssetUnits("0"), 0);
   assert.equal(parseNonNegativeAssetUnits("125.50000000"), 12_550_000_000);
   assert.throws(() => parseNonNegativeAssetUnits("-0.01"), /valid amount/);
+});
+
+test("server game math settles exact wallet units", () => {
+  const win = dicePayout(100_000_000, 5050, "over", 7500);
+  assert.equal(win.won, true);
+  assert.equal(win.multiplierMicros, 2_000_000);
+  assert.equal(win.payoutUnits, 200_000_000);
+  const loss = dicePayout(100_000_000, 5050, "over", 1000);
+  assert.equal(loss.won, false);
+  assert.equal(loss.payoutUnits, 0);
+  assert.equal(dicePayout(100_000_000, 5050, "over", 10_000).won, true);
+  const minesMultiplier = minesMultiplierMicros(3, 1);
+  assert.equal(minesMultiplier, 1_125_000);
+  assert.equal(payoutFromMultiplier(100_000_000, minesMultiplier), 112_500_000);
 });

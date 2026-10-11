@@ -180,7 +180,7 @@ function createWalletDialog() {
         </section>
         <section class="wallet-panel" data-wallet-panel="transactions" hidden>
           <div class="wallet-transaction-filters" aria-label="Transaction filters">
-            <button class="active" type="button" data-wallet-transaction-filter="all">All</button><button type="button" data-wallet-transaction-filter="deposit">Deposits</button><button type="button" data-wallet-transaction-filter="withdrawal">Withdrawals</button><button type="button" data-wallet-transaction-filter="tip">Tips</button><button type="button" data-wallet-transaction-filter="purchase">Purchases</button><button type="button" data-wallet-transaction-filter="bonus">Bonuses</button>
+            <button class="active" type="button" data-wallet-transaction-filter="all">All</button><button type="button" data-wallet-transaction-filter="bet">Bets</button><button type="button" data-wallet-transaction-filter="deposit">Deposits</button><button type="button" data-wallet-transaction-filter="withdrawal">Withdrawals</button><button type="button" data-wallet-transaction-filter="tip">Tips</button><button type="button" data-wallet-transaction-filter="purchase">Purchases</button><button type="button" data-wallet-transaction-filter="bonus">Bonuses</button>
           </div>
           <div class="wallet-transaction-list" data-wallet-transaction-list></div>
         </section>
@@ -391,6 +391,20 @@ function broadcastWalletSelection() {
   window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed", { detail }));
 }
 
+function applyWalletSnapshot(nextWallet) {
+  if (!nextWallet) return;
+  walletSnapshot = nextWallet;
+  if (currencies.length) refreshControls();
+  else updateHeader();
+}
+
+window.gamraceWallet = {
+  request: (path, options = {}) => api(path, options),
+  applyGameResult: (result) => applyWalletSnapshot(result?.wallet),
+  refresh: async () => { await loadWallet(); return walletSelectionDetail(); },
+  selection: () => walletSelectionDetail(),
+};
+
 function updateBalanceMenus() {
   balanceButtons.forEach((button) => {
     const list = button.parentElement?.querySelector(".balance-menu-list");
@@ -414,7 +428,7 @@ function updateBalanceMenus() {
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(selected));
       const shownBalance = balancePreferences.displayFiat ? money(balance.usdCents || 0) : `${cleanCryptoAmount(balance.available)} ${asset.symbol}`;
-      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${shownBalance}</em></span><i aria-hidden="true">✓</i>`;
+      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${shownBalance}</em></span><i aria-hidden="true"></i>`;
       option.addEventListener("click", async () => {
         closeBalanceMenus();
         try { await selectWalletCurrency(asset.code); } catch (error) { setStatus(error.message, "error"); }
@@ -500,7 +514,7 @@ function updateChoiceControls(context) {
     item.setAttribute("aria-selected", String(selected));
     item.classList.toggle("selected", selected);
     const detail = group.length > 1 ? `${group.length} networks available` : representative.network;
-    item.innerHTML = `<img src="${iconUrl(representative)}" alt="" /><span><strong>${representative.name} (${representative.symbol})</strong><small>${detail}</small></span><i aria-hidden="true">✓</i>`;
+    item.innerHTML = `<img src="${iconUrl(representative)}" alt="" /><span><strong>${representative.name} (${representative.symbol})</strong><small>${detail}</small></span><i aria-hidden="true"></i>`;
     item.addEventListener("click", () => {
       const rememberedCode = rememberedNetworkByContext[context].get(representative.symbol);
       const currentCode = asset.symbol === representative.symbol ? asset.code : null;
@@ -534,7 +548,7 @@ function updateChoiceControls(context) {
     item.setAttribute("aria-selected", String(selected));
     item.classList.toggle("selected", selected);
     const detail = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(networkAsset.code).available)} ${networkAsset.symbol} available` : `${networkAsset.symbol} network`;
-    item.innerHTML = `<img src="${networkIconUrl(networkAsset)}" alt="" /><span><strong>${networkAsset.network}</strong><small>${detail}</small></span><i aria-hidden="true">✓</i>`;
+    item.innerHTML = `<img src="${networkIconUrl(networkAsset)}" alt="" /><span><strong>${networkAsset.network}</strong><small>${detail}</small></span><i aria-hidden="true"></i>`;
     item.addEventListener("click", () => {
       select.value = networkAsset.code;
       rememberedNetworkByContext[context].set(networkAsset.symbol, networkAsset.code);
@@ -597,7 +611,10 @@ function renderWalletTransactions(filter = "all") {
     const row = document.createElement("article");
     row.className = "wallet-activity-row";
     const asset = assetFor(item.currency);
-    row.innerHTML = `<img class="wallet-activity-icon" src="${iconUrl(asset || item.currency)}" alt="" /><div><strong>${item.type === "withdrawal" ? "Withdrawal" : item.type === "deposit" ? "Deposit" : "Wallet activity"}</strong><span>${asset?.symbol || String(item.currency || "").toUpperCase()} · ${String(item.status || "Pending").replaceAll("_", " ")}</span></div><strong>${item.type === "withdrawal" ? "−" : "+"}${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}</strong>`;
+    const title = item.type === "withdrawal" ? "Withdrawal" : item.type === "deposit" ? "Deposit" : item.type === "bet" ? `${item.game || "Game"} bet` : "Wallet activity";
+    const amount = item.type === "bet" ? `${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}` : `${item.type === "withdrawal" ? "−" : "+"}${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}`;
+    const detail = item.type === "bet" && item.multiplier ? `${Number(item.multiplier).toFixed(2)}× · ${String(item.status || "open")}` : String(item.status || "Pending").replaceAll("_", " ");
+    row.innerHTML = `<img class="wallet-activity-icon" src="${iconUrl(asset || item.currency)}" alt="" /><div><strong>${title}</strong><span>${asset?.symbol || String(item.currency || "").toUpperCase()} · ${detail}</span></div><strong>${amount}</strong>`;
     dialog.transactionList.append(row);
   });
 }
