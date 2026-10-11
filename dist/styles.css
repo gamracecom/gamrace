@@ -813,7 +813,7 @@ body.modal-open { overflow: hidden; }
 }
 
 @media (max-width: 560px) {
-  .game-main { padding-top: 162px; }
+  .game-main { padding-top: 80px; }
   .mines-board-panel { min-height: auto; padding: 18px 12px 25px; }
   .mines-board { gap: 7px; }
   .mine-tile { border-radius: 8px; box-shadow: 0 5px 0 #07141d; }
