@@ -135,9 +135,8 @@ function createWalletDialog() {
       <div class="wallet-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet-tab="deposit">Deposit</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="withdraw">Withdraw</button>
-        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy"><span class="wallet-tab-desktop">Buy Crypto</span><span class="wallet-tab-mobile">Buy</span></button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy">Buy Crypto</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="tip"><span class="wallet-tab-desktop">Tip User</span><span class="wallet-tab-mobile">Tip</span></button>
-        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="transactions"><span class="wallet-tab-desktop">Transactions</span><span class="wallet-tab-mobile">History</span></button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="vault">Vault</button>
       </div>
       <div class="wallet-body">
@@ -356,14 +355,6 @@ function ensureHeaderControls() {
       wrapper.append(menu);
       button.setAttribute("aria-haspopup", "listbox");
       button.setAttribute("aria-expanded", "false");
-    }
-  });
-  walletButtons.forEach((button) => {
-    if (!button.querySelector(".wallet-button-icon")) {
-      const icon = document.createElement("span");
-      icon.className = "wallet-button-icon";
-      icon.setAttribute("aria-hidden", "true");
-      button.prepend(icon);
     }
   });
 }

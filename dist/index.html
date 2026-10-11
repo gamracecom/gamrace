@@ -13,7 +13,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=shell-stability-1" />
+    <link rel="stylesheet" href="styles.css?v=mobile-wallet-1" />
   </head>
   <body data-authenticated="pending">
     <div class="app-shell">
@@ -23,7 +23,7 @@
           <button class="mobile-menu-close" type="button" aria-label="Close menu">×</button>
         </div>
         <nav class="primary-nav">
-          <a class="nav-link active" href="#top"><img class="nav-icon nav-icon-home" src="assets/icons/navigation/home.png" alt="" aria-hidden="true" />Home</a>
+          <a class="nav-link active" href="/"><img class="nav-icon nav-icon-home" src="assets/icons/navigation/home.png" alt="" aria-hidden="true" />Home</a>
           <a class="nav-link" href="#house" data-mobile-menu-action="house"><img class="nav-icon nav-icon-house" src="assets/icons/navigation/house-mode.png" alt="" aria-hidden="true" />House</a>
           <a class="nav-link" href="#player" data-mobile-menu-action="player"><img class="nav-icon nav-icon-player" src="assets/icons/navigation/player-mode.png" alt="" aria-hidden="true" />Player</a>
           <a class="nav-link" href="#slots"><img class="nav-icon nav-icon-slots" src="assets/icons/navigation/slots.png" alt="" aria-hidden="true" />Slots</a>
@@ -40,7 +40,7 @@
       <main class="main-content" id="top">
         <header class="topbar">
           <div class="topbar-inner">
-            <a class="topbar-brand" href="#top" aria-label="GamRace home">
+            <a class="topbar-brand" href="/" aria-label="GamRace home">
               <img class="brand-full" src="assets/brand/gamrace-logo-large.png" alt="GamRace" />
               <img class="brand-icon" src="assets/brand/gamrace-icon.png" alt="" aria-hidden="true" />
             </a>
@@ -330,6 +330,6 @@
     <script src="mobile-nav.js?v=navigation-icons-1"></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=shell-stability-1"></script>
+    <script type="module" src="wallet.js?v=mobile-wallet-1"></script>
   </body>
 </html>

@@ -1096,8 +1096,6 @@ body.modal-open { overflow: hidden; }
 .balance-option em { color: #d8e8ef; font-size: .7rem; font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .balance-option > i { width: 7px; height: 7px; justify-self: center; border-radius: 50%; background: transparent; }
 .balance-option.selected > i { background: #4bd2ff; }
-.wallet-button-icon { width: 19px; height: 17px; display: inline-block; border: 1.8px solid currentColor; border-radius: 3px; position: relative; }
-.wallet-button-icon::after { width: 7px; height: 5px; border: 1.6px solid currentColor; border-radius: 2px; position: absolute; right: -4px; top: 4px; background: inherit; content: ""; }
 .utility.wallet { border-color: #087ebe; background: #087ac0; color: #fff; }
 .utility.wallet:hover { background: #0a8dd8; }
 
@@ -1105,7 +1103,7 @@ body.modal-open { overflow: hidden; }
 .wallet-modal { width: min(620px, calc(100vw - 32px)); max-height: min(820px, calc(100dvh - 32px)); border: 1px solid #173548; border-radius: 12px; background: #071018; box-shadow: 0 28px 90px rgba(0, 0, 0, .76); }
 .wallet-close { z-index: 30; top: 14px; right: 16px; width: 34px; height: 34px; color: #94a8b6; font-size: 1.55rem; }
 .wallet-close:hover { color: #fff; }
-.wallet-tabs { position: sticky; z-index: 20; top: 0; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 15px 50px 0 22px; border-bottom: 1px solid #20313d; background: #071018; }
+.wallet-tabs { position: sticky; z-index: 20; top: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 15px 50px 0 22px; border-bottom: 1px solid #20313d; background: #071018; }
 .wallet-tab { min-height: 46px; padding: 0 8px; border-radius: 0; position: relative; color: #a3b3bf; font-size: .78rem; font-weight: 680; white-space: nowrap; }
 .wallet-tab-mobile { display: none; }
 .wallet-tab.active { background: transparent; color: #55c9ff; }
@@ -1205,14 +1203,14 @@ body.modal-open { overflow: hidden; }
   .region-block-card { padding: 34px 22px; }
   .balance-menu { width: min(306px, calc(100vw - 20px)); max-height: min(430px, calc(100dvh - 92px)); position: fixed; top: 72px; right: 10px; left: auto; transform: none; }
   .balance-option { min-height: 54px; }
-  .wallet-overlay { padding: 0; align-items: end; }
-  .wallet-modal { width: 100vw; max-height: calc(100dvh - 6px); border-right: 0; border-bottom: 0; border-left: 0; border-radius: 16px 16px 0 0; }
-  .wallet-close { top: 8px; right: 7px; width: 36px; height: 36px; }
-  .wallet-tabs { display: grid; overflow: visible; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 10px 44px 0 6px; }
-  .wallet-tab { min-width: 0; min-height: 42px; padding: 0 2px; font-size: .62rem; }
+  .wallet-overlay { padding: 0; align-items: stretch; background: #071018; backdrop-filter: none; }
+  .wallet-modal { width: 100vw; height: 100dvh; max-height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 0; border-radius: 0; box-shadow: none; }
+  .wallet-close { top: max(7px, env(safe-area-inset-top)); right: 6px; width: 36px; height: 36px; }
+  .wallet-tabs { display: grid; overflow: visible; grid-template-columns: 1fr 1.08fr 1.2fr .7fr .72fr; padding: max(8px, env(safe-area-inset-top)) 44px 0 4px; }
+  .wallet-tab { min-width: 0; min-height: 44px; padding: 0 1px; font-size: clamp(.55rem, 2.55vw, .66rem); letter-spacing: -.015em; }
   .wallet-tab-desktop { display: none; }
   .wallet-tab-mobile { display: inline; }
-  .wallet-body { padding: 16px 14px max(20px, env(safe-area-inset-bottom)); }
+  .wallet-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 14px max(24px, calc(env(safe-area-inset-bottom) + 14px)); }
   .wallet-stack { gap: 13px; }
   .wallet-asset-balance { display: none; }
   .wallet-asset-trigger { min-height: 50px; padding-inline: 11px; }
@@ -1223,7 +1221,7 @@ body.modal-open { overflow: hidden; }
   .wallet-qr { width: 164px; height: 164px; padding: 8px; }
   .wallet-history-toggle { min-height: 42px; margin-top: 12px; }
   .wallet-network-warning { font-size: .68rem; line-height: 1.4; }
-  .wallet-placeholder-panel { min-height: 300px; }
+  .wallet-placeholder-panel { min-height: calc(100dvh - 125px); }
   .wallet-percentages { grid-template-columns: repeat(2, 1fr); gap: 6px; }
   .wallet-vault-balances, .wallet-vault-actions { grid-template-columns: 1fr; }
   .transaction-row { grid-template-columns: 1fr; gap: 7px; }
