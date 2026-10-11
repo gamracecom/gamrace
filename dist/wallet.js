@@ -131,7 +131,6 @@ function createWalletDialog() {
   overlay.innerHTML = `
     <section class="wallet-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
       <h2 class="sr-only" id="wallet-title">GamRace Wallet</h2>
-      <button class="wallet-close" type="button" aria-label="Close wallet">×</button>
       <div class="wallet-tabs" role="tablist" aria-label="Wallet actions">
         <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet-tab="deposit">Deposit</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="withdraw">Withdraw</button>
@@ -195,7 +194,6 @@ function createWalletDialog() {
   document.body.append(overlay);
   return {
     overlay,
-    close: overlay.querySelector(".wallet-close"),
     tabs: [...overlay.querySelectorAll("[data-wallet-tab]")],
     panels: [...overlay.querySelectorAll("[data-wallet-panel]")],
     withdrawalForm: overlay.querySelector('[data-wallet-form="withdraw"]'),
@@ -250,7 +248,7 @@ function setStatus(message = "", state = "") {
 function setBusy(nextBusy) {
   busy = nextBusy;
   dialog.overlay.querySelectorAll("button, input, select").forEach((element) => {
-    if (!element.classList.contains("wallet-close")) element.disabled = nextBusy;
+    element.disabled = nextBusy;
   });
 }
 
@@ -659,7 +657,7 @@ async function openWallet(defaultTab = "deposit") {
     setStatus();
     if (defaultTab === "deposit") await ensureDepositAddress(dialog.depositSelect.value);
   } catch (error) { setStatus(error.message, "error"); }
-  dialog.close.focus();
+  dialog.tabs.find((tab) => tab.classList.contains("active"))?.focus();
 }
 
 function closeWallet() {
@@ -839,7 +837,6 @@ balanceButtons.forEach((button) => button.addEventListener("click", () => {
   menu.hidden = !willOpen;
   button.setAttribute("aria-expanded", String(willOpen));
 }));
-dialog.close.addEventListener("click", closeWallet);
 dialog.overlay.addEventListener("click", (event) => { if (event.target === dialog.overlay) closeWallet(); });
 document.addEventListener("click", (event) => { if (!event.target.closest(".balance-control")) closeBalanceMenus(); });
 document.addEventListener("keydown", (event) => {
@@ -865,7 +862,13 @@ dialog.copyMemo.addEventListener("click", () => copyText(dialog.depositMemo.text
 dialog.depositRetry.addEventListener("click", () => {
   ensureDepositAddress(dialog.depositSelect.value, true).catch((error) => setStatus(error.message, "error"));
 });
-dialog.transactionLinks.forEach((button) => button.addEventListener("click", () => selectTab("transactions")));
+dialog.transactionLinks.forEach((button) => button.addEventListener("click", () => {
+  closeWallet();
+  window.dispatchEvent(new CustomEvent("gamrace:open-transactions"));
+}));
+document.querySelectorAll(".mobile-tab-action").forEach((button) => button.addEventListener("click", () => {
+  if (!dialog.overlay.hidden) closeWallet();
+}));
 dialog.transactionFilters.forEach((button) => button.addEventListener("click", () => renderWalletTransactions(button.dataset.walletTransactionFilter)));
 
 dialog.depositSelect.addEventListener("change", async () => {
