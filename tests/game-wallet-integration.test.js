@@ -28,6 +28,17 @@ test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(wallet, /applyGameResult/);
 });
 
+test("Mines reveals numeric tiles and restores unfinished rounds", () => {
+  assert.match(mines, /JSON\.stringify\(\{ tile: index \}\)/);
+  assert.doesNotMatch(mines, /JSON\.stringify\(\{ tile \}\)/);
+  assert.match(mines, /\/games\/mines\/rounds\/active\?currency=/);
+  assert.match(mines, /adoptActiveRound/);
+  assert.match(worker, /handleGetActiveMinesRound/);
+  assert.match(worker, /GET" && path === "\/games\/mines\/rounds\/active"/);
+  assert.match(worker, /WHERE uid = \? AND currency = \? AND status = 'active'/);
+  assert.match(worker, /NOT EXISTS\(\s*SELECT 1 FROM mines_rounds/);
+});
+
 test("game history and win-loss multiplier pills are wired", () => {
   assert.match(gameHtml, /data-game-result-strip/);
   assert.match(styles, /\.game-result-pill\.win/);

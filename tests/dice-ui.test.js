@@ -30,6 +30,13 @@ test("Dice settles through the authenticated wallet service and reacts to wallet
   assert.match(workerScript, /handleDiceBet/);
 });
 
+test("Dice animates the server result without generating client-side outcomes", () => {
+  assert.match(diceScript, /function animateRoll\(finalRoll\)/);
+  assert.match(diceScript, /await animateRoll\(roll\)/);
+  assert.match(diceScript, /requestAnimationFrame\(frame\)/);
+  assert.doesNotMatch(diceScript, /crypto\.getRandomValues/);
+});
+
 test("completed Dice and Mines bets share the recent multiplier strip", () => {
   assert.match(gameHtml, /data-game-result-strip/);
   assert.match(diceScript, /game-result-pill/);

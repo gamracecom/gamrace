@@ -716,12 +716,42 @@ function minesRoundResponse(row, revealMines = false) {
   };
 }
 
+async function restorableMinesRound(env, row) {
+  if (!row) return null;
+  const round = minesRoundResponse(row);
+  try {
+    const asset = requireWalletAsset(row.currency);
+    const prices = await providerPrices(env);
+    const price = Number(prices?.[asset.providerCurrency] || 0);
+    if (Number.isFinite(price) && price > 0) {
+      round.wagerUsdCents = Math.max(1, Math.round(Number(round.wager) * price * 100));
+    }
+  } catch { /* Coin values remain sufficient when live pricing is unavailable. */ }
+  return round;
+}
+
+async function handleGetActiveMinesRound(request, env, user) {
+  const currency = normalizeCurrency(new URL(request.url).searchParams.get("currency"));
+  const current = await env.DB.prepare(`
+    SELECT * FROM mines_rounds
+    WHERE uid = ? AND currency = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, currency).first();
+  return json(request, env, 200, { round: await restorableMinesRound(env, current), wallet: await walletResponse(env, user.sub) });
+}
+
 async function handleStartMinesRound(request, env, user) {
   const body = await requestJson(request);
   const requestId = normalizeRequestId(body.requestId);
   const existing = await env.DB.prepare("SELECT * FROM mines_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
   if (existing) return json(request, env, 200, { round: minesRoundResponse(existing), wallet: await walletResponse(env, user.sub) });
   const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const active = await env.DB.prepare(`
+    SELECT * FROM mines_rounds
+    WHERE uid = ? AND currency = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, asset.code).first();
+  if (active) return json(request, env, 200, { round: await restorableMinesRound(env, active), wallet: await walletResponse(env, user.sub) });
   const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
   const mineCount = Number(body.mineCount);
   if (!Number.isInteger(mineCount) || mineCount < 1 || mineCount > 24) throw httpError(400, "Choose between 1 and 24 mines");
@@ -738,9 +768,13 @@ async function handleStartMinesRound(request, env, user) {
       SELECT ?, ?, ?, ?, ?, ?, ?, '[]', 'active', 0, 1000000, 0, ?, ?
       FROM crypto_balances
       WHERE uid = ? AND currency = ? AND available_units >= ?
+        AND NOT EXISTS(
+          SELECT 1 FROM mines_rounds
+          WHERE uid = ? AND currency = ? AND status = 'active'
+        )
     `).bind(
       id, requestId, user.sub, asset.code, wagerUnits, mineCount, JSON.stringify(minePositions), timestamp, timestamp,
-      user.sub, asset.code, wagerUnits,
+      user.sub, asset.code, wagerUnits, user.sub, asset.code,
     ),
       env.DB.prepare(`
         UPDATE crypto_balances
@@ -758,10 +792,16 @@ async function handleStartMinesRound(request, env, user) {
   } catch (error) {
     const duplicate = await env.DB.prepare("SELECT * FROM mines_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
     if (duplicate) return json(request, env, 200, { round: minesRoundResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    const active = await env.DB.prepare(`
+      SELECT * FROM mines_rounds
+      WHERE uid = ? AND currency = ? AND status = 'active'
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(user.sub, asset.code).first();
+    if (active) return json(request, env, 200, { round: await restorableMinesRound(env, active), wallet: await walletResponse(env, user.sub) });
     throw error;
   }
   const created = await env.DB.prepare("SELECT * FROM mines_rounds WHERE id = ?").bind(id).first();
-  return json(request, env, 201, { round: minesRoundResponse(created), wallet: await walletResponse(env, user.sub) });
+  return json(request, env, 201, { round: await restorableMinesRound(env, created), wallet: await walletResponse(env, user.sub) });
 }
 
 async function ownedMinesRound(env, uid, id) {
@@ -1683,6 +1723,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "POST" && path === "/games/dice/bets") return handleDiceBet(request, env, user);
+  if (request.method === "GET" && path === "/games/mines/rounds/active") return handleGetActiveMinesRound(request, env, user);
   if (request.method === "POST" && path === "/games/mines/rounds") return handleStartMinesRound(request, env, user);
   const minesRevealMatch = path.match(/^\/games\/mines\/rounds\/([A-Za-z0-9-]+)\/reveal$/);
   if (request.method === "POST" && minesRevealMatch) return handleRevealMinesTile(request, env, user, minesRevealMatch[1]);

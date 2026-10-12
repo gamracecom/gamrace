@@ -148,13 +148,47 @@
     resultValue.textContent = roll.toFixed(2);
     resultOutcome.textContent = won ? "Win" : "Loss";
     resultCard.hidden = false;
-    resultCard.classList.remove("win", "loss", "dice-result-pop");
+    resultCard.classList.remove("win", "loss", "rolling", "dice-result-pop");
     void resultCard.offsetWidth;
     resultCard.classList.add(won ? "win" : "loss", "dice-result-pop");
     sliderShell.style.setProperty("--dice-result-position", `${roll}%`);
-    sliderShell.classList.remove("show-result", "result-win", "result-loss");
+    sliderShell.classList.remove("show-result", "result-win", "result-loss", "result-rolling");
     void sliderShell.offsetWidth;
     sliderShell.classList.add("show-result", won ? "result-win" : "result-loss");
+  }
+
+  function animateRoll(finalRoll) {
+    if (settings.turbo || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+    resultCard.hidden = false;
+    resultOutcome.textContent = "Rolling…";
+    resultCard.classList.remove("win", "loss", "dice-result-pop");
+    resultCard.classList.add("rolling");
+    sliderShell.classList.remove("result-win", "result-loss");
+    sliderShell.classList.add("show-result", "result-rolling");
+    const duration = 720;
+    const settleAt = 0.72;
+    const revolutions = 3.35;
+    const settleStart = (settleAt * revolutions * 100) % 100;
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+      const frame = (timestamp) => {
+        const progress = Math.min(1, (timestamp - startedAt) / duration);
+        let displayed;
+        if (progress < settleAt) {
+          displayed = (progress * revolutions * 100) % 100;
+        } else {
+          const localProgress = (progress - settleAt) / (1 - settleAt);
+          const eased = 1 - (1 - localProgress) ** 3;
+          displayed = settleStart + (finalRoll - settleStart) * eased;
+        }
+        const clamped = Math.max(0, Math.min(100, displayed));
+        resultValue.textContent = clamped.toFixed(2);
+        sliderShell.style.setProperty("--dice-result-position", `${clamped}%`);
+        if (progress < 1) requestAnimationFrame(frame);
+        else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
   }
 
   function addMultiplierResult(multiplier, won) {
@@ -202,10 +236,12 @@
           direction,
         }),
       });
-      window.gamraceWallet.applyGameResult(response);
       const won = response.bet.outcome === "win";
+      const roll = Number(response.bet.roll);
+      await animateRoll(roll);
+      window.gamraceWallet.applyGameResult(response);
       const profit = won ? amount * (Number(response.bet.multiplier) - 1) : -amount;
-      renderResult(Number(response.bet.roll), won);
+      renderResult(roll, won);
       addMultiplierResult(response.bet.multiplier, won);
       recordRoll(amount, profit);
       return { won, profit };
@@ -220,7 +256,6 @@
 
   async function runManualRoll() {
     actionButton.disabled = true;
-    if (!settings.turbo) await delay(220);
     await runRoll(cleanAmount(betInput));
   }
 

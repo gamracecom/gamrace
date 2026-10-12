@@ -55,6 +55,8 @@
   const revealingTiles = new Set();
   let revealQueue = Promise.resolve();
   let roundPending = false;
+  let activeRoundCheckCurrency = "";
+  let activeRoundRestorePromise = null;
   const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0, cumulativeProfit: [] };
   let statCurrency = "";
 
@@ -148,6 +150,7 @@
 
   function applyWalletSelection(detail) {
     if (!detail?.asset || !detail?.balance) return;
+    const previousCurrency = selectedCurrency;
     const nextDisplayFiat = detail.displayFiat !== false;
     const selectionChanged = statCurrency && (statCurrency !== detail.currency || displayFiat !== nextDisplayFiat);
     selectedCurrency = detail.currency;
@@ -155,6 +158,12 @@
     displayFiat = nextDisplayFiat;
     selectedSymbol = detail.asset.symbol || selectedCurrency.toUpperCase();
     balance = Math.max(0, displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0));
+    if (previousCurrency && previousCurrency !== selectedCurrency) {
+      activeRound = null;
+      activeRoundCheckCurrency = "";
+      result.hidden = true;
+      buildBoard();
+    }
     const minimum = minimumWager();
     [betInput, autoBetInput].forEach((input) => {
       input.min = minimum.toFixed(displayFiat ? 2 : 8);
@@ -165,6 +174,7 @@
     if (balance <= 0) showInsufficientBalance();
     else setBalanceMessage();
     updateWagerAvailability();
+    void restoreActiveRound();
   }
 
   function flashInvalid(element) {
@@ -200,6 +210,90 @@
     autoSelectedCount.textContent = `${selectedAutoTiles.size} / ${maximum}`;
     const amount = cleanAmount(autoBetInput);
     if (!autoplayRunning) autoActionButton.disabled = betPending || selectedAutoTiles.size === 0 || amount < minimumWager() || amount > balance;
+  }
+
+  function setMinesMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll("[data-mines-mode]").forEach((item) => {
+      const selected = item.dataset.minesMode === mode;
+      item.classList.toggle("active", selected);
+      item.setAttribute("aria-selected", String(selected));
+    });
+    document.querySelectorAll("[data-mode-panel]").forEach((panel) => { panel.hidden = panel.dataset.modePanel !== mode; });
+  }
+
+  function restoredRoundAmount(round, fallback = 0) {
+    const value = displayFiat ? Number(round?.wagerUsdCents || 0) / 100 : Number(round?.wager || 0);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  function renderRevealedSafeTiles() {
+    if (!activeRound) return;
+    activeRound.revealed.forEach((index) => {
+      const tile = tileElement(index);
+      if (!tile) return;
+      tile.disabled = true;
+      tile.classList.add("revealed", "is-gem");
+      addTileArt(tile, "gem");
+    });
+  }
+
+  function adoptActiveRound(round, { fallbackAmount = 0, automated = false, forceManual = false } = {}) {
+    if (!round || round.status !== "active") return false;
+    if (forceManual) setMinesMode("manual");
+    const amount = restoredRoundAmount(round, fallbackAmount);
+    activeRound = {
+      id: round.id,
+      currency: round.currency || selectedCurrency,
+      amount,
+      mines: Number(round.mineCount),
+      minePositions: new Set(),
+      revealed: new Set(round.revealed || []),
+      finished: false,
+      automated,
+      multiplier: Number(round.multiplier || 1),
+    };
+    if (forceManual) betInput.value = amount.toFixed(displayFiat ? 2 : 8);
+    result.hidden = true;
+    buildBoard();
+    renderRevealedSafeTiles();
+    updateBetDisplay();
+    updateCashoutButton();
+    actionButton.disabled = activeRound.revealed.size === 0;
+    mineSelect.disabled = true;
+    betInput.disabled = true;
+    return true;
+  }
+
+  async function restoreActiveRound() {
+    const currency = selectedCurrency;
+    if (!currency || !window.gamraceWallet?.request || activeRoundCheckCurrency === currency || (activeRound && !activeRound.finished && activeRound.currency === currency)) return;
+    activeRoundCheckCurrency = currency;
+    betPending = true;
+    updateWagerAvailability();
+    const restore = (async () => {
+      try {
+        const response = await window.gamraceWallet.request(`/games/mines/rounds/active?currency=${encodeURIComponent(currency)}`);
+        if (selectedCurrency !== currency) return;
+        window.gamraceWallet.applyGameResult(response);
+        if (response.round) {
+          adoptActiveRound(response.round, { forceManual: true });
+          setBalanceMessage("Your active Mines round was restored.");
+        }
+      } catch (error) {
+        if (selectedCurrency === currency) {
+          activeRoundCheckCurrency = "";
+          setBalanceMessage(error.message || "Your active Mines round could not be restored.");
+        }
+      }
+    })();
+    activeRoundRestorePromise = restore;
+    try { await restore; }
+    finally {
+      if (activeRoundRestorePromise === restore) activeRoundRestorePromise = null;
+      betPending = false;
+      updateWagerAvailability();
+    }
   }
 
   function buildBoard() {
@@ -271,23 +365,7 @@
         }),
       });
       window.gamraceWallet.applyGameResult(response);
-      activeRound = {
-        id: response.round.id,
-        amount,
-        mines,
-        minePositions: new Set(),
-        revealed: new Set(response.round.revealed || []),
-        finished: false,
-        automated,
-        multiplier: 1,
-      };
-      result.hidden = true;
-      buildBoard();
-      updateBetDisplay();
-      updateCashoutButton();
-      actionButton.disabled = true;
-      mineSelect.disabled = true;
-      betInput.disabled = true;
+      adoptActiveRound(response.round, { fallbackAmount: amount, automated });
       return true;
     } catch (error) {
       setBalanceMessage(error.message || "The bet could not be started.");
@@ -325,7 +403,7 @@
     tile.classList.remove("auto-selected", "auto-selectable");
     try {
       const response = await window.gamraceWallet.request(`/games/mines/rounds/${encodeURIComponent(activeRound.id)}/reveal`, {
-        method: "POST", body: JSON.stringify({ tile }),
+        method: "POST", body: JSON.stringify({ tile: index }),
       });
       window.gamraceWallet.applyGameResult(response);
       activeRound.revealed = new Set(response.round.revealed || []);
@@ -637,6 +715,7 @@
     lockAutoControls(true);
     autoActionButton.disabled = false;
     autoActionButton.textContent = "Stop Autoplay";
+    let interrupted = false;
     for (let round = 1; round <= rounds && !stopAutoplayRequested; round += 1) {
       if (amount > balance) break;
       if (round > 1) resetForNewRound();
@@ -644,9 +723,14 @@
       for (const index of shuffle(selectedTiles)) {
         await delay(260);
         if (activeRound.finished) break;
-        await revealTileForRound(index);
+        const revealed = await revealTileForRound(index);
+        if (!revealed && activeRound && !activeRound.finished) {
+          interrupted = true;
+          break;
+        }
       }
 
+      if (interrupted) break;
       if (!activeRound.finished && activeRound.revealed.size === selectedTiles.length) await cashOut();
       await delay(420);
     }
@@ -655,7 +739,19 @@
     stopAutoplayRequested = false;
     lockAutoControls(false);
     autoActionButton.textContent = "Start Autoplay";
-    resetForNewRound();
+    if (activeRound && !activeRound.finished) {
+      activeRound.automated = false;
+      setMinesMode("manual");
+      buildBoard();
+      renderRevealedSafeTiles();
+      updateCashoutButton();
+      actionButton.disabled = activeRound.revealed.size === 0;
+      mineSelect.disabled = true;
+      betInput.disabled = true;
+      setBalanceMessage("Autoplay paused. Continue this round manually or cash out.");
+    } else {
+      resetForNewRound();
+    }
   }
 
   buildMineOptions(mineSelect);
@@ -749,13 +845,7 @@
         flashInvalid(tab);
         return;
       }
-      currentMode = tab.dataset.minesMode;
-      document.querySelectorAll("[data-mines-mode]").forEach((item) => {
-        const selected = item === tab;
-        item.classList.toggle("active", selected);
-        item.setAttribute("aria-selected", String(selected));
-      });
-      document.querySelectorAll("[data-mode-panel]").forEach((panel) => { panel.hidden = panel.dataset.modePanel !== currentMode; });
+      setMinesMode(tab.dataset.minesMode);
       resetForNewRound();
     });
   });

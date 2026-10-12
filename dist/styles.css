@@ -117,15 +117,15 @@ html[data-session-state="signed-in"] body[data-authenticated="pending"] .profile
 .leaderboard-slide-indicators i.active { width: 18px; background: #42ef84; }
 .hero-mode-stack { min-width: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .hero-card { position: relative; width: 100%; min-height: 0; padding: 0; overflow: hidden; border: 1px solid; border-radius: 14px; color: inherit; cursor: pointer; font: inherit; text-align: left; appearance: none; isolation: isolate; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.hero-card:hover { transform: translateY(-2px); }
+.hero-card:hover { transform: none; }
 .hero-card .hero-artwork { position: absolute; z-index: 0; inset: -9% -5% -9% -5%; width: 110%; height: 118%; object-fit: cover; object-position: center; filter: var(--hero-art-filter); transform: scale(1.08); transform-origin: 78% 50%; transition: transform .48s cubic-bezier(.2, .75, .2, 1), filter .4s ease; }
 .hero-card:hover .hero-artwork { filter: var(--hero-art-filter) brightness(1.08); transform: translate3d(1.5%, -1%, 0) scale(1.17); }
 .hero-card::before { content: ""; position: absolute; z-index: 1; inset: 0; background: var(--hero-overlay); }
 .hero-card::after { content: ""; position: absolute; z-index: 2; right: 0; bottom: -1px; left: 0; height: 22%; background: var(--hero-floor-glow); pointer-events: none; }
 .hero-house { --hero-art-filter: saturate(1.08) contrast(1.04); --hero-overlay: linear-gradient(90deg, rgba(11, 22, 34, .97) 0%, rgba(11, 22, 34, .82) 31%, rgba(11, 22, 34, .16) 64%, transparent 82%); --hero-floor-glow: linear-gradient(180deg, transparent, rgba(18, 156, 255, .18)); border-color: #129cff; background: #0b1622; box-shadow: inset 0 0 34px rgba(18, 156, 255, .1), 0 12px 28px rgba(0, 0, 0, .2); }
-.hero-house:hover, .hero-house.active { border-color: #58c8ff; box-shadow: inset 0 0 38px rgba(18, 156, 255, .14), 0 16px 40px rgba(18, 156, 255, .18); }
+.hero-house:hover, .hero-house.active { border-color: #129cff; box-shadow: 0 12px 28px rgba(0, 0, 0, .2); }
 .hero-player { --hero-art-filter: hue-rotate(53deg) saturate(1.24) contrast(1.03); --hero-overlay: linear-gradient(90deg, rgba(21, 16, 30, .97) 0%, rgba(21, 16, 30, .83) 31%, rgba(68, 35, 102, .18) 64%, transparent 82%); --hero-floor-glow: linear-gradient(180deg, transparent, rgba(124, 77, 255, .2)); border-color: #7c4dff; background: #15101e; box-shadow: inset 0 0 34px rgba(124, 77, 255, .12), 0 12px 28px rgba(0, 0, 0, .22); }
-.hero-player:hover, .hero-player.active { border-color: #b47cff; box-shadow: inset 0 0 38px rgba(180, 124, 255, .16), 0 16px 40px rgba(124, 77, 255, .2); }
+.hero-player:hover, .hero-player.active { border-color: #7c4dff; box-shadow: 0 12px 28px rgba(0, 0, 0, .22); }
 .dot-field { position: absolute; z-index: 2; inset: 0 auto 0 0; width: 10%; opacity: .45; background-image: radial-gradient(currentColor 1px, transparent 1px); background-size: 6px 6px; color: #129cff; mask-image: linear-gradient(90deg, #000, transparent); }
 .hero-player .dot-field { color: #7c4dff; }
 .hero-copy { position: relative; z-index: 3; width: 54%; padding: 15px 0 12px 24px; }
@@ -1012,6 +1012,10 @@ body.modal-open { overflow: hidden; }
 .dice-result-card small { color: #ff7285; font-size: .65rem; font-weight: 850; }
 .dice-result-card.win { border-color: #20c9ef; box-shadow: 0 14px 34px rgba(0, 0, 0, .36); }
 .dice-result-card.win small { color: #59e5ff; }
+.dice-result-card.rolling { border-color: #2787ad; }
+.dice-result-card.rolling strong { color: #58c8ff; animation: dice-number-flicker .18s ease-in-out infinite alternate; }
+.dice-result-card.rolling small { color: #8ccce5; }
+.dice-slider-shell.result-rolling::after { background: #58c8ff; animation: dice-marker-pulse .24s ease-in-out infinite alternate; }
 .dice-result-pop { animation: dice-result-pop .22s ease-out both; }
 .dice-stage-footer { position: relative; grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-width: 0; padding: 0 20px; border-top: 1px solid #1a3445; border-radius: 0 0 11px 11px; background: #07121b; }
 .dice-stage-footer > div { display: flex; gap: 4px; }
@@ -1021,6 +1025,12 @@ body.modal-open { overflow: hidden; }
 .dice-game.turbo-mode .dice-result-pop { animation: none; }
 
 @keyframes dice-result-pop { from { opacity: .2; transform: translateX(-50%) scale(.88); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@keyframes dice-number-flicker { from { opacity: .62; } to { opacity: 1; } }
+@keyframes dice-marker-pulse { from { border-color: rgba(255, 255, 255, .58); transform: translate(-50%, -50%) scale(.82); } to { border-color: #fff; transform: translate(-50%, -50%) scale(1.18); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dice-result-card.rolling strong, .dice-slider-shell.result-rolling::after { animation: none; }
+}
 
 @media (max-width: 1080px) {
   .dice-stage { grid-template-columns: minmax(270px, 305px) minmax(400px, 1fr); grid-template-rows: minmax(500px, auto) 50px; }
