@@ -1186,13 +1186,11 @@ body.modal-open { overflow: hidden; }
 .roulette-option header { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; color: #dfeaf0; font-size: .76rem; font-weight: 800; }
 .roulette-option header strong { color: currentColor; font-size: 1rem; }
 .roulette-lane-icon { width: 39px; height: 39px; flex: 0 0 auto; }
-.roulette-option.blue { color: #2f80ff; }
-.roulette-option.cyan { color: #15c7d9; }
-.roulette-option.purple { color: #8b5cf6; }
-.roulette-option.gold { color: #f5b942; }
-.roulette-option > button { width: calc(100% - 12px); min-height: 42px; margin: 0 6px; border: 0; border-radius: 7px; background: currentColor; cursor: pointer; }
-.roulette-option > button::after { color: #031019; content: "Place Bet"; font-size: .72rem; font-weight: 950; }
-.roulette-option > button { color: inherit; font-size: 0; }
+.roulette-option.blue { --lane-color: #2f80ff; color: #2f80ff; }
+.roulette-option.cyan { --lane-color: #15c7d9; color: #15c7d9; }
+.roulette-option.purple { --lane-color: #8b5cf6; color: #8b5cf6; }
+.roulette-option.gold { --lane-color: #f5b942; color: #f5b942; }
+.roulette-option > button { width: calc(100% - 12px); min-height: 42px; margin: 0 6px; border: 0; border-radius: 7px; background: var(--lane-color); color: #031019; cursor: pointer; font-size: .72rem; font-weight: 950; }
 .roulette-option > button:disabled { cursor: not-allowed; opacity: .4; }
 .roulette-option footer { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; color: #778f9e; font-size: .64rem; }
 .roulette-option footer strong { overflow: hidden; color: #d9e6ec; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
