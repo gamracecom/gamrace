@@ -17,7 +17,7 @@ test("Roulette offers the exact two 2x lanes plus 7x and 14x tile order", () => 
   assert.match(html, /Win <strong>7×/);
   assert.match(html, /Win <strong>14×/);
   assert.match(script, /"purple", "gold", "purple"/);
-  assert.match(styles, /blue-2x\.png/);
+  assert.match(html, /blue-2x\.png/);
   assert.doesNotMatch(html, /jackpot/i);
 });
 

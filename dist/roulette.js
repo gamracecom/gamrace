@@ -47,7 +47,7 @@
   let recentLoaded = false;
 
   function iconMarkup(outcome) {
-    return `<i class="roulette-tile-icon ${outcome}" aria-hidden="true"></i>`;
+    return `<img class="roulette-tile-icon" src="assets/icons/roulette/${outcome === "blue" ? "blue-2x" : outcome === "cyan" ? "cyan-2x" : outcome === "purple" ? "purple-7x" : "gold-14x"}.png" alt="" aria-hidden="true" />`;
   }
 
   function tile(outcome, compact = false) {
