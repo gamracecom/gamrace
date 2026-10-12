@@ -40,7 +40,7 @@
   const toolButtons = [...diceGame.querySelectorAll("[data-dice-game-tool]")];
   const toolPanels = [...diceGame.querySelectorAll("[data-dice-game-tool-panel]")];
   const favoriteButton = diceGame.querySelector('[data-dice-game-favorite="dice"]');
-  const resultStrip = document.querySelector("[data-game-result-strip]");
+  const resultStrip = diceGame.querySelector("[data-game-result-strip]");
 
   let direction = "over";
   let currentMode = "manual";
@@ -459,6 +459,16 @@
       });
       diceGame.querySelectorAll("[data-dice-mode-panel]").forEach((panel) => { panel.hidden = panel.dataset.diceModePanel !== currentMode; });
       updateWagerAvailability();
+    });
+  });
+
+  diceGame.querySelectorAll("[data-dice-history-view]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      diceGame.querySelectorAll("[data-dice-history-view]").forEach((item) => {
+        const active = item === tab;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-selected", String(active));
+      });
     });
   });
 

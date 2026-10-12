@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=game-recovery-1" />
+    <link rel="stylesheet" href="styles.css?v=plinko-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -56,7 +56,6 @@
         </header>
 
         <div class="game-rail">
-          <div class="game-result-strip" data-game-result-strip aria-label="Recent bet multipliers" aria-live="polite" hidden></div>
           <section class="mines-game" id="mines-game" hidden aria-label="Mines">
             <div class="mines-stage">
               <section class="mines-controls" aria-label="Mines controls">
@@ -177,6 +176,7 @@
           </section>
           <section class="dice-game" id="dice-game" hidden aria-label="Dice">
             <div class="dice-stage">
+              <div class="game-result-strip dice-result-strip" data-game-result-strip aria-label="Recent Dice multipliers" aria-live="polite" hidden></div>
               <section class="dice-controls" aria-label="Dice controls">
                 <div class="dice-mode-tabs" role="tablist" aria-label="Game mode">
                   <button class="dice-mode-tab active" type="button" role="tab" aria-selected="true" data-dice-mode="manual">Manual</button>
@@ -276,6 +276,68 @@
                 <button class="fairness-label" type="button">Fair Play</button>
               </footer>
             </div>
+            <section class="mines-history dice-history" aria-labelledby="dice-history-heading">
+              <div class="history-toolbar">
+                <div class="history-tabs" role="tablist" aria-label="Dice results">
+                  <button class="history-tab active" id="dice-history-heading" type="button" role="tab" aria-selected="true" data-dice-history-view="top">Top Wins</button>
+                  <button class="history-tab" type="button" role="tab" aria-selected="false" data-dice-history-view="lucky">Lucky Wins</button>
+                </div>
+                <label class="history-period"><span class="sr-only">Results period</span><select id="dice-history-period"><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
+              </div>
+              <div class="history-table-wrap">
+                <table class="history-table">
+                  <thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead>
+                  <tbody aria-label="Dice results not available yet">
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+
+          <section class="plinko-game" id="plinko-game" hidden aria-label="Plinko">
+            <div class="plinko-stage">
+              <section class="plinko-controls" aria-label="Plinko controls">
+                <div class="plinko-mode-tabs" role="tablist" aria-label="Game mode">
+                  <button class="plinko-mode-tab active" type="button" role="tab" aria-selected="true" data-plinko-mode="manual">Manual</button>
+                  <button class="plinko-mode-tab" type="button" role="tab" aria-selected="false" data-plinko-mode="auto">Auto</button>
+                </div>
+                <div class="plinko-control-stack" data-plinko-mode-panel="manual">
+                  <label class="plinko-field">
+                    <span><strong>Bet Amount</strong><small data-plinko-balance>0.00000000 COIN</small></span>
+                    <span class="plinko-input-shell"><span class="plinko-currency" data-plinko-currency>$</span><input id="plinko-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Plinko bet amount" /><button type="button" data-plinko-bet-action="half">½</button><button type="button" data-plinko-bet-action="double">2×</button></span>
+                  </label>
+                  <div class="plinko-field"><span><strong>Risk</strong><small>Volatility</small></span><div class="plinko-risk-options" role="group" aria-label="Risk level"><button class="active" type="button" data-plinko-risk="low">Low</button><button type="button" data-plinko-risk="medium">Medium</button><button type="button" data-plinko-risk="high">High</button></div></div>
+                  <label class="plinko-field"><span><strong>Rows</strong><small>8–16</small></span><span class="plinko-select-shell"><select id="plinko-rows" aria-label="Plinko rows"></select></span></label>
+                  <button class="plinko-primary-button" id="plinko-action" type="button" disabled>Drop Ball</button>
+                </div>
+                <div class="plinko-control-stack" data-plinko-mode-panel="auto" hidden>
+                  <label class="plinko-field">
+                    <span><strong>Bet Amount</strong><small>Per ball</small></span>
+                    <span class="plinko-input-shell"><span class="plinko-currency" data-plinko-currency>$</span><input id="plinko-auto-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Automatic Plinko bet amount" /><button type="button" data-plinko-auto-bet-action="half">½</button><button type="button" data-plinko-auto-bet-action="double">2×</button></span>
+                  </label>
+                  <label class="plinko-field"><span><strong>Number of Bets</strong><small>1–100</small></span><span class="plinko-input-shell single-input"><input id="plinko-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Plinko bets" /></span></label>
+                  <button class="plinko-primary-button" id="plinko-auto-action" type="button" disabled>Start Autoplay</button>
+                </div>
+                <p class="plinko-balance-message" id="plinko-balance-message" role="status" aria-live="polite" hidden></p>
+              </section>
+              <section class="plinko-board-panel" aria-label="Plinko board">
+                <div class="plinko-board-shell">
+                  <canvas id="plinko-canvas" width="900" height="560" aria-label="Plinko ball board"></canvas>
+                  <div class="plinko-payouts" id="plinko-payouts" aria-label="Plinko multipliers"></div>
+                </div>
+                <div class="plinko-result" id="plinko-result" hidden aria-live="assertive"><strong id="plinko-result-multiplier">1.00×</strong><span id="plinko-result-payout">$0.00</span></div>
+              </section>
+              <footer class="plinko-stage-footer"><div></div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button></footer>
+            </div>
+            <section class="mines-history plinko-history" aria-labelledby="plinko-history-heading">
+              <div class="history-toolbar"><div class="history-tabs" role="tablist" aria-label="Plinko results"><button class="history-tab active" id="plinko-history-heading" type="button" role="tab" aria-selected="true" data-plinko-history-view="top">Top Wins</button><button class="history-tab" type="button" role="tab" aria-selected="false" data-plinko-history-view="lucky">Lucky Wins</button></div><label class="history-period"><span class="sr-only">Results period</span><select><option>Lifetime</option><option>Today</option><option>This week</option></select></label></div>
+              <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Plinko results not available yet"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
+            </section>
           </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
@@ -290,8 +352,9 @@
       <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" aria-hidden="true" /><strong>Chat</strong></button>
     </nav>
     <script type="module" src="region-access.js?v=region-access-1"></script>
-    <script src="mines.js?v=game-recovery-1" defer></script>
-    <script src="dice.js?v=game-recovery-1" defer></script>
+    <script src="mines.js?v=plinko-1" defer></script>
+    <script src="dice.js?v=plinko-1" defer></script>
+    <script src="plinko.js?v=plinko-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

@@ -4,7 +4,6 @@ import test from "node:test";
 
 const gameHtml = await readFile(new URL("../dist/game.html", import.meta.url), "utf8");
 const diceScript = await readFile(new URL("../dist/dice.js", import.meta.url), "utf8");
-const minesScript = await readFile(new URL("../dist/mines.js", import.meta.url), "utf8");
 const workerScript = await readFile(new URL("../worker/src/index.js", import.meta.url), "utf8");
 
 test("Dice exposes Manual and Auto without an Advanced mode", () => {
@@ -37,8 +36,13 @@ test("Dice animates the server result without generating client-side outcomes", 
   assert.doesNotMatch(diceScript, /crypto\.getRandomValues/);
 });
 
-test("completed Dice and Mines bets share the recent multiplier strip", () => {
+test("completed Dice bets render in the in-border multiplier strip", () => {
   assert.match(gameHtml, /data-game-result-strip/);
+  assert.match(gameHtml, /class="game-result-strip dice-result-strip"/);
   assert.match(diceScript, /game-result-pill/);
-  assert.match(minesScript, /game-result-pill/);
+});
+
+test("Dice matches the compact Mines stage dimensions and includes win tables", () => {
+  assert.match(gameHtml, /data-dice-history-view="top">Top Wins/);
+  assert.match(gameHtml, /data-dice-history-view="lucky">Lucky Wins/);
 });

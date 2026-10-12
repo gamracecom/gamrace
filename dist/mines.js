@@ -6,7 +6,7 @@
   const blankState = document.querySelector("#game-blank-state");
 
   if (gameName !== "mines") {
-    if (gameName !== "dice") {
+    if (!["dice", "plinko"].includes(gameName)) {
       document.title = "GamRace";
       blankState.hidden = false;
     }
@@ -35,7 +35,6 @@
   const toolButtons = [...document.querySelectorAll("[data-game-tool]")];
   const toolPanels = [...document.querySelectorAll("[data-game-tool-panel]")];
   const favoriteButton = document.querySelector('[data-game-favorite="mines"]');
-  const resultStrip = document.querySelector("[data-game-result-strip]");
   const FAVORITES_KEY = "gamrace-favourites-v1";
   const SETTINGS_KEY = "gamrace-game-settings-v1";
 
@@ -471,21 +470,9 @@
     betInput.disabled = false;
   }
 
-  function addMultiplierResult(multiplier, won) {
-    if (!resultStrip) return;
-    resultStrip.hidden = false;
-    const pill = document.createElement("span");
-    pill.className = `game-result-pill${won ? " win" : ""}`;
-    pill.textContent = `${Number(multiplier || 0).toFixed(2)}×`;
-    resultStrip.append(pill);
-    while (resultStrip.children.length > 9) resultStrip.firstElementChild.remove();
-    resultStrip.scrollLeft = resultStrip.scrollWidth;
-  }
-
   function endLoss(explodedIndex) {
     activeRound.finished = true;
     recordCompletedRound(0);
-    addMultiplierResult(activeRound.multiplier, false);
     revealRemainingMines(explodedIndex);
     resultPayout.textContent = money(0);
     result.hidden = false;
@@ -501,7 +488,6 @@
     activeRound.minePositions = new Set(round.minePositions || []);
     activeRound.finished = true;
     recordCompletedRound(payout);
-    addMultiplierResult(multiplier, true);
     revealRemainingMines();
     resultPayout.textContent = money(payout);
     result.hidden = false;

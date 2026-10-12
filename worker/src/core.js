@@ -128,6 +128,58 @@ export function dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPo
   return { won, chanceBasisPoints, multiplierMicros, payoutUnits };
 }
 
+function binomialCoefficient(rows, bucket) {
+  const k = Math.min(bucket, rows - bucket);
+  let result = 1;
+  for (let index = 1; index <= k; index += 1) result = result * (rows - k + index) / index;
+  return result;
+}
+
+export function plinkoMultipliers(rowsValue, riskValue) {
+  const rows = Number(rowsValue);
+  const risk = String(riskValue || "").toLowerCase();
+  if (!Number.isInteger(rows) || rows < 8 || rows > 16) throw new Error("Invalid Plinko row count");
+  if (!["low", "medium", "high"].includes(risk)) throw new Error("Invalid Plinko risk level");
+
+  let floor;
+  let edge;
+  let curve;
+  if (risk === "low") {
+    floor = 0.72;
+    edge = 5.2 + 1.1 * (rows - 8);
+    curve = 4;
+  } else if (risk === "medium") {
+    floor = 0.42;
+    edge = 12 * 1.33 ** (rows - 8);
+    curve = 6;
+  } else {
+    floor = 0.2;
+    edge = 28 * 1.56 ** (rows - 8);
+    curve = 8;
+  }
+
+  const raw = Array.from({ length: rows + 1 }, (_, bucket) => {
+    const edgeDistance = Math.abs((2 * bucket - rows) / rows);
+    return floor + (edge - floor) * edgeDistance ** curve;
+  });
+  const expected = raw.reduce((total, multiplier, bucket) => (
+    total + binomialCoefficient(rows, bucket) / 2 ** rows * multiplier
+  ), 0);
+  const scale = 0.99 / expected;
+  return raw.map((multiplier) => Math.max(1, Math.floor(multiplier * scale * 1_000_000)));
+}
+
+export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue) {
+  const wager = Number(wagerUnits);
+  const rows = Number(rowsValue);
+  const bucket = Number(bucketValue);
+  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Plinko wager");
+  if (!Number.isInteger(bucket) || bucket < 0 || bucket > rows) throw new Error("Invalid Plinko bucket");
+  const multiplierMicros = plinkoMultipliers(rows, riskValue)[bucket];
+  const payoutUnits = payoutFromMultiplier(wager, multiplierMicros);
+  return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
+}
+
 export function minesMultiplierMicros(mineCount, revealedCount) {
   const mines = Number(mineCount);
   const revealed = Number(revealedCount);

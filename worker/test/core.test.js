@@ -16,6 +16,8 @@ import {
   providerAmountToUnits,
   parseUsdCents,
   paymentCanCredit,
+  plinkoMultipliers,
+  plinkoPayout,
   payoutFromMultiplier,
   oxaDepositStatus,
   oxaPayoutStatus,
@@ -92,4 +94,25 @@ test("server game math settles exact wallet units", () => {
   const minesMultiplier = minesMultiplierMicros(3, 1);
   assert.equal(minesMultiplier, 1_125_000);
   assert.equal(payoutFromMultiplier(100_000_000, minesMultiplier), 112_500_000);
+});
+
+test("Plinko paytables are symmetric and preserve a 99% expected return", () => {
+  for (const risk of ["low", "medium", "high"]) {
+    for (const rows of [8, 12, 16]) {
+      const multipliers = plinkoMultipliers(rows, risk);
+      assert.equal(multipliers.length, rows + 1);
+      assert.deepEqual(multipliers, [...multipliers].reverse());
+      let expectedMicros = 0;
+      const choose = (n, k) => {
+        let result = 1;
+        for (let index = 1; index <= k; index += 1) result = result * (n - k + index) / index;
+        return result;
+      };
+      multipliers.forEach((multiplier, bucket) => { expectedMicros += choose(rows, bucket) / 2 ** rows * multiplier; });
+      assert.ok(Math.abs(expectedMicros / 1_000_000 - 0.99) < 0.00001);
+    }
+  }
+  const settlement = plinkoPayout(100_000_000, 8, "high", 0);
+  assert.equal(settlement.outcome, "win");
+  assert.ok(settlement.payoutUnits > 100_000_000);
 });
