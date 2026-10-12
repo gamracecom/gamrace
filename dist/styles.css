@@ -1148,15 +1148,15 @@ body.modal-open { overflow: hidden; }
 .roulette-track-tile { width: 86px; height: 86px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: #fff; }
 .roulette-track-tile i,
 .roulette-recent-tile i,
-.roulette-lane-icon { width: 58%; height: 58%; display: block; background: currentColor; mask-position: center; mask-repeat: no-repeat; mask-size: contain; }
+.roulette-lane-icon { width: 58%; height: 58%; display: block; background: currentColor; -webkit-mask-position: center; mask-position: center; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: contain; mask-size: contain; }
 .roulette-track-tile.blue, .roulette-recent-tile.blue { background: #2f80ff; color: #fff; }
 .roulette-track-tile.cyan, .roulette-recent-tile.cyan { background: #15c7d9; color: #fff; }
 .roulette-track-tile.purple, .roulette-recent-tile.purple { background: #8b5cf6; color: #fff; }
 .roulette-track-tile.gold, .roulette-recent-tile.gold { background: #f5b942; color: #fff; }
-.roulette-tile-icon.blue, .roulette-lane-icon.blue { mask-image: url("assets/icons/roulette/blue-2x.png"); }
-.roulette-tile-icon.cyan, .roulette-lane-icon.cyan { mask-image: url("assets/icons/roulette/cyan-2x.png"); }
-.roulette-tile-icon.purple, .roulette-lane-icon.purple { mask-image: url("assets/icons/roulette/purple-7x.png"); }
-.roulette-tile-icon.gold, .roulette-lane-icon.gold { mask-image: url("assets/icons/roulette/gold-14x.png"); }
+.roulette-tile-icon.blue, .roulette-lane-icon.blue { -webkit-mask-image: url("assets/icons/roulette/blue-2x.png"); mask-image: url("assets/icons/roulette/blue-2x.png"); }
+.roulette-tile-icon.cyan, .roulette-lane-icon.cyan { -webkit-mask-image: url("assets/icons/roulette/cyan-2x.png"); mask-image: url("assets/icons/roulette/cyan-2x.png"); }
+.roulette-tile-icon.purple, .roulette-lane-icon.purple { -webkit-mask-image: url("assets/icons/roulette/purple-7x.png"); mask-image: url("assets/icons/roulette/purple-7x.png"); }
+.roulette-tile-icon.gold, .roulette-lane-icon.gold { -webkit-mask-image: url("assets/icons/roulette/gold-14x.png"); mask-image: url("assets/icons/roulette/gold-14x.png"); }
 .roulette-pointer { position: absolute; z-index: 3; top: 0; bottom: 7px; left: 50%; width: 3px; background: #f7fbff; transform: translateX(-50%); }
 .roulette-pointer::after { position: absolute; bottom: -1px; left: 50%; width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-top: 9px solid #f7fbff; content: ""; transform: translateX(-50%); }
 .roulette-round-status { margin-top: 10px; color: #eaf7fc; font-size: .94rem; font-weight: 850; text-align: center; }
