@@ -14,7 +14,7 @@ const [gameHtml, styles, wallet, dice, mines, plinko, roulette, worker, migratio
   read("../worker/src/index.js"),
   read("../worker/migrations/0005_game_ledger.sql"),
   read("../worker/migrations/0007_plinko_bets.sql"),
-  read("../worker/migrations/0008_roulette_bets.sql"),
+  read("../worker/migrations/0009_roulette_rounds.sql"),
 ]);
 
 test("game outcomes are settled against the authenticated wallet", () => {
@@ -27,7 +27,7 @@ test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS dice_bets/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS mines_rounds/);
   assert.match(plinkoMigration, /CREATE TABLE IF NOT EXISTS plinko_bets/);
-  assert.match(rouletteMigration, /CREATE TABLE IF NOT EXISTS roulette_bets/);
+  assert.match(rouletteMigration, /CREATE TABLE IF NOT EXISTS roulette_rounds/);
   assert.match(migration, /settled INTEGER NOT NULL DEFAULT 0/);
   assert.match(worker, /env\.DB\.batch/);
   assert.match(worker, /available_units >= \?/);
@@ -60,7 +60,7 @@ test("Dice owns the win-loss roll rail and game history is wired", () => {
   assert.match(worker, /FROM dice_bets/);
   assert.match(worker, /FROM mines_rounds/);
   assert.match(worker, /FROM plinko_bets/);
-  assert.match(worker, /FROM roulette_bets/);
+  assert.match(worker, /FROM roulette_rounds/);
 });
 
 test("visible tick glyphs are absent from the site UI", async () => {

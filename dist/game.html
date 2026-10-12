@@ -346,31 +346,48 @@
                   <div class="roulette-track" id="roulette-track"></div>
                   <span class="roulette-pointer" aria-hidden="true"></span>
                 </div>
-                <div class="roulette-round-status" id="roulette-round-status" role="status" aria-live="polite">Choose a lane to start</div>
+                <div class="roulette-round-status" id="roulette-round-status" role="status" aria-live="polite">Place a bet to start the round</div>
                 <div class="roulette-progress" aria-hidden="true"><i id="roulette-progress"></i></div>
-                <div class="roulette-recent"><strong>Last 10</strong><div id="roulette-recent-results" aria-label="Last 10 Roulette results"></div></div>
+                <div class="roulette-recent">
+                  <strong>Last 100</strong>
+                  <span class="roulette-count blue"><i></i><b id="roulette-blue-count">0</b></span>
+                  <span class="roulette-count cyan"><i></i><b id="roulette-cyan-count">0</b></span>
+                  <span class="roulette-count purple"><i></i><b id="roulette-purple-count">0</b></span>
+                  <span class="roulette-count gold"><i></i><b id="roulette-gold-count">0</b></span>
+                  <div id="roulette-recent-results" aria-label="Recent Roulette results"></div>
+                </div>
               </section>
 
               <section class="roulette-betting-panel" aria-label="Roulette betting controls">
-                <label class="roulette-field">
-                  <span><strong>Bet Amount</strong><small data-roulette-balance>0.00000000 COIN</small></span>
-                  <span class="roulette-input-shell"><span data-roulette-currency>$</span><input id="roulette-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Roulette bet amount" /><button type="button" data-roulette-bet-action="half">½</button><button type="button" data-roulette-bet-action="double">2×</button><button type="button" data-roulette-bet-action="max">Max</button></span>
-                </label>
-                <div class="roulette-options" role="radiogroup" aria-label="Choose a Roulette lane">
-                  <button class="roulette-option cyan active" type="button" role="radio" aria-checked="true" data-roulette-option="cyan">
-                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 5 53 17v25L32 59 11 42V17Z"/><path d="m18 35 10-17 1 13h17L35 48l-1-13Z"/></svg><span><strong>Velocity</strong><small>Win 2×</small></span>
-                  </button>
-                  <button class="roulette-option red" type="button" role="radio" aria-checked="false" data-roulette-option="red">
-                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M10 15h19l8 9H18v25H10Z"/><path d="M54 15H35l-8 9h19v25h8Z"/><circle cx="32" cy="39" r="10"/></svg><span><strong>Rival</strong><small>Win 2×</small></span>
-                  </button>
-                  <button class="roulette-option violet" type="button" role="radio" aria-checked="false" data-roulette-option="violet">
-                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="m32 5 6 17 18-3-13 13 13 13-18-3-6 17-6-17-18 3 13-13L8 19l18 3Z"/><circle cx="32" cy="32" r="7"/></svg><span><strong>Overtake</strong><small>Win 7×</small></span>
-                  </button>
-                  <button class="roulette-option gold" type="button" role="radio" aria-checked="false" data-roulette-option="gold">
-                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="m10 22 13 9 9-18 9 18 13-9-5 25H15Z"/><path d="M17 51h30"/><circle cx="32" cy="36" r="6"/></svg><span><strong>Pole</strong><small>Win 14×</small></span>
-                  </button>
+                <div class="roulette-stake-row">
+                  <label class="roulette-field">
+                    <span><strong>Bet Amount</strong><small data-roulette-balance>0.00000000 COIN</small></span>
+                    <span class="roulette-input-shell"><span data-roulette-currency>$</span><input id="roulette-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Roulette bet amount" /><button type="button" data-roulette-bet-action="half">½</button><button type="button" data-roulette-bet-action="double">2×</button><button type="button" data-roulette-bet-action="max">Max</button></span>
+                  </label>
+                  <button class="roulette-clear" id="roulette-clear" type="button" disabled>Clear bets</button>
                 </div>
-                <button class="roulette-primary-button" id="roulette-action" type="button" disabled>Place Bet &amp; Roll</button>
+                <div class="roulette-options" aria-label="Roulette betting lanes">
+                  <article class="roulette-option blue">
+                    <header><span>Win <strong>2×</strong></span><i class="roulette-lane-icon blue" aria-hidden="true"></i></header>
+                    <button type="button" data-roulette-option="blue">Place Bet</button>
+                    <footer><span>Your bet</span><strong data-roulette-stake="blue">$0.00</strong></footer>
+                  </article>
+                  <article class="roulette-option gold">
+                    <header><span>Win <strong>14×</strong></span><i class="roulette-lane-icon gold" aria-hidden="true"></i></header>
+                    <button type="button" data-roulette-option="gold">Place Bet</button>
+                    <footer><span>Your bet</span><strong data-roulette-stake="gold">$0.00</strong></footer>
+                  </article>
+                  <article class="roulette-option cyan">
+                    <header><span>Win <strong>2×</strong></span><i class="roulette-lane-icon cyan" aria-hidden="true"></i></header>
+                    <button type="button" data-roulette-option="cyan">Place Bet</button>
+                    <footer><span>Your bet</span><strong data-roulette-stake="cyan">$0.00</strong></footer>
+                  </article>
+                  <article class="roulette-option purple">
+                    <header><span>Win <strong>7×</strong></span><i class="roulette-lane-icon purple" aria-hidden="true"></i></header>
+                    <button type="button" data-roulette-option="purple">Place Bet</button>
+                    <footer><span>Your bet</span><strong data-roulette-stake="purple">$0.00</strong></footer>
+                  </article>
+                </div>
                 <p class="roulette-message" id="roulette-message" role="status" aria-live="polite" hidden></p>
               </section>
 
@@ -393,7 +410,7 @@
     <script src="mines.js?v=plinko-1" defer></script>
     <script src="dice.js?v=dice-rolls-1" defer></script>
     <script src="plinko.js?v=plinko-2" defer></script>
-    <script src="roulette.js?v=roulette-1" defer></script>
+    <script src="roulette.js?v=roulette-2" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

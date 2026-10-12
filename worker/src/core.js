@@ -180,18 +180,30 @@ export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue) {
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }
 
-export function roulettePayout(wagerUnits, selectionValue, resultValue) {
-  const wager = Number(wagerUnits);
-  const selection = String(selectionValue || "").toLowerCase();
+export function roulettePayout(betsValue, resultValue) {
   const result = String(resultValue || "").toLowerCase();
-  const multipliers = { cyan: 2_000_000, red: 2_000_000, violet: 7_000_000, gold: 14_000_000 };
-  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Roulette wager");
-  if (!Object.hasOwn(multipliers, selection)) throw new Error("Invalid Roulette selection");
+  const multipliers = { blue: 2_000_000, cyan: 2_000_000, purple: 7_000_000, gold: 14_000_000 };
   if (!Object.hasOwn(multipliers, result)) throw new Error("Invalid Roulette result");
-  const won = selection === result;
-  const multiplierMicros = won ? multipliers[result] : 0;
-  const payoutUnits = won ? payoutFromMultiplier(wager, multiplierMicros) : 0;
-  return { won, multiplierMicros, payoutUnits };
+  if (!betsValue || typeof betsValue !== "object" || Array.isArray(betsValue)) throw new Error("Invalid Roulette bets");
+  const bets = {};
+  for (const [selection, value] of Object.entries(betsValue)) {
+    if (!Object.hasOwn(multipliers, selection)) throw new Error("Invalid Roulette selection");
+    const wager = Number(value);
+    if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Roulette wager");
+    bets[selection] = wager;
+  }
+  const totalWagerUnits = Object.values(bets).reduce((total, wager) => total + wager, 0);
+  if (!Number.isSafeInteger(totalWagerUnits) || totalWagerUnits <= 0) throw new Error("Invalid Roulette bets");
+  const winningWager = bets[result] || 0;
+  const payoutUnits = winningWager ? payoutFromMultiplier(winningWager, multipliers[result]) : 0;
+  const multiplierMicros = Number(BigInt(payoutUnits) * 1_000_000n / BigInt(totalWagerUnits));
+  return {
+    won: payoutUnits >= totalWagerUnits,
+    multiplierMicros,
+    payoutUnits,
+    totalWagerUnits,
+    winningMultiplierMicros: multipliers[result],
+  };
 }
 
 export function minesMultiplierMicros(mineCount, revealedCount) {

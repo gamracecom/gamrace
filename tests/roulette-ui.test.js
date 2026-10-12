@@ -7,16 +7,17 @@ const [html, script, styles, worker, migration] = await Promise.all([
   readFile(new URL("../dist/roulette.js", import.meta.url), "utf8"),
   readFile(new URL("../dist/styles.css", import.meta.url), "utf8"),
   readFile(new URL("../worker/src/index.js", import.meta.url), "utf8"),
-  readFile(new URL("../worker/migrations/0008_roulette_bets.sql", import.meta.url), "utf8"),
+  readFile(new URL("../worker/migrations/0009_roulette_rounds.sql", import.meta.url), "utf8"),
 ]);
 
-test("Roulette offers two 2x lanes plus 7x and 14x lanes with original vector icons", () => {
+test("Roulette offers the exact two 2x lanes plus 7x and 14x tile order", () => {
   assert.match(html, /id="roulette-game"/);
-  for (const outcome of ["cyan", "red", "violet", "gold"]) assert.match(html, new RegExp(`data-roulette-option="${outcome}"`));
-  assert.equal((html.match(/Win 2×/g) || []).length, 2);
-  assert.match(html, /Win 7×/);
-  assert.match(html, /Win 14×/);
-  assert.match(html, /<svg viewBox="0 0 64 64"/);
+  for (const outcome of ["blue", "cyan", "purple", "gold"]) assert.match(html, new RegExp(`data-roulette-option="${outcome}"`));
+  assert.equal((html.match(/Win <strong>2×/g) || []).length, 2);
+  assert.match(html, /Win <strong>7×/);
+  assert.match(html, /Win <strong>14×/);
+  assert.match(script, /"purple", "gold", "purple"/);
+  assert.match(styles, /blue-2x\.png/);
   assert.doesNotMatch(html, /jackpot/i);
 });
 
@@ -27,7 +28,9 @@ test("Roulette animates only the server-authoritative result and settles the wal
   assert.doesNotMatch(script, /getRandomValues/);
   assert.match(worker, /secureRouletteResult\(\)/);
   assert.match(worker, /handleRouletteBet/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS roulette_bets/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS roulette_rounds/);
+  assert.match(script, /ROUND_LENGTH_MS = 8000/);
+  assert.match(script, /submittedBets/);
 });
 
 test("Roulette stays simple and responsive", () => {

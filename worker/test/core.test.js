@@ -118,10 +118,16 @@ test("Plinko paytables are symmetric and preserve a 99% expected return", () => 
   assert.ok(settlement.payoutUnits > 100_000_000);
 });
 
-test("Roulette settlements use the selected lane multiplier", () => {
-  assert.deepEqual(roulettePayout(100_000_000, "cyan", "cyan"), { won: true, multiplierMicros: 2_000_000, payoutUnits: 200_000_000 });
-  assert.equal(roulettePayout(100_000_000, "violet", "violet").payoutUnits, 700_000_000);
-  assert.equal(roulettePayout(100_000_000, "gold", "gold").payoutUnits, 1_400_000_000);
-  assert.deepEqual(roulettePayout(100_000_000, "red", "cyan"), { won: false, multiplierMicros: 0, payoutUnits: 0 });
-  assert.throws(() => roulettePayout(100_000_000, "invalid", "cyan"), /selection/);
+test("Roulette settles multiple lane bets against one authoritative result", () => {
+  const blue = roulettePayout({ blue: 100_000_000 }, "blue");
+  assert.equal(blue.payoutUnits, 200_000_000);
+  assert.equal(blue.totalWagerUnits, 100_000_000);
+  assert.equal(blue.multiplierMicros, 2_000_000);
+  assert.equal(roulettePayout({ purple: 100_000_000 }, "purple").payoutUnits, 700_000_000);
+  assert.equal(roulettePayout({ gold: 100_000_000 }, "gold").payoutUnits, 1_400_000_000);
+  const hedged = roulettePayout({ blue: 100_000_000, cyan: 100_000_000 }, "blue");
+  assert.equal(hedged.totalWagerUnits, 200_000_000);
+  assert.equal(hedged.payoutUnits, 200_000_000);
+  assert.equal(hedged.multiplierMicros, 1_000_000);
+  assert.throws(() => roulettePayout({ invalid: 100_000_000 }, "blue"), /selection/);
 });

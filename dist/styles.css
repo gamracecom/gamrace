@@ -1141,71 +1141,88 @@ body.modal-open { overflow: hidden; }
 /* GamRace Roulette */
 .roulette-game { width: min(100%, 1240px); margin-inline: auto; }
 .roulette-stage { overflow: hidden; border: 1px solid #17394f; border-radius: 12px; background: #050e16; }
-.roulette-track-panel { padding: clamp(26px, 4vw, 48px) clamp(16px, 3vw, 36px) 24px; }
-.roulette-track-viewport { position: relative; min-height: 132px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
-.roulette-track { height: 116px; display: flex; align-items: center; gap: 10px; width: max-content; transform: translateX(0); will-change: transform; }
-.roulette-track.is-spinning { transition: transform 3.15s cubic-bezier(.12, .72, .08, 1); }
-.roulette-track-tile { width: 92px; height: 92px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 12px; color: #fff; }
-.roulette-track-tile svg { width: 52px; height: 52px; fill: currentColor; }
-.roulette-track-tile.cyan { background: #087eac; color: #78e6ff; }
-.roulette-track-tile.red { background: #a6243b; color: #ff7d91; }
-.roulette-track-tile.violet { background: #5430a0; color: #c4a4ff; }
-.roulette-track-tile.gold { background: #a66b09; color: #ffd767; }
-.roulette-pointer { position: absolute; z-index: 3; top: 0; bottom: 4px; left: 50%; width: 3px; background: #f4fbff; transform: translateX(-50%); }
-.roulette-pointer::after { position: absolute; bottom: -1px; left: 50%; width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-bottom: 0; border-top: 9px solid #f4fbff; content: ""; transform: translateX(-50%); }
-.roulette-round-status { margin-top: 12px; color: #eaf7fc; font-size: 1rem; font-weight: 850; text-align: center; }
+.roulette-track-panel { padding: clamp(24px, 3.5vw, 42px) clamp(14px, 2.5vw, 30px) 20px; }
+.roulette-track-viewport { position: relative; min-height: 118px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.roulette-track { height: 106px; display: flex; align-items: center; gap: 8px; width: max-content; transform: translateX(0); will-change: transform; }
+.roulette-track.is-spinning { transition: transform 3.4s cubic-bezier(.1, .7, .08, 1); }
+.roulette-track-tile { width: 86px; height: 86px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: #fff; }
+.roulette-track-tile i,
+.roulette-recent-tile i,
+.roulette-lane-icon { width: 58%; height: 58%; display: block; background: currentColor; mask-position: center; mask-repeat: no-repeat; mask-size: contain; }
+.roulette-track-tile.blue, .roulette-recent-tile.blue { background: #2f80ff; color: #fff; }
+.roulette-track-tile.cyan, .roulette-recent-tile.cyan { background: #15c7d9; color: #fff; }
+.roulette-track-tile.purple, .roulette-recent-tile.purple { background: #8b5cf6; color: #fff; }
+.roulette-track-tile.gold, .roulette-recent-tile.gold { background: #f5b942; color: #fff; }
+.roulette-tile-icon.blue, .roulette-lane-icon.blue { mask-image: url("assets/icons/roulette/blue-2x.png"); }
+.roulette-tile-icon.cyan, .roulette-lane-icon.cyan { mask-image: url("assets/icons/roulette/cyan-2x.png"); }
+.roulette-tile-icon.purple, .roulette-lane-icon.purple { mask-image: url("assets/icons/roulette/purple-7x.png"); }
+.roulette-tile-icon.gold, .roulette-lane-icon.gold { mask-image: url("assets/icons/roulette/gold-14x.png"); }
+.roulette-pointer { position: absolute; z-index: 3; top: 0; bottom: 7px; left: 50%; width: 3px; background: #f7fbff; transform: translateX(-50%); }
+.roulette-pointer::after { position: absolute; bottom: -1px; left: 50%; width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-top: 9px solid #f7fbff; content: ""; transform: translateX(-50%); }
+.roulette-round-status { margin-top: 10px; color: #eaf7fc; font-size: .94rem; font-weight: 850; text-align: center; }
 .roulette-round-status strong { color: #38d7ff; }
-.roulette-progress { height: 4px; margin-top: 16px; overflow: hidden; border-radius: 99px; background: #102331; }
-.roulette-progress i { width: 0; height: 100%; display: block; border-radius: inherit; background: #18bfe8; transition: width 3.1s linear; }
-.roulette-recent { min-width: 0; display: flex; align-items: center; gap: 12px; margin-top: 18px; color: #8ca3b3; font-size: .72rem; }
-.roulette-recent > div { min-width: 0; display: flex; gap: 6px; overflow: hidden; }
-.roulette-recent-tile { width: 28px; height: 28px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; color: #fff; }
-.roulette-recent-tile svg { width: 18px; height: 18px; fill: currentColor; }
-.roulette-recent-tile.cyan { background: #087eac; color: #78e6ff; }
-.roulette-recent-tile.red { background: #a6243b; color: #ff7d91; }
-.roulette-recent-tile.violet { background: #5430a0; color: #c4a4ff; }
-.roulette-recent-tile.gold { background: #a66b09; color: #ffd767; }
-.roulette-betting-panel { padding: 24px clamp(18px, 3vw, 36px) 30px; border-top: 1px solid #173143; background: #07131d; }
+.roulette-progress { height: 3px; margin-top: 15px; overflow: hidden; border-radius: 99px; background: #102331; }
+.roulette-progress i { width: 0; height: 100%; display: block; border-radius: inherit; background: #21c8ec; }
+.roulette-recent { min-width: 0; display: flex; align-items: center; gap: 10px; margin-top: 17px; color: #8499a7; font-size: .69rem; }
+.roulette-recent > strong { color: #c7d4dc; white-space: nowrap; }
+.roulette-count { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.roulette-count i { width: 9px; height: 9px; border-radius: 3px; }
+.roulette-count.blue i { background: #2f80ff; }
+.roulette-count.cyan i { background: #15c7d9; }
+.roulette-count.purple i { background: #8b5cf6; }
+.roulette-count.gold i { background: #f5b942; }
+.roulette-count b { color: #b9c8d1; font-weight: 800; }
+.roulette-recent > div { min-width: 0; display: flex; gap: 5px; margin-left: auto; overflow: hidden; }
+.roulette-recent-tile { width: 27px; height: 27px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; }
+.roulette-betting-panel { padding: 22px clamp(16px, 2.6vw, 30px) 28px; border-top: 1px solid #173143; background: #07131d; }
+.roulette-stake-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
 .roulette-field { display: grid; gap: 9px; }
 .roulette-field > span:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .roulette-field strong { color: #edf7fb; font-size: .78rem; }
 .roulette-field small { color: #7e96a6; font-size: .66rem; }
-.roulette-input-shell { min-height: 50px; display: flex; align-items: center; overflow: hidden; border-bottom: 1px solid #245069; background: #0b1c27; color: #34d5ff; }
+.roulette-input-shell { min-height: 48px; display: flex; align-items: center; overflow: hidden; border: 1px solid #1c3b4d; border-radius: 8px; background: #0a1a25; color: #34d5ff; }
 .roulette-input-shell > span { padding-left: 15px; font-size: .75rem; font-weight: 900; }
-.roulette-input-shell input { min-width: 0; height: 48px; flex: 1; padding: 0 12px; border: 0; outline: 0; background: transparent; color: #fff; font-weight: 800; }
-.roulette-input-shell button { min-width: 54px; height: 38px; margin-right: 5px; border: 0; border-radius: 7px; background: #172d3c; color: #d9e8ef; cursor: pointer; font-weight: 800; }
+.roulette-input-shell input { min-width: 0; height: 46px; flex: 1; padding: 0 12px; border: 0; outline: 0; background: transparent; color: #fff; font-weight: 800; }
+.roulette-input-shell button { min-width: 52px; height: 36px; margin-right: 5px; border: 0; border-radius: 6px; background: #142b3a; color: #d9e8ef; cursor: pointer; font-weight: 800; }
+.roulette-clear { min-height: 48px; padding: 0 16px; border: 1px solid #254253; border-radius: 8px; background: transparent; color: #9db1bd; cursor: pointer; font-weight: 800; }
+.roulette-clear:disabled { cursor: default; opacity: .38; }
 .roulette-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
-.roulette-option { min-width: 0; min-height: 76px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #1c394b; border-radius: 9px; background: #091722; color: #dce9f0; cursor: pointer; text-align: left; }
-.roulette-option svg { width: 38px; height: 38px; flex: 0 0 auto; fill: currentColor; }
-.roulette-option span { min-width: 0; display: grid; gap: 3px; }
-.roulette-option strong { overflow: hidden; font-size: .76rem; text-overflow: ellipsis; }
-.roulette-option small { color: #a9bdc9; font-size: .68rem; font-weight: 850; }
-.roulette-option.cyan { color: #4edbff; }
-.roulette-option.red { color: #ff617d; }
-.roulette-option.violet { color: #ad82ff; }
-.roulette-option.gold { color: #ffc957; }
-.roulette-option.active { border-color: currentColor; background: #0d202c; }
-.roulette-option:disabled { cursor: not-allowed; opacity: .58; }
-.roulette-primary-button { width: 100%; min-height: 50px; margin-top: 14px; border: 0; border-radius: 8px; background: #0daeda; color: #00141d; cursor: pointer; font-weight: 900; }
-.roulette-primary-button:disabled { cursor: not-allowed; opacity: .42; }
+.roulette-option { min-width: 0; overflow: hidden; border-radius: 9px; background: #091722; }
+.roulette-option header { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; color: #dfeaf0; font-size: .76rem; font-weight: 800; }
+.roulette-option header strong { color: currentColor; font-size: 1rem; }
+.roulette-lane-icon { width: 39px; height: 39px; flex: 0 0 auto; }
+.roulette-option.blue { color: #2f80ff; }
+.roulette-option.cyan { color: #15c7d9; }
+.roulette-option.purple { color: #8b5cf6; }
+.roulette-option.gold { color: #f5b942; }
+.roulette-option > button { width: calc(100% - 12px); min-height: 42px; margin: 0 6px; border: 0; border-radius: 7px; background: currentColor; cursor: pointer; }
+.roulette-option > button::after { color: #031019; content: "Place Bet"; font-weight: 950; }
+.roulette-option > button { color: inherit; font-size: 0; }
+.roulette-option > button:disabled { cursor: not-allowed; opacity: .4; }
+.roulette-option footer { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; color: #778f9e; font-size: .64rem; }
+.roulette-option footer strong { overflow: hidden; color: #d9e6ec; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
 .roulette-message { margin: 12px 0 0; color: #ff8fa0; font-size: .7rem; font-weight: 700; text-align: center; }
 .roulette-message[hidden] { display: none; }
 .roulette-stage-footer { min-height: 52px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 20px; border-top: 1px solid #1a3445; background: #07121b; }
 .roulette-stage-footer > span { color: #315268; font-size: .95rem; font-weight: 900; letter-spacing: .05em; }
 .roulette-stage-footer .fairness-label { justify-self: end; min-height: 35px; border: 0; background: transparent; color: #8299a8; cursor: pointer; font-size: .63rem; text-decoration: underline; }
 @media (max-width: 780px) {
-  .roulette-track-panel { padding: 28px 10px 20px; }
-  .roulette-track-viewport { min-height: 112px; }
-  .roulette-track { height: 98px; gap: 8px; }
-  .roulette-track-tile { width: 76px; height: 76px; border-radius: 10px; }
-  .roulette-track-tile svg { width: 43px; height: 43px; }
+  .roulette-track-panel { padding: 24px 10px 18px; }
+  .roulette-track-viewport { min-height: 104px; }
+  .roulette-track { height: 92px; gap: 7px; }
+  .roulette-track-tile { width: 74px; height: 74px; border-radius: 9px; }
+  .roulette-recent > div { display: none; }
   .roulette-options { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 480px) {
   .roulette-betting-panel { padding: 18px 12px 24px; }
+  .roulette-stake-row { grid-template-columns: 1fr; }
+  .roulette-clear { min-height: 38px; }
   .roulette-input-shell button { min-width: 46px; }
-  .roulette-option { min-height: 68px; gap: 9px; padding: 10px; }
-  .roulette-option svg { width: 32px; height: 32px; }
+  .roulette-option header { min-height: 54px; padding: 8px 10px; }
+  .roulette-lane-icon { width: 32px; height: 32px; }
+  .roulette-option > button { min-height: 39px; }
+  .roulette-option footer { min-height: 40px; padding: 0 10px; }
   .roulette-stage-footer { grid-template-columns: 1fr auto; padding-inline: 10px; }
   .roulette-stage-footer > span { display: none; }
 }
