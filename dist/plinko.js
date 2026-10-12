@@ -8,6 +8,7 @@
   if (!game) return;
 
   document.title = "Plinko | GamRace";
+  document.body.classList.add("plinko-active");
   game.hidden = false;
   if (blankState) blankState.hidden = true;
 
@@ -32,10 +33,13 @@
   let selectedSymbol = "COIN";
   let displayFiat = true;
   let availableBalance = 0;
-  let betPending = false;
+  let reservedBalance = 0;
+  let activeRequests = 0;
   let autoplayRunning = false;
   let stopAutoplayRequested = false;
   let animationFrame = 0;
+  let nextBallId = 0;
+  const activeBalls = new Map();
 
   for (let rows = 8; rows <= 16; rows += 1) {
     const option = document.createElement("option");
@@ -43,6 +47,12 @@
     option.textContent = String(rows);
     option.selected = rows === 12;
     rowsSelect.append(option);
+  }
+
+  const historyBody = game.querySelector(".plinko-history tbody");
+  while (historyBody && historyBody.rows.length < 5) {
+    const row = historyBody.rows[0].cloneNode(true);
+    historyBody.append(row);
   }
 
   function clamp(value, minimum, maximum) {
@@ -56,6 +66,10 @@
 
   function minimumWager() {
     return displayFiat ? 0.01 : 0.00000001;
+  }
+
+  function spendableBalance() {
+    return Math.max(0, Math.round((availableBalance - reservedBalance) * 100000000) / 100000000);
   }
 
   function formatAmount(value) {
@@ -109,13 +123,13 @@
     return `hsl(${hue} 88% ${47 + distance * 7}%)`;
   }
 
-  function renderPayouts(hitBucket = -1) {
+  function renderPayouts() {
     const rows = Number(rowsSelect.value);
     const multipliers = multiplierTable(rows, risk);
     payouts.style.setProperty("--plinko-slots", String(rows + 1));
     payouts.replaceChildren(...multipliers.map((multiplier, index) => {
       const slot = document.createElement("span");
-      slot.className = `plinko-payout-slot${index === hitBucket ? " hit" : ""}`;
+      slot.className = "plinko-payout-slot";
       slot.style.setProperty("--slot-color", slotColor(index, rows));
       slot.textContent = multiplierText(multiplier);
       slot.title = `${multiplier.toFixed(6)}×`;
@@ -123,103 +137,184 @@
     }));
   }
 
-  function boardGeometry(rows) {
-    const left = 96;
-    const right = canvas.width - 96;
-    const top = 54;
-    const bottom = canvas.height - 30;
-    return { center: canvas.width / 2, top, bottom, rowGap: (bottom - top) / rows, slotGap: (right - left) / rows };
+  function highlightPayout(bucket) {
+    const slot = payouts.children[Number(bucket)];
+    if (!slot) return;
+    const hits = Number(slot.dataset.hits || 0) + 1;
+    slot.dataset.hits = String(hits);
+    slot.classList.add("hit");
+    window.setTimeout(() => {
+      const remaining = Math.max(0, Number(slot.dataset.hits || 1) - 1);
+      slot.dataset.hits = String(remaining);
+      if (!remaining) slot.classList.remove("hit");
+    }, 520);
   }
 
-  function drawBoard(ball = null) {
-    const rows = Number(rowsSelect.value);
+  function boardGeometry(rows) {
+    const side = 24;
+    const top = 48;
+    const pegBottom = canvas.height - 104;
+    const slotGap = (canvas.width - side * 2) / (rows + 1);
+    return {
+      center: canvas.width / 2,
+      top,
+      pegBottom,
+      cupY: canvas.height - 28,
+      rowGap: rows > 1 ? (pegBottom - top) / (rows - 1) : 0,
+      slotGap,
+    };
+  }
+
+  function drawPeg(x, y, colour, radius) {
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fillStyle = colour;
+    context.fill();
+    context.beginPath();
+    context.arc(x - radius * .25, y - radius * .28, radius * .32, 0, Math.PI * 2);
+    context.fillStyle = "rgba(255,255,255,.46)";
+    context.fill();
+  }
+
+  function drawBall(ball) {
+    if (ball.collision) {
+      context.beginPath();
+      context.arc(ball.collision.x, ball.collision.y, 8 + 12 * ball.collision.strength, 0, Math.PI * 2);
+      context.strokeStyle = `rgba(63, 207, 255, ${.42 * (1 - ball.collision.strength)})`;
+      context.lineWidth = 2;
+      context.stroke();
+    }
+    context.beginPath();
+    context.arc(ball.x, ball.y, 9, 0, Math.PI * 2);
+    const fill = context.createRadialGradient(ball.x - 3, ball.y - 4, 1, ball.x, ball.y, 11);
+    fill.addColorStop(0, "#ffffff");
+    fill.addColorStop(.28, "#8eeaff");
+    fill.addColorStop(1, "#078bd4");
+    context.fillStyle = fill;
+    context.fill();
+    context.lineWidth = 1.5;
+    context.strokeStyle = "#58cfff";
+    context.stroke();
+  }
+
+  function drawBoard(balls = []) {
+    const rows = activeBalls.size ? activeBalls.values().next().value.rows : Number(rowsSelect.value);
     const geometry = boardGeometry(rows);
     context.clearRect(0, 0, canvas.width, canvas.height);
-    const glow = context.createRadialGradient(geometry.center, canvas.height * .48, 10, geometry.center, canvas.height * .48, canvas.width * .46);
-    glow.addColorStop(0, "rgba(113, 47, 255, .12)");
-    glow.addColorStop(.55, "rgba(0, 186, 255, .06)");
-    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
-    context.fillStyle = glow;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
     for (let row = 0; row < rows; row += 1) {
       const y = geometry.top + row * geometry.rowGap;
       for (let peg = 0; peg <= row; peg += 1) {
         const x = geometry.center + (peg - row / 2) * geometry.slotGap;
-        const colour = slotColor(peg / Math.max(1, row) * rows, rows);
-        context.beginPath();
-        context.arc(x, y, rows > 13 ? 4.6 : 5.5, 0, Math.PI * 2);
-        context.fillStyle = colour;
-        context.shadowColor = colour;
-        context.shadowBlur = 11;
-        context.fill();
+        drawPeg(x, y, "#64bedf", rows > 13 ? 4.1 : 4.8);
       }
     }
-    context.shadowBlur = 0;
-    if (!ball) return;
-    context.beginPath();
-    context.arc(ball.x, ball.y, 10, 0, Math.PI * 2);
-    const ballFill = context.createRadialGradient(ball.x - 3, ball.y - 4, 1, ball.x, ball.y, 12);
-    ballFill.addColorStop(0, "#ffffff");
-    ballFill.addColorStop(.25, "#8eeaff");
-    ballFill.addColorStop(1, "#078bd4");
-    context.fillStyle = ballFill;
-    context.shadowColor = "#37d8ff";
-    context.shadowBlur = 18;
-    context.fill();
-    context.shadowBlur = 0;
+    balls.forEach(drawBall);
   }
 
-  function animatePath(path) {
-    cancelAnimationFrame(animationFrame);
+  function buildBallPoints(path) {
     const rows = path.length;
     const geometry = boardGeometry(rows);
-    const points = [{ x: geometry.center, y: geometry.top - geometry.rowGap * .8 }];
+    const points = [{ x: geometry.center, y: geometry.top - 34, peg: null }];
     let rights = 0;
     path.forEach((step, index) => {
+      const pegX = geometry.center + (rights - index / 2) * geometry.slotGap;
+      const pegY = geometry.top + index * geometry.rowGap;
+      points.push({ x: pegX, y: pegY - 10, peg: { x: pegX, y: pegY }, direction: step ? 1 : -1 });
       rights += step;
-      points.push({
-        x: geometry.center + (rights - (index + 1) / 2) * geometry.slotGap,
-        y: geometry.top + index * geometry.rowGap,
-      });
     });
-    points.push({ x: geometry.center + (rights - rows / 2) * geometry.slotGap, y: geometry.bottom });
+    points.push({
+      x: geometry.center + (rights - rows / 2) * geometry.slotGap,
+      y: geometry.cupY,
+      peg: null,
+      direction: 0,
+    });
+    return points;
+  }
+
+  function ballPosition(ball, timestamp) {
+    const progress = Math.min(1, (timestamp - ball.startedAt) / ball.duration);
+    const scaled = progress * (ball.points.length - 1);
+    const segment = Math.min(ball.points.length - 2, Math.floor(scaled));
+    const local = scaled - segment;
+    const from = ball.points[segment];
+    const to = ball.points[segment + 1];
+    const eased = .5 - Math.cos(local * Math.PI) / 2;
+    const direction = to.direction || Math.sign(to.x - from.x) || 1;
+    const bounce = Math.sin(local * Math.PI);
+    const collision = to.peg && local > .78 ? {
+      x: to.peg.x,
+      y: to.peg.y,
+      strength: (local - .78) / .22,
+    } : null;
+    return {
+      x: from.x + (to.x - from.x) * eased + direction * bounce * 4,
+      y: from.y + (to.y - from.y) * local - bounce * 3,
+      collision,
+      complete: progress >= 1,
+    };
+  }
+
+  function animateBalls(timestamp) {
+    const visible = [];
+    activeBalls.forEach((ball, id) => {
+      const position = ballPosition(ball, timestamp);
+      visible.push(position);
+      if (position.complete) {
+        activeBalls.delete(id);
+        highlightPayout(ball.bucket);
+        ball.resolve();
+      }
+    });
+    drawBoard(visible);
+    if (activeBalls.size) animationFrame = requestAnimationFrame(animateBalls);
+    else {
+      animationFrame = 0;
+      updateAvailability();
+    }
+  }
+
+  function animatePath(path, bucket) {
+    if (!Array.isArray(path) || !path.length) return Promise.resolve();
+    const points = buildBallPoints(path);
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      drawBoard(points.at(-1));
+      highlightPayout(bucket);
       return Promise.resolve();
     }
-    const duration = Math.max(900, rows * 92);
     return new Promise((resolve) => {
-      const started = performance.now();
-      const frame = (timestamp) => {
-        const progress = Math.min(1, (timestamp - started) / duration);
-        const scaled = progress * (points.length - 1);
-        const segment = Math.min(points.length - 2, Math.floor(scaled));
-        const local = scaled - segment;
-        const eased = .5 - Math.cos(local * Math.PI) / 2;
-        const from = points[segment];
-        const to = points[segment + 1];
-        const arc = Math.sin(local * Math.PI) * Math.min(10, geometry.rowGap * .2);
-        drawBoard({ x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * local - arc });
-        if (progress < 1) animationFrame = requestAnimationFrame(frame);
-        else resolve();
-      };
-      animationFrame = requestAnimationFrame(frame);
+      const id = ++nextBallId;
+      activeBalls.set(id, {
+        id,
+        rows: path.length,
+        bucket: Number(bucket),
+        points,
+        startedAt: performance.now(),
+        duration: Math.max(980, path.length * 96),
+        resolve,
+      });
+      if (!animationFrame) animationFrame = requestAnimationFrame(animateBalls);
+      updateAvailability();
     });
+  }
+
+  function boardBusy() {
+    return activeRequests > 0 || activeBalls.size > 0 || autoplayRunning;
   }
 
   function updateAvailability() {
     const manual = cleanAmount(betInput);
     const auto = cleanAmount(autoBetInput);
     const minimum = minimumWager();
-    actionButton.disabled = betPending || autoplayRunning || manual < minimum || manual > availableBalance;
-    autoActionButton.disabled = betPending || (!autoplayRunning && (auto < minimum || auto > availableBalance));
-    balanceLabel.textContent = formatAmount(availableBalance);
+    const spendable = spendableBalance();
+    actionButton.disabled = autoplayRunning || manual < minimum || manual > spendable;
+    autoActionButton.disabled = !autoplayRunning && (auto < minimum || auto > spendable);
+    balanceLabel.textContent = formatAmount(spendable);
+    rowsSelect.disabled = boardBusy();
+    game.querySelectorAll("[data-plinko-risk]").forEach((button) => { button.disabled = boardBusy(); });
     const current = mode === "auto" ? auto : manual;
-    if (current > availableBalance && current > 0) {
+    if (current > spendable && current > 0) {
       balanceMessage.textContent = `Insufficient ${selectedSymbol} balance.`;
       balanceMessage.hidden = false;
-    } else {
+    } else if (!balanceMessage.dataset.error) {
       balanceMessage.hidden = true;
     }
   }
@@ -231,54 +326,70 @@
     displayFiat = detail.displayFiat !== false;
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0);
     const minimum = minimumWager();
-    [betInput, autoBetInput].forEach((input) => { input.min = minimum.toFixed(displayFiat ? 2 : 8); input.step = input.min; });
+    [betInput, autoBetInput].forEach((input) => {
+      input.min = minimum.toFixed(displayFiat ? 2 : 8);
+      input.step = input.min;
+    });
     game.querySelectorAll("[data-plinko-currency]").forEach((field) => { field.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
     updateAvailability();
   }
 
   function adjustBet(input, action) {
     const amount = cleanAmount(input);
-    input.value = Math.min(availableBalance, action === "half" ? amount / 2 : amount * 2).toFixed(displayFiat ? 2 : 8);
+    input.value = Math.min(spendableBalance(), action === "half" ? amount / 2 : amount * 2).toFixed(displayFiat ? 2 : 8);
     updateAvailability();
   }
 
   async function dropBall(amount) {
     if (!selectedCurrency || !window.gamraceWallet?.request) {
+      balanceMessage.dataset.error = "true";
       balanceMessage.textContent = "Sign in and wait for your wallet to load before betting.";
       balanceMessage.hidden = false;
       return null;
     }
-    if (amount < minimumWager() || amount > availableBalance) return null;
-    betPending = true;
-    result.hidden = true;
-    renderPayouts();
+    if (amount < minimumWager() || amount > spendableBalance()) {
+      updateAvailability();
+      return null;
+    }
+
+    const rows = Number(rowsSelect.value);
+    const selectedRisk = risk;
+    reservedBalance = Math.round((reservedBalance + amount) * 100000000) / 100000000;
+    activeRequests += 1;
+    delete balanceMessage.dataset.error;
     updateAvailability();
     try {
       const response = await window.gamraceWallet.request("/games/plinko/bets", {
         method: "POST",
         body: JSON.stringify({
-          requestId: crypto.randomUUID().replaceAll("-", ""), currency: selectedCurrency,
-          wager: amount.toFixed(displayFiat ? 2 : 8), displayFiat,
-          rows: Number(rowsSelect.value), risk,
+          requestId: crypto.randomUUID().replaceAll("-", ""),
+          currency: selectedCurrency,
+          wager: amount.toFixed(displayFiat ? 2 : 8),
+          displayFiat,
+          rows,
+          risk: selectedRisk,
         }),
       });
-      await animatePath(response.bet.path || []);
+      reservedBalance = Math.max(0, Math.round((reservedBalance - amount) * 100000000) / 100000000);
+      activeRequests = Math.max(0, activeRequests - 1);
       window.gamraceWallet.applyGameResult(response);
       const multiplier = Number(response.bet.multiplier || 0);
       const payout = amount * multiplier;
-      renderPayouts(Number(response.bet.bucket));
       resultMultiplier.textContent = `${multiplier.toFixed(2)}×`;
       resultPayout.textContent = formatAmount(payout);
       result.classList.toggle("loss", response.bet.outcome !== "win");
       result.hidden = false;
+      animatePath(response.bet.path || [], response.bet.bucket);
+      updateAvailability();
       return response.bet;
     } catch (error) {
+      reservedBalance = Math.max(0, Math.round((reservedBalance - amount) * 100000000) / 100000000);
+      activeRequests = Math.max(0, activeRequests - 1);
+      balanceMessage.dataset.error = "true";
       balanceMessage.textContent = error.message || "The Plinko bet could not be completed.";
       balanceMessage.hidden = false;
-      return null;
-    } finally {
-      betPending = false;
       updateAvailability();
+      return null;
     }
   }
 
@@ -290,14 +401,14 @@
     }
     const rounds = Math.round(clamp(autoRoundInput.value, 1, 100));
     const amount = cleanAmount(autoBetInput);
-    if (amount < minimumWager() || amount > availableBalance) return;
+    if (amount < minimumWager() || amount > spendableBalance()) return;
     autoplayRunning = true;
     stopAutoplayRequested = false;
     autoActionButton.textContent = "Stop Autoplay";
     updateAvailability();
     for (let index = 0; index < rounds && !stopAutoplayRequested; index += 1) {
-      if (!await dropBall(amount)) break;
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
+      if (amount > spendableBalance() || !await dropBall(amount)) break;
+      await new Promise((resolve) => window.setTimeout(resolve, 90));
     }
     autoplayRunning = false;
     stopAutoplayRequested = false;
@@ -317,7 +428,7 @@
     updateAvailability();
   }));
   game.querySelectorAll("[data-plinko-risk]").forEach((button) => button.addEventListener("click", () => {
-    if (betPending || autoplayRunning) return;
+    if (boardBusy()) return;
     risk = button.dataset.plinkoRisk;
     game.querySelectorAll("[data-plinko-risk]").forEach((item) => item.classList.toggle("active", item === button));
     result.hidden = true;
@@ -332,13 +443,18 @@
   }));
   game.querySelectorAll("[data-plinko-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(betInput, button.dataset.plinkoBetAction)));
   game.querySelectorAll("[data-plinko-auto-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(autoBetInput, button.dataset.plinkoAutoBetAction)));
-  rowsSelect.addEventListener("change", () => { result.hidden = true; renderPayouts(); drawBoard(); });
-  betInput.addEventListener("input", updateAvailability);
-  autoBetInput.addEventListener("input", updateAvailability);
+  rowsSelect.addEventListener("change", () => {
+    if (boardBusy()) return;
+    result.hidden = true;
+    renderPayouts();
+    drawBoard();
+  });
+  betInput.addEventListener("input", () => { delete balanceMessage.dataset.error; updateAvailability(); });
+  autoBetInput.addEventListener("input", () => { delete balanceMessage.dataset.error; updateAvailability(); });
   actionButton.addEventListener("click", () => dropBall(cleanAmount(betInput)));
   autoActionButton.addEventListener("click", runAutoplay);
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
-  window.addEventListener("resize", () => drawBoard());
+  window.addEventListener("resize", () => drawBoard([...activeBalls.values()].map((ball) => ballPosition(ball, performance.now()))));
 
   renderPayouts();
   drawBoard();

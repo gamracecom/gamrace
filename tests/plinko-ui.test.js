@@ -24,13 +24,25 @@ test("Plinko has manual and automatic wallet-backed play", () => {
 test("Plinko outcome and animation are server-authoritative", () => {
   assert.match(worker, /const path = Array\.from\(\{ length: rows \}, \(\) => secureRandomInt\(2\)\)/);
   assert.match(core, /export function plinkoPayout/);
-  assert.match(script, /await animatePath\(response\.bet\.path/);
+  assert.match(script, /animatePath\(response\.bet\.path/);
+  assert.match(script, /const activeBalls = new Map\(\)/);
+  assert.match(script, /requestAnimationFrame\(animateBalls\)/);
   assert.doesNotMatch(script, /getRandomValues/);
+  assert.doesNotMatch(script, /cancelAnimationFrame/);
 });
 
 test("Plinko provides rows, risks, colourful pockets, and responsive board layout", () => {
   for (const risk of ["low", "medium", "high"]) assert.match(html, new RegExp(`data-plinko-risk="${risk}"`));
   assert.match(styles, /\.plinko-payout-slot/);
   assert.match(styles, /--slot-color/);
+  assert.match(styles, /border-top: 0/);
   assert.match(styles, /@media \(max-width: 780px\)[\s\S]*\.plinko-stage/);
+});
+
+test("Plinko reserves rapid wagers so queued balls cannot overspend the wallet", () => {
+  assert.match(script, /let reservedBalance = 0/);
+  assert.match(script, /availableBalance - reservedBalance/);
+  assert.match(script, /reservedBalance = Math\.round\(\(reservedBalance \+ amount\)/);
+  assert.match(script, /amount > spendableBalance\(\)/);
+  assert.match(script, /while \(historyBody && historyBody\.rows\.length < 5\)/);
 });
