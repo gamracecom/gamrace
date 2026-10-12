@@ -180,6 +180,20 @@ export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue) {
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }
 
+export function roulettePayout(wagerUnits, selectionValue, resultValue) {
+  const wager = Number(wagerUnits);
+  const selection = String(selectionValue || "").toLowerCase();
+  const result = String(resultValue || "").toLowerCase();
+  const multipliers = { cyan: 2_000_000, red: 2_000_000, violet: 7_000_000, gold: 14_000_000 };
+  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Roulette wager");
+  if (!Object.hasOwn(multipliers, selection)) throw new Error("Invalid Roulette selection");
+  if (!Object.hasOwn(multipliers, result)) throw new Error("Invalid Roulette result");
+  const won = selection === result;
+  const multiplierMicros = won ? multipliers[result] : 0;
+  const payoutUnits = won ? payoutFromMultiplier(wager, multiplierMicros) : 0;
+  return { won, multiplierMicros, payoutUnits };
+}
+
 export function minesMultiplierMicros(mineCount, revealedCount) {
   const mines = Number(mineCount);
   const revealed = Number(revealedCount);

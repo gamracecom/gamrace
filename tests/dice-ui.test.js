@@ -36,10 +36,13 @@ test("Dice animates the server result without generating client-side outcomes", 
   assert.doesNotMatch(diceScript, /crypto\.getRandomValues/);
 });
 
-test("completed Dice bets render in the in-border multiplier strip", () => {
+test("completed Dice bets render the last ten rolled numbers on the game background", () => {
   assert.match(gameHtml, /data-game-result-strip/);
   assert.match(gameHtml, /class="game-result-strip dice-result-strip"/);
   assert.match(diceScript, /game-result-pill/);
+  assert.match(diceScript, /addRollResult\(roll, won\)/);
+  assert.match(diceScript, /children\.length > 10/);
+  assert.doesNotMatch(diceScript, /addMultiplierResult/);
 });
 
 test("Dice matches the compact Mines stage dimensions and includes win tables", () => {

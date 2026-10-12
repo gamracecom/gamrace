@@ -18,6 +18,7 @@ import {
   paymentCanCredit,
   plinkoMultipliers,
   plinkoPayout,
+  roulettePayout,
   payoutFromMultiplier,
   oxaDepositStatus,
   oxaPayoutStatus,
@@ -115,4 +116,12 @@ test("Plinko paytables are symmetric and preserve a 99% expected return", () => 
   const settlement = plinkoPayout(100_000_000, 8, "high", 0);
   assert.equal(settlement.outcome, "win");
   assert.ok(settlement.payoutUnits > 100_000_000);
+});
+
+test("Roulette settlements use the selected lane multiplier", () => {
+  assert.deepEqual(roulettePayout(100_000_000, "cyan", "cyan"), { won: true, multiplierMicros: 2_000_000, payoutUnits: 200_000_000 });
+  assert.equal(roulettePayout(100_000_000, "violet", "violet").payoutUnits, 700_000_000);
+  assert.equal(roulettePayout(100_000_000, "gold", "gold").payoutUnits, 1_400_000_000);
+  assert.deepEqual(roulettePayout(100_000_000, "red", "cyan"), { won: false, multiplierMicros: 0, payoutUnits: 0 });
+  assert.throws(() => roulettePayout(100_000_000, "invalid", "cyan"), /selection/);
 });

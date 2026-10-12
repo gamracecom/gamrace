@@ -191,14 +191,14 @@
     });
   }
 
-  function addMultiplierResult(multiplier, won) {
+  function addRollResult(roll, won) {
     if (!resultStrip) return;
     resultStrip.hidden = false;
     const pill = document.createElement("span");
     pill.className = `game-result-pill${won ? " win" : ""}`;
-    pill.textContent = `${Number(multiplier).toFixed(2)}×`;
+    pill.textContent = Number(roll).toFixed(2);
     resultStrip.append(pill);
-    while (resultStrip.children.length > 9) resultStrip.firstElementChild.remove();
+    while (resultStrip.children.length > 10) resultStrip.firstElementChild.remove();
     resultStrip.scrollLeft = resultStrip.scrollWidth;
   }
 
@@ -242,7 +242,7 @@
       window.gamraceWallet.applyGameResult(response);
       const profit = won ? amount * (Number(response.bet.multiplier) - 1) : -amount;
       renderResult(roll, won);
-      addMultiplierResult(response.bet.multiplier, won);
+      addRollResult(roll, won);
       recordRoll(amount, profit);
       return { won, profit };
     } catch (error) {

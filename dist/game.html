@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=plinko-2" />
+    <link rel="stylesheet" href="styles.css?v=roulette-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -176,7 +176,6 @@
           </section>
           <section class="dice-game" id="dice-game" hidden aria-label="Dice">
             <div class="dice-stage">
-              <div class="game-result-strip dice-result-strip" data-game-result-strip aria-label="Recent Dice multipliers" aria-live="polite" hidden></div>
               <section class="dice-controls" aria-label="Dice controls">
                 <div class="dice-mode-tabs" role="tablist" aria-label="Game mode">
                   <button class="dice-mode-tab active" type="button" role="tab" aria-selected="true" data-dice-mode="manual">Manual</button>
@@ -214,6 +213,7 @@
               </section>
 
               <section class="dice-play-panel" aria-label="Dice roll controls">
+                <div class="game-result-strip dice-result-strip" data-game-result-strip aria-label="Last 10 Dice rolls" aria-live="polite" hidden></div>
                 <div class="dice-result-card" id="dice-result-card" hidden aria-live="assertive">
                   <span>Roll</span><strong id="dice-result-value">00.00</strong><small id="dice-result-outcome">Ready</small>
                 </div>
@@ -339,6 +339,44 @@
               <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Plinko results not available yet"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
             </section>
           </section>
+          <section class="roulette-game" id="roulette-game" hidden aria-label="Roulette">
+            <div class="roulette-stage">
+              <section class="roulette-track-panel" aria-label="Roulette result track">
+                <div class="roulette-track-viewport" id="roulette-track-viewport">
+                  <div class="roulette-track" id="roulette-track"></div>
+                  <span class="roulette-pointer" aria-hidden="true"></span>
+                </div>
+                <div class="roulette-round-status" id="roulette-round-status" role="status" aria-live="polite">Choose a lane to start</div>
+                <div class="roulette-progress" aria-hidden="true"><i id="roulette-progress"></i></div>
+                <div class="roulette-recent"><strong>Last 10</strong><div id="roulette-recent-results" aria-label="Last 10 Roulette results"></div></div>
+              </section>
+
+              <section class="roulette-betting-panel" aria-label="Roulette betting controls">
+                <label class="roulette-field">
+                  <span><strong>Bet Amount</strong><small data-roulette-balance>0.00000000 COIN</small></span>
+                  <span class="roulette-input-shell"><span data-roulette-currency>$</span><input id="roulette-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Roulette bet amount" /><button type="button" data-roulette-bet-action="half">½</button><button type="button" data-roulette-bet-action="double">2×</button><button type="button" data-roulette-bet-action="max">Max</button></span>
+                </label>
+                <div class="roulette-options" role="radiogroup" aria-label="Choose a Roulette lane">
+                  <button class="roulette-option cyan active" type="button" role="radio" aria-checked="true" data-roulette-option="cyan">
+                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 5 53 17v25L32 59 11 42V17Z"/><path d="m18 35 10-17 1 13h17L35 48l-1-13Z"/></svg><span><strong>Velocity</strong><small>Win 2×</small></span>
+                  </button>
+                  <button class="roulette-option red" type="button" role="radio" aria-checked="false" data-roulette-option="red">
+                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M10 15h19l8 9H18v25H10Z"/><path d="M54 15H35l-8 9h19v25h8Z"/><circle cx="32" cy="39" r="10"/></svg><span><strong>Rival</strong><small>Win 2×</small></span>
+                  </button>
+                  <button class="roulette-option violet" type="button" role="radio" aria-checked="false" data-roulette-option="violet">
+                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="m32 5 6 17 18-3-13 13 13 13-18-3-6 17-6-17-18 3 13-13L8 19l18 3Z"/><circle cx="32" cy="32" r="7"/></svg><span><strong>Overtake</strong><small>Win 7×</small></span>
+                  </button>
+                  <button class="roulette-option gold" type="button" role="radio" aria-checked="false" data-roulette-option="gold">
+                    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="m10 22 13 9 9-18 9 18 13-9-5 25H15Z"/><path d="M17 51h30"/><circle cx="32" cy="36" r="6"/></svg><span><strong>Pole</strong><small>Win 14×</small></span>
+                  </button>
+                </div>
+                <button class="roulette-primary-button" id="roulette-action" type="button" disabled>Place Bet &amp; Roll</button>
+                <p class="roulette-message" id="roulette-message" role="status" aria-live="polite" hidden></p>
+              </section>
+
+              <footer class="roulette-stage-footer"><div></div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button></footer>
+            </div>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -353,8 +391,9 @@
     </nav>
     <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="mines.js?v=plinko-1" defer></script>
-    <script src="dice.js?v=plinko-1" defer></script>
+    <script src="dice.js?v=dice-rolls-1" defer></script>
     <script src="plinko.js?v=plinko-2" defer></script>
+    <script src="roulette.js?v=roulette-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

@@ -11,6 +11,7 @@ import {
   parseAssetUnits,
   parseNonNegativeAssetUnits,
   plinkoPayout,
+  roulettePayout,
   payoutFromMultiplier,
   oxaDepositStatus,
   oxaPayoutStatus,
@@ -476,7 +477,7 @@ async function enforceCooldown(env, uid, action, seconds) {
 }
 
 async function listActivity(env, uid) {
-  const [walletResult, diceResult, minesResult, plinkoResult] = await Promise.all([
+  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult] = await Promise.all([
     env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
            pay_currency AS currency, created_at
@@ -498,6 +499,10 @@ async function listActivity(env, uid) {
     env.DB.prepare(`
       SELECT id, currency, wager_units, payout_units, multiplier_micros, outcome, created_at
       FROM plinko_bets WHERE uid = ? ORDER BY created_at DESC LIMIT 50
+    `).bind(uid).all(),
+    env.DB.prepare(`
+      SELECT id, currency, wager_units, payout_units, multiplier_micros, outcome, created_at
+      FROM roulette_bets WHERE uid = ? ORDER BY created_at DESC LIMIT 50
     `).bind(uid).all(),
   ]);
   const walletRows = (walletResult.results || []).map((row) => ({
@@ -541,7 +546,18 @@ async function listActivity(env, uid) {
     currency: row.currency,
     createdAt: Number(row.created_at),
   }));
-  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
+  const rouletteRows = (rouletteResult.results || []).map((row) => ({
+    id: row.id,
+    type: "bet",
+    game: "Roulette",
+    status: row.outcome,
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
 async function handleGetWallet(request, env, user) {
@@ -602,6 +618,14 @@ function secureRandomInt(maximum) {
   const values = new Uint32Array(1);
   do crypto.getRandomValues(values); while (values[0] >= limit);
   return values[0] % max;
+}
+
+function secureRouletteResult() {
+  const value = secureRandomInt(100);
+  if (value < 43) return "cyan";
+  if (value < 86) return "red";
+  if (value < 96) return "violet";
+  return "gold";
 }
 
 function shuffledTiles() {
@@ -779,6 +803,74 @@ async function handlePlinkoBet(request, env, user) {
   }
   const created = await env.DB.prepare("SELECT * FROM plinko_bets WHERE id = ?").bind(id).first();
   return json(request, env, 201, { bet: plinkoBetResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+function rouletteBetResponse(row) {
+  return {
+    id: row.id,
+    game: "roulette",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    net: assetUnitsToString(Math.abs(Number(row.payout_units) - Number(row.wager_units)), false),
+    netDirection: Number(row.payout_units) >= Number(row.wager_units) ? "credit" : "debit",
+    selection: row.selection,
+    result: row.result,
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    outcome: row.outcome,
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleRouletteBet(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM roulette_bets WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { bet: rouletteBetResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const selection = String(body.selection || "").toLowerCase();
+  const result = secureRouletteResult();
+  let settlement;
+  try { settlement = roulettePayout(wagerUnits, selection, result); }
+  catch (error) { throw httpError(400, error.message); }
+  const timestamp = now();
+  const id = crypto.randomUUID();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO roulette_bets(
+          id, request_id, uid, currency, wager_units, payout_units,
+          selection, result, multiplier_micros, outcome, created_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+      `).bind(
+        id, requestId, user.sub, asset.code, wagerUnits, settlement.payoutUnits,
+        selection, result, settlement.multiplierMicros, settlement.won ? "win" : "loss", timestamp,
+        user.sub, asset.code, wagerUnits,
+      ),
+      env.DB.prepare(`
+        UPDATE crypto_balances
+        SET available_units = available_units - ? + ?, updated_at = ?
+        WHERE uid = ? AND currency = ?
+          AND EXISTS(SELECT 1 FROM roulette_bets WHERE id = ?)
+      `).bind(wagerUnits, settlement.payoutUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'roulette_' || id, uid, currency, 'game_bet', payout_units - wager_units, id, created_at
+        FROM roulette_bets WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM roulette_bets WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { bet: rouletteBetResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM roulette_bets WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { bet: rouletteBetResponse(created), wallet: await walletResponse(env, user.sub) });
 }
 
 function integerArray(value) {
@@ -1816,6 +1908,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "POST" && path === "/games/dice/bets") return handleDiceBet(request, env, user);
   if (request.method === "POST" && path === "/games/plinko/bets") return handlePlinkoBet(request, env, user);
+  if (request.method === "POST" && path === "/games/roulette/bets") return handleRouletteBet(request, env, user);
   if (request.method === "GET" && path === "/games/mines/rounds/active") return handleGetActiveMinesRound(request, env, user);
   if (request.method === "POST" && path === "/games/mines/rounds") return handleStartMinesRound(request, env, user);
   const minesRevealMatch = path.match(/^\/games\/mines\/rounds\/([A-Za-z0-9-]+)\/reveal$/);

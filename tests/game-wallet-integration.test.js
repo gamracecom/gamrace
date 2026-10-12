@@ -3,33 +3,38 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [gameHtml, styles, wallet, dice, mines, plinko, worker, migration, plinkoMigration] = await Promise.all([
+const [gameHtml, styles, wallet, dice, mines, plinko, roulette, worker, migration, plinkoMigration, rouletteMigration] = await Promise.all([
   read("../dist/game.html"),
   read("../dist/styles.css"),
   read("../dist/wallet.js"),
   read("../dist/dice.js"),
   read("../dist/mines.js"),
   read("../dist/plinko.js"),
+  read("../dist/roulette.js"),
   read("../worker/src/index.js"),
   read("../worker/migrations/0005_game_ledger.sql"),
   read("../worker/migrations/0007_plinko_bets.sql"),
+  read("../worker/migrations/0008_roulette_bets.sql"),
 ]);
 
 test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(worker, /POST" && path === "\/games\/dice\/bets"/);
   assert.match(worker, /POST" && path === "\/games\/mines\/rounds"/);
   assert.match(worker, /POST" && path === "\/games\/plinko\/bets"/);
+  assert.match(worker, /POST" && path === "\/games\/roulette\/bets"/);
   assert.match(worker, /handleRevealMinesTile/);
   assert.match(worker, /handleCashoutMinesRound/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS dice_bets/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS mines_rounds/);
   assert.match(plinkoMigration, /CREATE TABLE IF NOT EXISTS plinko_bets/);
+  assert.match(rouletteMigration, /CREATE TABLE IF NOT EXISTS roulette_bets/);
   assert.match(migration, /settled INTEGER NOT NULL DEFAULT 0/);
   assert.match(worker, /env\.DB\.batch/);
   assert.match(worker, /available_units >= \?/);
   assert.match(dice, /gamraceWallet\.applyGameResult/);
   assert.match(mines, /gamraceWallet\.applyGameResult/);
   assert.match(plinko, /gamraceWallet\.applyGameResult/);
+  assert.match(roulette, /gamraceWallet\.applyGameResult/);
   assert.match(wallet, /applyGameResult/);
 });
 
@@ -44,7 +49,7 @@ test("Mines reveals numeric tiles and restores unfinished rounds", () => {
   assert.match(worker, /NOT EXISTS\(\s*SELECT 1 FROM mines_rounds/);
 });
 
-test("Dice owns the win-loss multiplier rail and game history is wired", () => {
+test("Dice owns the win-loss roll rail and game history is wired", () => {
   assert.match(gameHtml, /data-game-result-strip/);
   assert.match(styles, /\.game-result-pill\.win/);
   assert.match(styles, /\.game-result-pill\s*\{/);
@@ -55,6 +60,7 @@ test("Dice owns the win-loss multiplier rail and game history is wired", () => {
   assert.match(worker, /FROM dice_bets/);
   assert.match(worker, /FROM mines_rounds/);
   assert.match(worker, /FROM plinko_bets/);
+  assert.match(worker, /FROM roulette_bets/);
 });
 
 test("visible tick glyphs are absent from the site UI", async () => {
@@ -69,6 +75,7 @@ test("visible tick glyphs are absent from the site UI", async () => {
     "../dist/dice.js",
     "../dist/mines.js",
     "../dist/plinko.js",
+    "../dist/roulette.js",
   ].map(read));
   for (const source of sources) assert.doesNotMatch(source, /[✓✔☑]/u);
 });

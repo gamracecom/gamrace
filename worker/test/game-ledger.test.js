@@ -13,6 +13,7 @@ test("game ledger schema includes exact settlement records", () => {
   assert.ok(minesColumns.includes("settled"));
   assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'dice_bets'").get());
   assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mines_rounds'").get());
+  assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'roulette_bets'").get());
 });
 
 test("game settlement uses atomic D1 batches and balance eligibility checks", () => {
