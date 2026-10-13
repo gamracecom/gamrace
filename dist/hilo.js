@@ -124,18 +124,18 @@
     renderCardHistory(round?.cards || []);
     const high = round?.choices?.higher;
     const low = round?.choices?.lower;
-    game.querySelector("[data-hilo-high-chance]").textContent = high ? `${Number(high.chance).toFixed(2)}% chance` : "—";
-    game.querySelector("[data-hilo-low-chance]").textContent = low ? `${Number(low.chance).toFixed(2)}% chance` : "—";
-    game.querySelector("[data-hilo-high-multiplier]").textContent = high ? formatMultiplier(high.multiplier) : "—";
-    game.querySelector("[data-hilo-low-multiplier]").textContent = low ? formatMultiplier(low.multiplier) : "—";
+    game.querySelector("[data-hilo-high-chance]").textContent = high?.available === false ? "Unavailable on this card" : high ? `${Number(high.chance).toFixed(2)}% chance` : "—";
+    game.querySelector("[data-hilo-low-chance]").textContent = low?.available === false ? "Unavailable on this card" : low ? `${Number(low.chance).toFixed(2)}% chance` : "—";
+    game.querySelector("[data-hilo-high-multiplier]").textContent = high?.available === false ? "—" : high ? formatMultiplier(high.multiplier) : "—";
+    game.querySelector("[data-hilo-low-multiplier]").textContent = low?.available === false ? "—" : low ? formatMultiplier(low.multiplier) : "—";
     roundMultiplier.textContent = formatMultiplier(round?.multiplier || 1);
     if (!round) roundLabel.textContent = "Start a round to reveal your first card";
     else if (active && Number(round.guesses) === 0) roundLabel.textContent = "Will the next card be higher or lower?";
     else if (active) roundLabel.textContent = `${round.guesses} correct · Keep playing or cash out`;
     else if (round.status === "cashed_out") roundLabel.textContent = `Cashed out at ${formatMultiplier(round.multiplier)}`;
     else roundLabel.textContent = "The next card ended this round";
-    higherButton.disabled = !active || busy || autoRunning;
-    lowerButton.disabled = !active || busy || autoRunning;
+    higherButton.disabled = !active || busy || autoRunning || high?.available === false;
+    lowerButton.disabled = !active || busy || autoRunning || low?.available === false;
     cashoutButton.disabled = !active || Number(round?.guesses || 0) < 1 || busy || autoRunning;
     cashoutButton.textContent = active ? cashoutLabel(round) : "Cash Out";
     updateAvailability();
@@ -273,8 +273,10 @@
   }
 
   function automaticDirection(round) {
-    if (autoStrategy.value === "higher" || autoStrategy.value === "lower") return autoStrategy.value;
-    return Number(round.choices?.higher?.chance || 0) >= Number(round.choices?.lower?.chance || 0) ? "higher" : "lower";
+    const requested = autoStrategy.value;
+    if ((requested === "higher" || requested === "lower") && round.choices?.[requested]?.available !== false) return requested;
+    const available = ["higher", "lower"].filter((direction) => round.choices?.[direction]?.available !== false);
+    return available.sort((left, right) => Number(round.choices?.[right]?.chance || 0) - Number(round.choices?.[left]?.chance || 0))[0];
   }
 
   async function runAuto() {

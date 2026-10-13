@@ -1,5 +1,6 @@
 import {
   assetUnitsToString,
+  coinflipMultiplierMicros,
   createRawHmacSignature,
   dicePayout,
   hiloChoice,
@@ -31,6 +32,26 @@ let currencyCache;
 let currencyCacheExpiresAt = 0;
 let priceCache;
 let priceCacheExpiresAt = 0;
+
+const GAME_EDGE_DEFINITIONS = Object.freeze([
+  { id: "mines", name: "Mines", editable: true },
+  { id: "dice", name: "Dice", editable: true },
+  { id: "wheel", name: "Wheel", editable: true },
+  { id: "hi-lo", name: "Hi-Lo", editable: true },
+  { id: "coinflip", name: "Coinflip", editable: true },
+  { id: "plinko", name: "Plinko", editable: false, reason: "Uses a fixed, audited paytable" },
+  { id: "keno", name: "Keno", editable: false, reason: "Uses fixed risk paytables" },
+  { id: "roulette", name: "Roulette", editable: false, reason: "Determined by the live tile distribution" },
+]);
+
+async function gameHouseEdgeBasisPoints(env, gameId) {
+  const row = await env.DB.prepare("SELECT house_edge_basis_points FROM game_settings WHERE game_id = ?").bind(gameId).first();
+  return Number.isInteger(Number(row?.house_edge_basis_points)) ? Number(row.house_edge_basis_points) : 100;
+}
+
+async function gameHouseFactorMicros(env, gameId) {
+  return 1_000_000 - await gameHouseEdgeBasisPoints(env, gameId) * 100;
+}
 
 function httpError(status, message, code = "REQUEST_FAILED") {
   return Object.assign(new Error(message), { httpStatus: status, code });
@@ -754,8 +775,9 @@ async function handleDiceBet(request, env, user) {
   const targetBasisPoints = Math.round(Number(body.target) * 100);
   const direction = String(body.direction || "").toLowerCase();
   const rollBasisPoints = secureRandomInt(10_000) + 1;
+  const houseFactorMicros = await gameHouseFactorMicros(env, "dice");
   let settlement;
-  try { settlement = dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPoints); }
+  try { settlement = dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPoints, houseFactorMicros); }
   catch (error) { throw httpError(400, error.message); }
   const timestamp = now();
   const id = crypto.randomUUID();
@@ -919,8 +941,9 @@ async function handleStartWheelBet(request, env, user) {
   if (!["low", "medium", "high"].includes(risk)) throw httpError(400, "Choose a valid Wheel risk level");
   const resultIndex = secureRandomInt(segments);
   const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "wheel");
   let settlement;
-  try { settlement = wheelPayout(wagerUnits, segments, risk, resultIndex); }
+  try { settlement = wheelPayout(wagerUnits, segments, risk, resultIndex, houseFactorMicros); }
   catch (error) { throw httpError(400, error.message); }
   const timestamp = now();
   const id = crypto.randomUUID();
@@ -1139,8 +1162,9 @@ function hiloCards(row) {
 function hiloRoundResponse(row) {
   if (!row) return null;
   const currentRank = Number(row.current_rank);
-  const higher = hiloChoice(currentRank, "higher");
-  const lower = hiloChoice(currentRank, "lower");
+  const houseFactorMicros = Number(row.house_factor_micros || 990_000);
+  const higher = hiloChoice(currentRank, "higher", houseFactorMicros);
+  const lower = hiloChoice(currentRank, "lower", houseFactorMicros);
   return {
     id: row.id,
     game: "hi-lo",
@@ -1152,8 +1176,8 @@ function hiloRoundResponse(row) {
     guesses: Number(row.guesses),
     multiplier: Number(row.multiplier_micros) / 1_000_000,
     choices: {
-      higher: { chance: higher.chanceBasisPoints / 100, multiplier: higher.multiplierMicros / 1_000_000 },
-      lower: { chance: lower.chanceBasisPoints / 100, multiplier: lower.multiplierMicros / 1_000_000 },
+      higher: { chance: higher.chanceBasisPoints / 100, multiplier: higher.multiplierMicros / 1_000_000, available: higher.available },
+      lower: { chance: lower.chanceBasisPoints / 100, multiplier: lower.multiplierMicros / 1_000_000, available: lower.available },
     },
     status: row.status,
     createdAt: new Date(Number(row.created_at)).toISOString(),
@@ -1178,6 +1202,7 @@ async function handleStartHiloRound(request, env, user) {
   const active = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
   if (active) return json(request, env, 200, { round: hiloRoundResponse(active), wallet: await walletResponse(env, user.sub) });
   const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "hi-lo");
   const rank = secureRandomInt(13) + 1;
   const suit = secureRandomInt(4);
   const timestamp = now();
@@ -1189,13 +1214,13 @@ async function handleStartHiloRound(request, env, user) {
         INSERT INTO hilo_rounds(
           id, request_id, uid, currency, wager_units, payout_units,
           current_rank, current_suit, card_history, guesses, multiplier_micros,
-          status, created_at, updated_at
+          status, created_at, updated_at, house_factor_micros
         )
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1000000, 'active', ?, ?
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1000000, 'active', ?, ?, ?
         FROM crypto_balances
         WHERE uid = ? AND currency = ? AND available_units >= ?
           AND NOT EXISTS(SELECT 1 FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active')
-      `).bind(id, requestId, user.sub, asset.code, wagerUnits, wagerUnits, rank, suit, history, timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
+      `).bind(id, requestId, user.sub, asset.code, wagerUnits, wagerUnits, rank, suit, history, timestamp, timestamp, houseFactorMicros, user.sub, asset.code, wagerUnits, user.sub, asset.code),
       env.DB.prepare(`
         UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
         WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM hilo_rounds WHERE id = ?)
@@ -1234,8 +1259,10 @@ async function handleHiloGuess(request, env, user, roundIdValue) {
   const nextRank = secureRandomInt(13) + 1;
   const nextSuit = secureRandomInt(4);
   const currentRank = Number(row.current_rank);
+  const choice = hiloChoice(currentRank, direction, Number(row.house_factor_micros || 990_000));
+  if (!choice.available) throw httpError(400, "That prediction is unavailable because its payout would be below 1×");
   const won = hiloWins(currentRank, nextRank, direction);
-  const stepMicros = hiloChoice(currentRank, direction).multiplierMicros;
+  const stepMicros = choice.multiplierMicros;
   const cumulativeMicros = Number((BigInt(Number(row.multiplier_micros)) * BigInt(stepMicros)) / 1_000_000n);
   const cappedMicros = Math.min(cumulativeMicros, 1_000_000_000_000);
   const payoutUnits = won ? Number((BigInt(Number(row.wager_units)) * BigInt(cappedMicros) / 1_000_000n) > 1_000_000_000_000_000n ? 1_000_000_000_000_000n : (BigInt(Number(row.wager_units)) * BigInt(cappedMicros) / 1_000_000n)) : 0;
@@ -1280,6 +1307,147 @@ async function handleHiloCashout(request, env, user, roundIdValue) {
   return json(request, env, 200, { round: hiloRoundResponse(row), wallet: await walletResponse(env, user.sub) });
 }
 
+function coinflipHistory(row) {
+  try {
+    const parsed = JSON.parse(String(row?.flip_history || "[]"));
+    return Array.isArray(parsed) ? parsed.filter((flip) => ["heads", "tails"].includes(flip?.choice) && ["heads", "tails"].includes(flip?.result)) : [];
+  } catch { return []; }
+}
+
+function coinflipRoundResponse(row) {
+  if (!row) return null;
+  const canFlip = Number(row.streak) < 20;
+  const nextMultiplierMicros = canFlip ? coinflipMultiplierMicros(Number(row.streak) + 1, Number(row.house_factor_micros || 990_000)) : Number(row.multiplier_micros);
+  return {
+    id: row.id,
+    game: "coinflip",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    streak: Number(row.streak),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    nextMultiplier: nextMultiplierMicros / 1_000_000,
+    canFlip,
+    lastResult: row.last_result || null,
+    flips: coinflipHistory(row),
+    status: row.status,
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleGetActiveCoinflipRound(request, env, user) {
+  const currency = normalizeCurrency(new URL(request.url).searchParams.get("currency"));
+  const row = await env.DB.prepare(`
+    SELECT * FROM coinflip_rounds WHERE uid = ? AND currency = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, currency).first();
+  return json(request, env, 200, { round: coinflipRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleStartCoinflipRound(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { round: coinflipRoundResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const active = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+  if (active) return json(request, env, 200, { round: coinflipRoundResponse(active), wallet: await walletResponse(env, user.sub) });
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "coinflip");
+  const timestamp = now();
+  const id = crypto.randomUUID();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO coinflip_rounds(
+          id, request_id, uid, currency, wager_units, payout_units, streak,
+          multiplier_micros, house_factor_micros, flip_history, status, created_at, updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, 0, 0, 1000000, ?, '[]', 'active', ?, ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+          AND NOT EXISTS(SELECT 1 FROM coinflip_rounds WHERE uid = ? AND currency = ? AND status = 'active')
+      `).bind(id, requestId, user.sub, asset.code, wagerUnits, houseFactorMicros, timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM coinflip_rounds WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'coinflip_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
+        FROM coinflip_rounds WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) {
+      const current = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+      if (current) return json(request, env, 200, { round: coinflipRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+      throw httpError(409, "Your available balance is too low");
+    }
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { round: coinflipRoundResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { round: coinflipRoundResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleCoinflipGuess(request, env, user, roundIdValue) {
+  const roundId = String(roundIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{12,80}$/.test(roundId)) throw httpError(400, "Invalid Coinflip round");
+  const body = await requestJson(request);
+  const choice = String(body.choice || "").toLowerCase();
+  if (!["heads", "tails"].includes(choice)) throw httpError(400, "Choose heads or tails");
+  const row = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  if (!row) throw httpError(404, "That Coinflip round was not found");
+  if (row.status !== "active") return json(request, env, 200, { round: coinflipRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+  if (Number(row.streak) >= 20) throw httpError(409, "Cash out this maximum streak");
+  const resultSide = secureRandomInt(2) === 0 ? "heads" : "tails";
+  const won = choice === resultSide;
+  const nextStreak = won ? Number(row.streak) + 1 : Number(row.streak);
+  const multiplierMicros = won ? coinflipMultiplierMicros(nextStreak, Number(row.house_factor_micros || 990_000)) : Number(row.multiplier_micros);
+  const payoutUnits = won ? payoutFromMultiplier(Number(row.wager_units), multiplierMicros) : 0;
+  const flips = coinflipHistory(row);
+  flips.push({ choice, result: resultSide, won });
+  const timestamp = now();
+  const update = await env.DB.prepare(`
+    UPDATE coinflip_rounds SET streak = ?, multiplier_micros = ?, payout_units = ?, last_result = ?,
+      flip_history = ?, status = ?, updated_at = ?, settled_at = ?
+    WHERE id = ? AND uid = ? AND status = 'active' AND updated_at = ?
+  `).bind(nextStreak, multiplierMicros, payoutUnits, resultSide, JSON.stringify(flips), won ? "active" : "lost", timestamp, won ? null : timestamp, roundId, user.sub, Number(row.updated_at)).run();
+  const updated = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  if (Number(update.meta?.changes || 0) !== 1 && updated?.status === "active") throw httpError(409, "That coin has already been flipped");
+  return json(request, env, 200, { round: coinflipRoundResponse(updated), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleCoinflipCashout(request, env, user, roundIdValue) {
+  const roundId = String(roundIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{12,80}$/.test(roundId)) throw httpError(400, "Invalid Coinflip round");
+  let row = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  if (!row) throw httpError(404, "That Coinflip round was not found");
+  if (row.status === "cashed_out") return json(request, env, 200, { round: coinflipRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+  if (row.status !== "active" || Number(row.streak) < 1) throw httpError(409, "Win at least one flip before cashing out");
+  const timestamp = now();
+  const results = await env.DB.batch([
+    env.DB.prepare("UPDATE coinflip_rounds SET status = 'cashed_out', updated_at = ?, settled_at = ? WHERE id = ? AND uid = ? AND status = 'active'").bind(timestamp, timestamp, roundId, user.sub),
+    env.DB.prepare(`
+      UPDATE crypto_balances SET available_units = available_units + ?, updated_at = ?
+      WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM coinflip_rounds WHERE id = ? AND uid = ? AND status = 'cashed_out' AND settled_at = ?)
+    `).bind(Number(row.payout_units), timestamp, user.sub, row.currency, roundId, user.sub, timestamp),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'coinflip_payout_' || id, uid, currency, 'game_payout', payout_units, id, ?
+      FROM coinflip_rounds WHERE id = ? AND uid = ? AND status = 'cashed_out' AND settled_at = ? AND payout_units > 0
+    `).bind(timestamp, roundId, user.sub, timestamp),
+  ]);
+  if (Number(results[0]?.meta?.changes || 0) !== 1) {
+    row = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+    if (row?.status !== "cashed_out") throw httpError(409, "That Coinflip round could not be cashed out");
+  }
+  row = await env.DB.prepare("SELECT * FROM coinflip_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  return json(request, env, 200, { round: coinflipRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
 async function handleGameHistory(request, env, user) {
   const url = new URL(request.url);
   const game = String(url.searchParams.get("game") || "").toLowerCase();
@@ -1293,6 +1461,7 @@ async function handleGameHistory(request, env, user) {
     keno: { table: "keno_bets", where: "b.status = 'settled'" },
     wheel: { table: "wheel_bets", where: "b.status = 'settled'" },
     "hi-lo": { table: "hilo_rounds", where: "b.status = 'cashed_out'" },
+    coinflip: { table: "coinflip_rounds", where: "b.status = 'cashed_out'" },
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
@@ -1865,14 +2034,15 @@ async function handleStartMinesRound(request, env, user) {
   const timestamp = now();
   const id = crypto.randomUUID();
   const minePositions = shuffledTiles().slice(0, mineCount).sort((left, right) => left - right);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "mines");
   try {
     const results = await env.DB.batch([
       env.DB.prepare(`
       INSERT INTO mines_rounds(
         id, request_id, uid, currency, wager_units, mine_count, mine_positions,
-        revealed_positions, status, payout_units, multiplier_micros, settled, created_at, updated_at
+        revealed_positions, status, payout_units, multiplier_micros, settled, created_at, updated_at, house_factor_micros
       )
-      SELECT ?, ?, ?, ?, ?, ?, ?, '[]', 'active', 0, 1000000, 0, ?, ?
+      SELECT ?, ?, ?, ?, ?, ?, ?, '[]', 'active', 0, 1000000, 0, ?, ?, ?
       FROM crypto_balances
       WHERE uid = ? AND currency = ? AND available_units >= ?
         AND NOT EXISTS(
@@ -1880,7 +2050,7 @@ async function handleStartMinesRound(request, env, user) {
           WHERE uid = ? AND currency = ? AND status = 'active'
         )
     `).bind(
-      id, requestId, user.sub, asset.code, wagerUnits, mineCount, JSON.stringify(minePositions), timestamp, timestamp,
+      id, requestId, user.sub, asset.code, wagerUnits, mineCount, JSON.stringify(minePositions), timestamp, timestamp, houseFactorMicros,
       user.sub, asset.code, wagerUnits, user.sub, asset.code,
     ),
       env.DB.prepare(`
@@ -1960,8 +2130,8 @@ async function handleRevealMinesTile(request, env, user, roundId) {
   const nextRevealed = [...revealed, tile].sort((left, right) => left - right);
   let status = hitMine ? "lost" : "active";
   let multiplierMicros = hitMine
-    ? minesMultiplierMicros(Number(current.mine_count), revealed.length)
-    : minesMultiplierMicros(Number(current.mine_count), nextRevealed.length);
+    ? minesMultiplierMicros(Number(current.mine_count), revealed.length, Number(current.house_factor_micros || 990_000))
+    : minesMultiplierMicros(Number(current.mine_count), nextRevealed.length, Number(current.house_factor_micros || 990_000));
   let payoutUnits = 0;
   if (!hitMine && nextRevealed.length === 25 - Number(current.mine_count)) {
     status = "won";
@@ -1988,7 +2158,7 @@ async function handleCashoutMinesRound(request, env, user, roundId) {
   if (current.status !== "active") return json(request, env, 200, { round: minesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
   const revealed = integerArray(current.revealed_positions);
   if (!revealed.length) throw httpError(409, "Reveal at least one safe tile before cashing out");
-  const multiplierMicros = minesMultiplierMicros(Number(current.mine_count), revealed.length);
+  const multiplierMicros = minesMultiplierMicros(Number(current.mine_count), revealed.length, Number(current.house_factor_micros || 990_000));
   const payoutUnits = payoutFromMultiplier(Number(current.wager_units), multiplierMicros);
   await settleMinesRound(env, current, {
     revealedPositions: current.revealed_positions,
@@ -2381,6 +2551,48 @@ async function handleLeaderboards(request, env) {
 async function handleAdminLeaderboards(request, env, user) {
   await requireAdminSession(request, env, user);
   return handleLeaderboards(request, env);
+}
+
+async function readGameEdges(env) {
+  const result = await env.DB.prepare("SELECT game_id, house_edge_basis_points, updated_at FROM game_settings").all();
+  const settings = new Map((result.results || []).map((row) => [row.game_id, row]));
+  return GAME_EDGE_DEFINITIONS.map((definition) => {
+    const row = settings.get(definition.id);
+    return {
+      ...definition,
+      houseEdgeBasisPoints: Number(row?.house_edge_basis_points ?? 100),
+      houseEdgePercent: Number(row?.house_edge_basis_points ?? 100) / 100,
+      rtpPercent: 100 - Number(row?.house_edge_basis_points ?? 100) / 100,
+      updatedAt: row?.updated_at ? new Date(Number(row.updated_at)).toISOString() : null,
+    };
+  });
+}
+
+async function handleAdminGameEdges(request, env, user) {
+  await requireAdminSession(request, env, user);
+  return json(request, env, 200, { games: await readGameEdges(env) });
+}
+
+async function handleAdminSetGameEdge(request, env, user, gameIdValue) {
+  await requireAdminSession(request, env, user);
+  const gameId = String(gameIdValue || "").toLowerCase();
+  const definition = GAME_EDGE_DEFINITIONS.find((game) => game.id === gameId);
+  if (!definition) throw httpError(404, "That game was not found");
+  if (!definition.editable) throw httpError(409, `${definition.name} uses fixed game math and cannot be changed here`);
+  const body = await requestJson(request);
+  const houseEdgeBasisPoints = Math.round(Number(body.houseEdgePercent) * 100);
+  if (!Number.isInteger(houseEdgeBasisPoints) || houseEdgeBasisPoints < 0 || houseEdgeBasisPoints > 1000) {
+    throw httpError(400, "House edge must be between 0% and 10%");
+  }
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO game_settings(game_id, house_edge_basis_points, updated_at, updated_by)
+    VALUES(?, ?, ?, ?)
+    ON CONFLICT(game_id) DO UPDATE SET house_edge_basis_points = excluded.house_edge_basis_points,
+      updated_at = excluded.updated_at, updated_by = excluded.updated_by
+  `).bind(gameId, houseEdgeBasisPoints, timestamp, user.sub).run();
+  await writeAdminAudit(env, user, "game.house_edge.updated", gameId, JSON.stringify({ houseEdgeBasisPoints }));
+  return json(request, env, 200, { game: (await readGameEdges(env)).find((game) => game.id === gameId) });
 }
 
 async function handleAdminStartLeaderboard(request, env, user, cadence) {
@@ -2816,6 +3028,9 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
   if (request.method === "GET" && path === "/admin/country-access") return handleAdminCountryAccess(request, env, user);
   if (request.method === "GET" && path === "/admin/leaderboards") return handleAdminLeaderboards(request, env, user);
+  if (request.method === "GET" && path === "/admin/game-edges") return handleAdminGameEdges(request, env, user);
+  const gameEdgeMatch = path.match(/^\/admin\/game-edges\/([a-z0-9-]+)$/);
+  if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
   const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(daily|biweekly)\/start$/);
   if (request.method === "POST" && leaderboardStartMatch) return handleAdminStartLeaderboard(request, env, user, leaderboardStartMatch[1]);
   const countryAccessMatch = path.match(/^\/admin\/country-access\/([A-Za-z]{2})$/);
@@ -2836,6 +3051,12 @@ async function route(request, env) {
   if (request.method === "POST" && hiloGuessMatch) return handleHiloGuess(request, env, user, hiloGuessMatch[1]);
   const hiloCashoutMatch = path.match(/^\/games\/hi-lo\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
   if (request.method === "POST" && hiloCashoutMatch) return handleHiloCashout(request, env, user, hiloCashoutMatch[1]);
+  if (request.method === "GET" && path === "/games/coinflip/rounds/active") return handleGetActiveCoinflipRound(request, env, user);
+  if (request.method === "POST" && path === "/games/coinflip/rounds") return handleStartCoinflipRound(request, env, user);
+  const coinflipGuessMatch = path.match(/^\/games\/coinflip\/rounds\/([A-Za-z0-9-]+)\/guess$/);
+  if (request.method === "POST" && coinflipGuessMatch) return handleCoinflipGuess(request, env, user, coinflipGuessMatch[1]);
+  const coinflipCashoutMatch = path.match(/^\/games\/coinflip\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
+  if (request.method === "POST" && coinflipCashoutMatch) return handleCoinflipCashout(request, env, user, coinflipCashoutMatch[1]);
   if (request.method === "POST" && path === "/games/dice/bets") return handleDiceBet(request, env, user);
   if (request.method === "POST" && path === "/games/plinko/bets") return handlePlinkoBet(request, env, user);
   if (request.method === "GET" && path === "/games/wheel/bets/active") return handleGetActiveWheelBet(request, env, user);

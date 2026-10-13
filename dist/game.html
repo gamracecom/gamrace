@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=hilo-1" />
+    <link rel="stylesheet" href="styles.css?v=coinflip-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -587,6 +587,27 @@
               <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Hi-Lo results"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
             </section>
           </section>
+          <section class="coinflip-game" id="coinflip-game" hidden aria-label="Coinflip">
+            <div class="coinflip-stage">
+              <section class="coinflip-controls" aria-label="Coinflip controls">
+                <div class="coinflip-mode-tabs" role="tablist"><button class="active" type="button" data-coinflip-mode="manual">Manual</button><button type="button" data-coinflip-mode="auto">Auto</button></div>
+                <label class="coinflip-field"><span><strong>Bet Amount</strong><small data-coinflip-balance>0.00000000 COIN</small></span><span class="coinflip-input-shell"><span data-coinflip-currency>$</span><input id="coinflip-bet-amount" type="number" min="0.01" step="0.01" value="0.00" /><button type="button" data-coinflip-bet-action="half">½</button><button type="button" data-coinflip-bet-action="double">2×</button></span></label>
+                <label class="coinflip-field" data-coinflip-auto-only hidden><span><strong>Side</strong><small>Choice for every flip</small></span><select id="coinflip-auto-side"><option value="heads">Heads</option><option value="tails">Tails</option><option value="alternate">Alternate</option></select></label>
+                <label class="coinflip-field" data-coinflip-auto-only hidden><span><strong>Cash Out After</strong><small>Correct flips</small></span><select id="coinflip-auto-target"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select></label>
+                <label class="coinflip-field" data-coinflip-auto-only hidden><span><strong>Number of Bets</strong><small>1–100</small></span><input id="coinflip-auto-count" type="number" min="1" max="100" value="10" /></label>
+                <button class="coinflip-primary" id="coinflip-action" type="button" disabled>Start Round</button><p class="coinflip-message" id="coinflip-message" hidden></p>
+              </section>
+              <section class="coinflip-board">
+                <div class="game-result-strip coinflip-result-strip" data-coinflip-result-strip hidden></div>
+                <div class="coinflip-arena"><div class="coinflip-shadow"></div><div class="coinflip-coin" id="coinflip-coin"><div class="coinflip-face heads"><img src="assets/games/coinflip/helmet.png" alt="Heads helmet" /><span>HEADS</span></div><div class="coinflip-face tails"><img src="assets/games/coinflip/wheel.png" alt="Tails steering wheel" /><span>TAILS</span></div></div></div>
+                <div class="coinflip-round-copy"><span id="coinflip-status">Start a round, then choose a side</span><strong id="coinflip-multiplier">1.00×</strong></div>
+                <div class="coinflip-picks"><button class="heads" id="coinflip-heads" disabled><img src="assets/games/coinflip/helmet.png" alt="" /><span><strong>Heads</strong><small>Electric Blue</small></span><b data-coinflip-next>1.98×</b></button><button class="tails" id="coinflip-tails" disabled><img src="assets/games/coinflip/wheel.png" alt="" /><span><strong>Tails</strong><small>Violet</small></span><b data-coinflip-next>1.98×</b></button></div>
+                <button class="coinflip-cashout" id="coinflip-cashout" disabled>Cash Out</button>
+              </section>
+              <footer class="coinflip-footer"><div><button type="button" id="coinflip-turbo" aria-pressed="false">Turbo</button><button type="button" data-coinflip-favorite aria-pressed="false">Favorite</button></div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button></footer>
+            </div>
+            <section class="mines-history coinflip-history" hidden aria-labelledby="coinflip-history-heading"><div class="history-toolbar"><div class="history-tabs" role="tablist"><button class="history-tab active" id="coinflip-history-heading" data-coinflip-history-view="top">Top Wins</button><button class="history-tab" data-coinflip-history-view="lucky">Lucky Wins</button></div><label class="history-period"><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Coinflip results"><tr class="history-skeleton"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div></section>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -607,8 +628,9 @@
     <script src="roulette.js?v=slower-spins-1" defer></script>
     <script src="keno.js?v=keno-clean-1" defer></script>
     <script src="wheel.js?v=wheel-results-1" defer></script>
-    <script src="hilo.js?v=hilo-1" defer></script>
-    <script src="game-history.js?v=hilo-1" defer></script>
+    <script src="hilo.js?v=hilo-fix-1" defer></script>
+    <script src="coinflip.js?v=coinflip-1" defer></script>
+    <script src="game-history.js?v=coinflip-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

@@ -50,6 +50,7 @@ let countryAccessCache = null;
 let playersCache = [];
 let activePlayer = null;
 let leaderboardCache = null;
+let gameEdgesCache = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -324,11 +325,48 @@ async function loadView(view, force = false) {
   if (view === "players") return loadPlayers();
   if (view === "deposits") return loadDeposits();
   if (view === "withdrawals") return loadWithdrawals();
+  if (view === "games") return loadGameEdges(force);
   if (view === "promotions") return loadLeaderboards(force);
   if (view === "audit") return loadAudit();
   if (view === "risk") return loadCountryAccess(force);
   if (view === "system" || view === "integrations") return loadSystem(force);
   setLastRefresh();
+}
+
+function renderGameEdges() {
+  const container = document.querySelector("#game-edge-grid");
+  if (!container || !gameEdgesCache) return;
+  container.innerHTML = gameEdgesCache.map((game) => `
+    <article class="panel-card game-edge-card${game.editable ? "" : " is-locked"}" data-game-edge="${escapeHtml(game.id)}">
+      <div class="game-edge-title"><span>${escapeHtml(game.name.slice(0, 1))}</span><div><strong>${escapeHtml(game.name)}</strong><small>${game.editable ? "Live configurable margin" : escapeHtml(game.reason || "Fixed game math")}</small></div><b>${game.editable ? "EDITABLE" : "FIXED"}</b></div>
+      <label><span>House edge</span><span class="game-edge-input"><input type="number" min="0" max="10" step="0.01" value="${Number(game.houseEdgePercent).toFixed(2)}" ${game.editable ? "" : "disabled"} aria-label="${escapeHtml(game.name)} house edge percentage" /><i>%</i></span></label>
+      <div class="game-edge-rtp"><span>Player RTP</span><strong>${Number(game.rtpPercent).toFixed(2)}%</strong></div>
+      <button class="solid-button" type="button" ${game.editable ? "" : "disabled"}>${game.editable ? "Save edge" : "Not adjustable"}</button>
+      <p role="status"></p>
+    </article>`).join("");
+  container.querySelectorAll("[data-game-edge]").forEach((card) => {
+    const game = gameEdgesCache.find((item) => item.id === card.dataset.gameEdge);
+    const input = card.querySelector("input");
+    const rtp = card.querySelector(".game-edge-rtp strong");
+    const button = card.querySelector("button");
+    const status = card.querySelector("p");
+    input?.addEventListener("input", () => { const edge = Number(input.value); rtp.textContent = Number.isFinite(edge) ? `${Math.max(0, 100 - edge).toFixed(2)}%` : "—"; });
+    button?.addEventListener("click", async () => {
+      const edge = Number(input.value);
+      if (!Number.isFinite(edge) || edge < 0 || edge > 10) { status.textContent = "Enter a value from 0% to 10%."; return; }
+      button.disabled = true; button.textContent = "Saving…"; status.textContent = "";
+      try {
+        const result = await api(`/admin/game-edges/${encodeURIComponent(game.id)}`, { method: "POST", body: JSON.stringify({ houseEdgePercent: edge }) });
+        gameEdgesCache = gameEdgesCache.map((item) => item.id === game.id ? result.game : item);
+        renderGameEdges(); showToast(`${game.name} house edge updated`);
+      } catch (error) { status.textContent = error.message; button.disabled = false; button.textContent = "Save edge"; }
+    });
+  });
+}
+
+async function loadGameEdges(force = false) {
+  if (!gameEdgesCache || force) gameEdgesCache = (await api("/admin/game-edges")).games || [];
+  renderGameEdges(); setLastRefresh();
 }
 
 function displayCountryName(code) {

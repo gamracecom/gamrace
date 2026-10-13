@@ -6,7 +6,7 @@
   const blankState = document.querySelector("#game-blank-state");
 
   if (gameName !== "mines") {
-    if (!["dice", "plinko", "roulette", "keno", "wheel", "hi-lo"].includes(gameName)) {
+    if (!["dice", "plinko", "roulette", "keno", "wheel", "hi-lo", "coinflip"].includes(gameName)) {
       document.title = "GamRace";
       blankState.hidden = false;
     }

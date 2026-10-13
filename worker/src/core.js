@@ -112,16 +112,20 @@ export function providerAmountToUnits(value) {
   return units;
 }
 
-export function hiloChoice(rankValue, directionValue) {
+export function hiloChoice(rankValue, directionValue, houseFactorMicrosValue = 990_000) {
   const rank = Number(rankValue);
   const direction = String(directionValue || "").toLowerCase();
   if (!Number.isInteger(rank) || rank < 1 || rank > 13) throw new Error("Invalid Hi-Lo card rank");
   if (!["higher", "lower"].includes(direction)) throw new Error("Invalid Hi-Lo direction");
   const favorableCards = direction === "higher" ? 14 - rank : rank;
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  const multiplierMicros = Math.floor(houseFactorMicros * 13 / favorableCards);
   return {
     favorableCards,
     chanceBasisPoints: Math.round(favorableCards / 13 * 10_000),
-    multiplierMicros: Math.floor(990_000 * 13 / favorableCards),
+    multiplierMicros,
+    available: multiplierMicros >= 1_000_000,
   };
 }
 
@@ -134,7 +138,7 @@ export function hiloWins(currentRankValue, nextRankValue, directionValue) {
   return direction === "higher" ? nextRank >= currentRank : nextRank <= currentRank;
 }
 
-export function dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPoints) {
+export function dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPoints, houseFactorMicrosValue = 990_000) {
   const wager = Number(wagerUnits);
   const target = Number(targetBasisPoints);
   const roll = Number(rollBasisPoints);
@@ -144,7 +148,9 @@ export function dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPo
   if (!["over", "under"].includes(direction)) throw new Error("Invalid Dice direction");
   const chanceBasisPoints = direction === "over" ? 10_000 - target : target;
   const won = direction === "over" ? roll > target : roll < target;
-  const multiplierMicros = Math.floor(9_900 * 1_000_000 / chanceBasisPoints);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  const multiplierMicros = Math.floor(houseFactorMicros * 10_000 / chanceBasisPoints);
   const payoutUnits = won ? Number(BigInt(wager) * BigInt(multiplierMicros) / 1_000_000n) : 0;
   if (!Number.isSafeInteger(payoutUnits)) throw new Error("Dice payout is too large");
   return { won, chanceBasisPoints, multiplierMicros, payoutUnits };
@@ -216,13 +222,15 @@ export function wheelMultipliers(segmentsValue, riskValue) {
   return Array.from({ length: segments }, (_, index) => index === segments - 1 ? segments * 990_000 : 0);
 }
 
-export function wheelPayout(wagerUnits, segmentsValue, riskValue, resultIndexValue) {
+export function wheelPayout(wagerUnits, segmentsValue, riskValue, resultIndexValue, houseFactorMicrosValue = 990_000) {
   const wager = Number(wagerUnits);
   const resultIndex = Number(resultIndexValue);
   const multipliers = wheelMultipliers(segmentsValue, riskValue);
   if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Wheel wager");
   if (!Number.isInteger(resultIndex) || resultIndex < 0 || resultIndex >= multipliers.length) throw new Error("Invalid Wheel result");
-  const multiplierMicros = multipliers[resultIndex];
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  const multiplierMicros = Math.floor(multipliers[resultIndex] * houseFactorMicros / 990_000);
   const payoutUnits = payoutFromMultiplier(wager, multiplierMicros);
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }
@@ -324,7 +332,7 @@ export function roulettePayout(betsValue, resultValue) {
   };
 }
 
-export function minesMultiplierMicros(mineCount, revealedCount) {
+export function minesMultiplierMicros(mineCount, revealedCount, houseFactorMicrosValue = 990_000) {
   const mines = Number(mineCount);
   const revealed = Number(revealedCount);
   if (!Number.isInteger(mines) || mines < 1 || mines > 24) throw new Error("Invalid mine count");
@@ -334,7 +342,20 @@ export function minesMultiplierMicros(mineCount, revealedCount) {
   for (let pick = 0; pick < revealed; pick += 1) {
     survivalProbability *= (25 - mines - pick) / (25 - pick);
   }
-  return Math.max(1_000_000, Math.floor((0.99 / survivalProbability) * 1_000_000));
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  return Math.max(1_000_000, Math.floor(houseFactorMicros / survivalProbability));
+}
+
+export function coinflipMultiplierMicros(streakValue, houseFactorMicrosValue = 990_000) {
+  const streak = Number(streakValue);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(streak) || streak < 0 || streak > 20) throw new Error("Invalid Coinflip streak");
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  let multiplierMicros = 1_000_000n;
+  const stepMicros = BigInt(houseFactorMicros * 2);
+  for (let index = 0; index < streak; index += 1) multiplierMicros = multiplierMicros * stepMicros / 1_000_000n;
+  return Number(multiplierMicros > 1_000_000_000_000n ? 1_000_000_000_000n : multiplierMicros);
 }
 
 export function payoutFromMultiplier(wagerUnits, multiplierMicros) {

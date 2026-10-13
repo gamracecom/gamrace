@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#040d14" />
     <title>Control Room | GamRace</title>
     <link rel="icon" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="admin.css?v=leaderboard-control-1" />
+    <link rel="stylesheet" href="admin.css?v=game-edges-1" />
   </head>
   <body>
     <div class="admin-ambient" aria-hidden="true"></div>
@@ -135,7 +135,11 @@
 
           <section class="admin-view" data-admin-panel="withdrawals" hidden><div class="page-intro"><div><p class="section-kicker">FINANCE</p><h2>Withdrawal review</h2><p>Approve a request to send it through OxaPay, or reject it to release the held funds.</p></div><div class="security-note"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.8 8.3 7 10 4.2-1.7 7-5.2 7-10V6l-7-3Z"/><path d="m9.2 12 1.8 1.8 4-4"/></svg><span>Funds remain reserved until OxaPay confirms the payout</span></div></div><div class="withdrawal-queue" id="withdrawal-queue"></div></section>
 
-          <section class="admin-view" data-admin-panel="games" hidden><div class="page-intro"><div><p class="section-kicker">PRODUCT</p><h2>Game management</h2><p>One operating view for originals, slots, live games and player-versus-player releases.</p></div><button class="solid-button" type="button" disabled>Add game</button></div><div class="product-summary-grid"><article><span>12</span><strong>GamRace Originals</strong><small>1 playable · 11 staged</small></article><article><span>0</span><strong>Slots connected</strong><small>Provider catalogue pending</small></article><article><span>0</span><strong>Live tables</strong><small>Provider catalogue pending</small></article><article><span>2</span><strong>Game modes</strong><small>House · Player</small></article></div><article class="panel-card"><div class="panel-heading"><div><p class="section-kicker">CATALOGUE</p><h3>Release control</h3></div><span class="future-badge">GAME SERVICE PLANNED</span></div><div class="management-list"><div><span class="management-icon">M</span><div><strong>Mines</strong><small>GamRace Original · House</small></div><span class="status-pill live">LIVE UI</span><button disabled>Manage</button></div><div><span class="management-icon">C</span><div><strong>Crash</strong><small>GamRace Original · House</small></div><span class="status-pill staged">STAGED</span><button disabled>Manage</button></div><div><span class="management-icon">B</span><div><strong>Blackjack</strong><small>GamRace Original · House</small></div><span class="status-pill staged">STAGED</span><button disabled>Manage</button></div><div><span class="management-icon">D</span><div><strong>Dice</strong><small>GamRace Original · House</small></div><span class="status-pill staged">STAGED</span><button disabled>Manage</button></div></div></article></section>
+          <section class="admin-view" data-admin-panel="games" hidden>
+            <div class="page-intro"><div><p class="section-kicker">PRODUCT</p><h2>Game house edge</h2><p>Control the live mathematical margin for supported originals. Fixed games are locked so the interface never suggests a change that cannot affect their odds.</p></div><span class="future-badge">SERVER AUTHORITATIVE</span></div>
+            <div class="edge-summary"><strong>Changes apply to new rounds only</strong><span>Existing Mines, Hi-Lo and Coinflip rounds keep the edge they started with.</span></div>
+            <div class="game-edge-grid" id="game-edge-grid" aria-live="polite"><article class="panel-card game-edge-loading">Loading live game settings…</article></div>
+          </section>
 
           <section class="admin-view" data-admin-panel="ranks" hidden><div class="page-intro"><div><p class="section-kicker">LOYALTY</p><h2>Ranks & VIP</h2><p>The complete racing progression is visible here and ready for future admin editing.</p></div><span class="future-badge">30 LEVELS · 10 STAGES</span></div><div class="rank-admin-grid" id="rank-admin-grid"></div></section>
 
@@ -208,6 +212,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=leaderboard-control-1"></script>
+    <script type="module" src="admin.js?v=game-edges-1"></script>
   </body>
 </html>
