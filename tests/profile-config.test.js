@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PROFILE_MENU, SETTINGS_SECTIONS } from "../dist/profile-config.js";
+import { PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, SETTINGS_SECTIONS } from "../dist/profile-config.js";
 
 test("profile menu uses unique ids and keeps log out behind a divider", () => {
   assert.equal(new Set(PROFILE_MENU.map((item) => item.id)).size, PROFILE_MENU.length);
@@ -18,4 +18,8 @@ test("settings contains the complete seven-section structure", () => {
     SETTINGS_SECTIONS.map((section) => section.id),
     ["account", "verification", "security", "sessions", "notifications", "privacy", "responsible-play"],
   );
+});
+
+test("privacy settings can hide a username from public game results", () => {
+  assert.ok(PROFILE_VISIBILITY_OPTIONS.some((option) => option.id === "showUsername"));
 });

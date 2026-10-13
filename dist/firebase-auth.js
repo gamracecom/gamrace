@@ -47,7 +47,11 @@ async function syncPlayerUsername(user) {
   const response = await fetch(`${WALLET_API_BASE_URL}/profile/sync`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: "{}",
+    body: JSON.stringify({
+      profilePublic: Boolean(preferences.profilePublic),
+      showUsername: Boolean(preferences.showUsername),
+      showRank: Boolean(preferences.showRank),
+    }),
     cache: "no-store",
   });
   if (!response.ok) throw new Error("Player profile sync failed");
@@ -465,6 +469,9 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape") { 
 profileDialog.preferenceInputs.forEach((input) => input.addEventListener("change", () => {
   preferences = profileServices.preferences.save({ ...preferences, [input.dataset.preference]: input.checked });
   profileDialog.preferenceInputs.filter((candidate) => candidate.dataset.preference === input.dataset.preference).forEach((candidate) => { candidate.checked = input.checked; });
+  if (["profilePublic", "showUsername", "showRank"].includes(input.dataset.preference) && auth.currentUser) {
+    syncPlayerUsername(auth.currentUser).catch((error) => console.warn("GamRace privacy sync deferred", error));
+  }
 }));
 profileDialog.form.addEventListener("submit", async (event) => {
   event.preventDefault();

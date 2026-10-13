@@ -1684,3 +1684,151 @@ body,
 .balance-option:hover { background: #242932; }
 .wallet-asset-option.selected,
 .balance-option.selected { background: #26384b; }
+
+/* Compact live game results */
+.game-results-card {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid #292e36;
+  border-radius: 10px;
+  background: #12151a;
+  box-shadow: none;
+}
+.game-results-summary {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  border: 0;
+  background: transparent;
+  color: #f5f7f9;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.game-results-summary:hover,
+.game-results-summary:focus-visible { background: #161a20; outline: 0; }
+.game-results-title { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.game-results-title strong { font-size: 1.04rem; transition: color .16s ease; }
+.game-results-title small {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #292e36;
+  color: #c0c5ce;
+  font-size: .68rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.game-results-summary:hover .game-results-title strong,
+.game-results-summary:focus-visible .game-results-title strong,
+.game-results-card.is-expanded .game-results-title strong { color: #249cff; }
+.game-results-leader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #2e343d;
+  border-radius: 8px;
+  background: #1c2026;
+  color: #f2f4f7;
+}
+.game-results-trophy { color: #f5b942; font-size: .8rem; }
+.game-results-leader > strong { color: #f5f7f9; font-size: .8rem; white-space: nowrap; }
+.game-results-player { display: flex; align-items: center; gap: 6px; color: #bbc1ca; font-size: .75rem; white-space: nowrap; }
+.game-results-player img { width: 25px; height: 25px; object-fit: contain; }
+.game-results-chevron {
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid #8c949f;
+  border-bottom: 2px solid #8c949f;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.game-results-summary:hover .game-results-chevron,
+.game-results-summary:focus-visible .game-results-chevron { border-color: #249cff; }
+.game-results-card.is-expanded .game-results-chevron { transform: rotate(225deg) translate(-2px, -2px); }
+.game-results-content { padding: 18px 20px 20px; border-top: 1px solid #292e36; background: #0d0f13; }
+.game-results-content[hidden] { display: none; }
+.game-results-content .history-toolbar { margin-bottom: 16px; }
+.game-results-content .history-tabs { border: 1px solid #2d323b; background: #1b1f25; }
+.game-results-content .history-tab { min-height: 40px; padding: 0 17px; font-family: inherit; }
+.game-results-content .history-period select {
+  min-width: 148px;
+  height: 40px;
+  border-color: #303641;
+  background: #1b1f25;
+  color: #eef1f5;
+  font-family: inherit;
+}
+.game-results-content .history-table-wrap { overflow-x: auto; }
+.game-results-content .history-table { min-width: 720px; font-family: inherit; }
+.game-results-content .history-table th { color: #8f97a3; font-size: .7rem; font-weight: 650; }
+.game-results-content .history-table td { height: 58px; border-color: #262b32; color: #dfe3e8; }
+.game-results-content .history-table tbody tr:nth-child(even) { background: #14171c; }
+.game-results-content .history-table tbody tr.is-you { background: #15283a; }
+.history-user-cell { white-space: nowrap; }
+.history-rank-badge { width: 30px; height: 30px; margin-right: 9px; object-fit: contain; vertical-align: middle; }
+.history-user-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #f3f5f7;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.history-user-button:hover,
+.history-user-button:focus-visible { color: #249cff; outline: 0; }
+.history-rank-cell { font-weight: 800; color: #f5b942 !important; }
+.history-number-cell { font-variant-numeric: tabular-nums; }
+.history-payout-cell { color: #42d88c !important; font-weight: 750; }
+.history-empty-row td { height: 84px !important; text-align: center; color: #89919c !important; }
+
+.public-profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 5, 8, .74);
+}
+.public-profile-overlay[hidden] { display: none; }
+.public-profile-card {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 28px;
+  border: 1px solid #303641;
+  border-radius: 12px;
+  background: #15181e;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .55);
+}
+.public-profile-close { position: absolute; top: 12px; right: 12px; border: 0; background: transparent; color: #a7aeb8; font-size: 1.3rem; cursor: pointer; }
+.public-profile-badge { width: 84px; height: 84px; margin: 0 auto 12px; object-fit: contain; }
+.public-profile-card h2 { margin: 6px 0; color: #fff; }
+.public-profile-rank { margin: 0; color: #249cff; font-weight: 800; }
+.public-profile-copy { margin: 12px 0 0; color: #969eaa; font-size: .84rem; }
+
+.keno-mode-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.keno-auto-field[hidden] { display: none; }
+.keno-auto-field .keno-input-shell > input { padding-left: 16px; }
+.keno-infinite-button.active { border-color: #249cff !important; background: #197fd4 !important; color: #fff !important; }
+
+@media (max-width: 700px) {
+  .game-results-card { margin-top: 10px; border-radius: 8px; }
+  .game-results-summary { min-height: 64px; grid-template-columns: minmax(0, 1fr) auto 16px; gap: 10px; padding: 12px 14px; }
+  .game-results-title small { display: none; }
+  .game-results-leader { padding: 7px 8px; }
+  .game-results-leader > strong { font-size: .72rem; }
+  .game-results-player > span { display: none; }
+  .game-results-content { padding: 14px 12px 16px; }
+  .game-results-content .history-toolbar { align-items: stretch; gap: 10px; }
+  .game-results-content .history-tabs { flex: 1; }
+  .game-results-content .history-tab { min-width: 0; padding: 0 11px; }
+  .game-results-content .history-period select { min-width: 132px; }
+}

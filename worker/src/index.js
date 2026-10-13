@@ -581,6 +581,7 @@ async function handleGetWallet(request, env, user) {
 }
 
 async function handleSyncProfile(request, env, user) {
+  const body = await requestJson(request);
   const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   const projectId = env.FIREBASE_PROJECT_ID || "gamrace";
   const profileUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(user.sub)}`;
@@ -589,11 +590,20 @@ async function handleSyncProfile(request, env, user) {
   const profile = await response.json();
   const username = String(profile?.fields?.username?.stringValue || "").trim();
   if (!/^[A-Za-z][A-Za-z0-9_]{2,19}$/.test(username)) throw httpError(409, "Your profile username is not ready yet");
+  const profilePublic = typeof body.profilePublic === "boolean" ? Number(body.profilePublic) : null;
+  const showUsername = typeof body.showUsername === "boolean" ? Number(body.showUsername) : null;
+  const showRank = typeof body.showRank === "boolean" ? Number(body.showRank) : null;
   await env.DB.prepare(`
-    INSERT INTO player_profiles(uid, username, updated_at) VALUES(?, ?, ?)
-    ON CONFLICT(uid) DO UPDATE SET username = excluded.username, updated_at = excluded.updated_at
-  `).bind(user.sub, username, now()).run();
-  return json(request, env, 200, { profile: { username } });
+    INSERT INTO player_profiles(uid, username, profile_public, show_username, show_rank, updated_at)
+    VALUES(?, ?, COALESCE(?, 1), COALESCE(?, 1), COALESCE(?, 1), ?)
+    ON CONFLICT(uid) DO UPDATE SET
+      username = excluded.username,
+      profile_public = COALESCE(?, player_profiles.profile_public),
+      show_username = COALESCE(?, player_profiles.show_username),
+      show_rank = COALESCE(?, player_profiles.show_rank),
+      updated_at = excluded.updated_at
+  `).bind(user.sub, username, profilePublic, showUsername, showRank, now(), profilePublic, showUsername, showRank).run();
+  return json(request, env, 200, { profile: { username, profilePublic: profilePublic !== 0, showUsername: showUsername !== 0, showRank: showRank !== 0 } });
 }
 
 async function handleCurrencies(request, env) {
@@ -974,7 +984,7 @@ async function handleGameHistory(request, env, user) {
   const url = new URL(request.url);
   const game = String(url.searchParams.get("game") || "").toLowerCase();
   const view = url.searchParams.get("view") === "lucky" ? "lucky" : "top";
-  const period = ["today", "week"].includes(url.searchParams.get("period")) ? url.searchParams.get("period") : "lifetime";
+  const period = ["30d", "90d"].includes(url.searchParams.get("period")) ? url.searchParams.get("period") : "lifetime";
   const games = {
     dice: { table: "dice_bets", where: "1 = 1" },
     mines: { table: "mines_rounds", where: "b.status <> 'active'" },
@@ -984,26 +994,39 @@ async function handleGameHistory(request, env, user) {
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
-  const cutoff = period === "today" ? new Date(new Date().setUTCHours(0, 0, 0, 0)).getTime() : period === "week" ? now() - 7 * 86_400_000 : 0;
+  const cutoff = period === "30d" ? now() - 30 * 86_400_000 : period === "90d" ? now() - 90 * 86_400_000 : 0;
   const order = view === "lucky" ? "b.multiplier_micros DESC, b.payout_units DESC, b.created_at DESC" : "b.payout_units DESC, b.multiplier_micros DESC, b.created_at DESC";
   const result = await env.DB.prepare(`
     SELECT b.id, b.uid, COALESCE(NULLIF(p.username, ''), 'Player') AS username,
+      COALESCE(p.profile_public, 1) AS profile_public,
+      COALESCE(p.show_username, 1) AS show_username,
+      COALESCE(p.show_rank, 1) AS show_rank,
       b.currency, b.wager_units, b.payout_units, b.multiplier_micros, b.created_at
     FROM ${config.table} AS b
     LEFT JOIN player_profiles AS p ON p.uid = b.uid
     WHERE ${config.where} AND b.created_at >= ?
-    ORDER BY ${order} LIMIT 5
+      AND b.payout_units > b.wager_units AND b.multiplier_micros > 1000000
+    ORDER BY ${order} LIMIT 3
   `).bind(cutoff).all();
-  const entries = (result.results || []).map((row, index) => ({
-    rank: index + 1,
-    username: row.username,
-    isYou: row.uid === user.sub,
-    currency: row.currency,
-    wager: assetUnitsToString(Number(row.wager_units), false),
-    payout: assetUnitsToString(Number(row.payout_units), false),
-    multiplier: Number(row.multiplier_micros) / 1_000_000,
-    createdAt: new Date(Number(row.created_at)).toISOString(),
-  }));
+  const entries = (result.results || []).map((row, index) => {
+    const isYou = row.uid === user.sub;
+    const profileVisible = isYou || Boolean(row.profile_public);
+    const usernameVisible = isYou || (profileVisible && Boolean(row.show_username));
+    const rankVisible = isYou || (profileVisible && Boolean(row.show_rank));
+    return {
+      rank: index + 1,
+      username: usernameVisible ? row.username : "Hidden Player",
+      usernameHidden: !usernameVisible,
+      profileVisible: profileVisible && usernameVisible,
+      isYou,
+      playerRank: rankVisible ? { id: "rookie-i", label: "Rookie I", badgePath: "/ranks/rookie-i.png" } : null,
+      currency: row.currency,
+      wager: assetUnitsToString(Number(row.wager_units), false),
+      payout: assetUnitsToString(Number(row.payout_units), false),
+      multiplier: Number(row.multiplier_micros) / 1_000_000,
+      createdAt: new Date(Number(row.created_at)).toISOString(),
+    };
+  });
   return json(request, env, 200, { game, view, period, entries, refreshedAt: new Date(now()).toISOString() });
 }
 

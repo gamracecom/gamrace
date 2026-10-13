@@ -22,6 +22,7 @@ export const SETTINGS_SECTIONS = Object.freeze([
 
 export const PROFILE_VISIBILITY_OPTIONS = Object.freeze([
   Object.freeze({ id: "profilePublic", label: "Public profile", detail: "Allow other players to view your public profile." }),
+  Object.freeze({ id: "showUsername", label: "Show username", detail: "Show your username in public game results and player links." }),
   Object.freeze({ id: "showWagers", label: "Show wager amounts", detail: "Display individual wager values on your profile." }),
   Object.freeze({ id: "showProfit", label: "Show profit and loss", detail: "Display your public profit and loss totals." }),
   Object.freeze({ id: "showFavorites", label: "Show favourite games", detail: "Display games you have added to favourites." }),

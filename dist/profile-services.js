@@ -4,6 +4,7 @@ const API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
 
 const DEFAULT_PREFERENCES = Object.freeze({
   profilePublic: true,
+  showUsername: true,
   showWagers: false,
   showProfit: false,
   showFavorites: true,

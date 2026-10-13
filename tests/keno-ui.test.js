@@ -20,6 +20,12 @@ test("Keno uses a forty-number board with one to ten selectable numbers", () => 
   assert.match(script, /length: 40/);
   assert.match(script, /selectedNumbers\.size < 10/);
   assert.match(html, /id="keno-auto-pick"/);
+  assert.match(html, /data-keno-mode="manual"/);
+  assert.match(html, /data-keno-mode="auto"/);
+  assert.match(html, /id="keno-auto-round-count"/);
+  assert.match(script, /async function runAuto\(\)/);
+  assert.match(script, /autoStopRequested/);
+  assert.doesNotMatch(script, /Select numbers to see the payout table/);
 });
 
 test("Keno outcomes are generated and settled by the worker", () => {

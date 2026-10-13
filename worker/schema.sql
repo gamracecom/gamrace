@@ -198,6 +198,9 @@ CREATE TABLE IF NOT EXISTS wallet_preferences (
 CREATE TABLE IF NOT EXISTS player_profiles (
   uid TEXT PRIMARY KEY,
   username TEXT NOT NULL,
+  profile_public INTEGER NOT NULL DEFAULT 1 CHECK (profile_public IN (0, 1)),
+  show_username INTEGER NOT NULL DEFAULT 1 CHECK (show_username IN (0, 1)),
+  show_rank INTEGER NOT NULL DEFAULT 1 CHECK (show_rank IN (0, 1)),
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS player_profiles_username_idx ON player_profiles(username COLLATE NOCASE);

@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=modern-surfaces-1" />
+    <link rel="stylesheet" href="styles.css?v=compact-results-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -158,7 +158,7 @@
                   <button class="history-tab active" id="history-heading" type="button" role="tab" aria-selected="true" data-history-view="top">Top Wins</button>
                   <button class="history-tab" type="button" role="tab" aria-selected="false" data-history-view="lucky">Lucky Wins</button>
                 </div>
-                <label class="history-period"><span class="sr-only">Results period</span><select id="history-period"><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
+                <label class="history-period"><span class="sr-only">Results period</span><select id="history-period"><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label>
               </div>
               <div class="history-table-wrap">
                 <table class="history-table">
@@ -282,7 +282,7 @@
                   <button class="history-tab active" id="dice-history-heading" type="button" role="tab" aria-selected="true" data-dice-history-view="top">Top Wins</button>
                   <button class="history-tab" type="button" role="tab" aria-selected="false" data-dice-history-view="lucky">Lucky Wins</button>
                 </div>
-                <label class="history-period"><span class="sr-only">Results period</span><select id="dice-history-period"><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
+                <label class="history-period"><span class="sr-only">Results period</span><select id="dice-history-period"><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label>
               </div>
               <div class="history-table-wrap">
                 <table class="history-table">
@@ -335,7 +335,7 @@
               <footer class="plinko-stage-footer"><div></div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button></footer>
             </div>
             <section class="mines-history plinko-history" hidden aria-labelledby="plinko-history-heading">
-              <div class="history-toolbar"><div class="history-tabs" role="tablist" aria-label="Plinko results"><button class="history-tab active" id="plinko-history-heading" type="button" role="tab" aria-selected="true" data-plinko-history-view="top">Top Wins</button><button class="history-tab" type="button" role="tab" aria-selected="false" data-plinko-history-view="lucky">Lucky Wins</button></div><label class="history-period"><span class="sr-only">Results period</span><select><option>Lifetime</option><option>Today</option><option>This week</option></select></label></div>
+              <div class="history-toolbar"><div class="history-tabs" role="tablist" aria-label="Plinko results"><button class="history-tab active" id="plinko-history-heading" type="button" role="tab" aria-selected="true" data-plinko-history-view="top">Top Wins</button><button class="history-tab" type="button" role="tab" aria-selected="false" data-plinko-history-view="lucky">Lucky Wins</button></div><label class="history-period"><span class="sr-only">Results period</span><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label></div>
               <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Plinko results not available yet"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
             </section>
           </section>
@@ -398,7 +398,7 @@
                   <button class="history-tab active" id="roulette-history-heading" type="button" role="tab" aria-selected="true" data-roulette-history-view="top">Top Wins</button>
                   <button class="history-tab" type="button" role="tab" aria-selected="false" data-roulette-history-view="lucky">Lucky Wins</button>
                 </div>
-                <label class="history-period"><span class="sr-only">Results period</span><select id="roulette-history-period"><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
+                <label class="history-period"><span class="sr-only">Results period</span><select id="roulette-history-period"><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label>
               </div>
               <div class="history-table-wrap">
                 <table class="history-table">
@@ -415,7 +415,7 @@
           <section class="keno-game" id="keno-game" hidden aria-label="Keno">
             <div class="keno-stage">
               <section class="keno-controls" aria-label="Keno controls">
-                <div class="keno-mode-tabs" role="tablist" aria-label="Game mode"><button class="active" type="button" role="tab" aria-selected="true">Manual</button></div>
+                <div class="keno-mode-tabs" role="tablist" aria-label="Game mode"><button class="active" type="button" role="tab" aria-selected="true" data-keno-mode="manual">Manual</button><button type="button" role="tab" aria-selected="false" data-keno-mode="auto">Auto</button></div>
                 <div class="keno-control-stack">
                   <label class="keno-field">
                     <span><strong>Bet Amount</strong><small data-keno-balance>0.00000000 COIN</small></span>
@@ -424,6 +424,7 @@
                   <label class="keno-field"><span><strong>Auto Pick</strong><small>1–10 numbers</small></span><span class="keno-select-shell"><select id="keno-pick-count" aria-label="Number of Keno picks"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select></span></label>
                   <div class="keno-pick-actions"><button id="keno-auto-pick" type="button">Auto Pick</button><button id="keno-clear-picks" type="button">Clear</button></div>
                   <div class="keno-risk-field"><span><strong>Risk</strong><small>99% RTP</small></span><div class="keno-risk-options" role="group" aria-label="Keno risk level"><button type="button" data-keno-risk="easy">Easy</button><button class="active" type="button" data-keno-risk="medium">Medium</button><button type="button" data-keno-risk="hard">Hard</button><button type="button" data-keno-risk="extreme">Extreme</button></div></div>
+                  <label class="keno-field keno-auto-field" data-keno-auto-only hidden><span><strong>Number of Bets</strong><small>1–100 or unlimited</small></span><span class="keno-input-shell"><input id="keno-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Keno bets" /><button class="keno-infinite-button" id="keno-auto-infinite" type="button" aria-pressed="false" aria-label="Toggle unlimited automatic Keno bets">∞</button></span></label>
                   <button class="keno-primary-button" id="keno-action" type="button" disabled>Place Bet</button>
                   <p class="keno-message" id="keno-message" role="status" aria-live="polite" hidden></p>
                 </div>
@@ -431,7 +432,7 @@
               <section class="keno-board-panel" aria-label="Choose Keno numbers">
                 <div class="keno-result" id="keno-result" hidden aria-live="assertive"><strong id="keno-result-title">0 hits</strong><span id="keno-result-payout">0.00×</span></div>
                 <div class="keno-board" id="keno-board" role="group" aria-label="Keno numbers 1 to 40"></div>
-                <section class="keno-paytable" id="keno-paytable" aria-label="Keno payout multipliers"><p>Select numbers to see the payout table</p></section>
+                <section class="keno-paytable" id="keno-paytable" aria-label="Keno payout multipliers"></section>
                 <div class="keno-draw-strip" id="keno-draw-strip" aria-label="Drawn Keno numbers"></div>
               </section>
               <footer class="keno-stage-footer">
@@ -462,7 +463,7 @@
             <section class="mines-history keno-history" hidden aria-labelledby="keno-history-heading">
               <div class="history-toolbar">
                 <div class="history-tabs" role="tablist" aria-label="Keno results"><button class="history-tab active" id="keno-history-heading" type="button" role="tab" aria-selected="true" data-keno-history-view="top">Top Wins</button><button class="history-tab" type="button" role="tab" aria-selected="false" data-keno-history-view="lucky">Lucky Wins</button></div>
-                <label class="history-period"><span class="sr-only">Results period</span><select><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
+                <label class="history-period"><span class="sr-only">Results period</span><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label>
               </div>
               <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Keno results"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
             </section>
@@ -484,8 +485,8 @@
     <script src="dice.js?v=dice-rolls-1" defer></script>
     <script src="plinko.js?v=plinko-2" defer></script>
     <script src="roulette.js?v=roulette-shared-1" defer></script>
-    <script src="keno.js?v=keno-1000x-1" defer></script>
-    <script src="game-history.js?v=history-toggle-1" defer></script>
+    <script src="keno.js?v=keno-auto-1" defer></script>
+    <script src="game-history.js?v=compact-results-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

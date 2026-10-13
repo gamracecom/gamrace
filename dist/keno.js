@@ -62,6 +62,10 @@
   const drawStrip = game.querySelector("#keno-draw-strip");
   const betInput = game.querySelector("#keno-bet-amount");
   const pickCount = game.querySelector("#keno-pick-count");
+  const modeButtons = [...game.querySelectorAll("[data-keno-mode]")];
+  const autoOnlyFields = [...game.querySelectorAll("[data-keno-auto-only]")];
+  const autoRoundCount = game.querySelector("#keno-auto-round-count");
+  const autoInfiniteButton = game.querySelector("#keno-auto-infinite");
   const autoPickButton = game.querySelector("#keno-auto-pick");
   const clearButton = game.querySelector("#keno-clear-picks");
   const riskButtons = [...game.querySelectorAll("[data-keno-risk]")];
@@ -86,13 +90,18 @@
   let turbo = false;
   let muted = false;
   let risk = "medium";
+  let mode = "manual";
+  let autoRunning = false;
+  let autoStopRequested = false;
+  let autoInfinite = false;
   const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0, cumulative: [] };
   try {
     const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     turbo = Boolean(stored.turbo);
     muted = Boolean(stored.mute);
+    autoInfinite = Boolean(stored.kenoAutoInfinite);
     if (Object.hasOwn(PAYTABLES, stored.kenoRisk)) risk = stored.kenoRisk;
-  } catch { turbo = false; muted = false; risk = "medium"; }
+  } catch { turbo = false; muted = false; autoInfinite = false; risk = "medium"; }
 
   function requestId() {
     return crypto.randomUUID().replaceAll("-", "");
@@ -135,9 +144,7 @@
     const table = PAYTABLES[risk]?.[selectedCount];
     paytable.style.setProperty("--keno-picks", String(Math.max(1, selectedCount)));
     if (!table) {
-      const empty = document.createElement("p");
-      empty.textContent = "Select numbers to see the payout table";
-      paytable.replaceChildren(empty);
+      paytable.replaceChildren();
       return;
     }
     paytable.replaceChildren(...Array.from({ length: selectedCount }, (_, index) => {
@@ -156,14 +163,36 @@
   function updateAvailability() {
     const amount = cleanAmount();
     const valid = selectedNumbers.size >= 1 && selectedNumbers.size <= 10;
-    actionButton.disabled = busy || !selectedCurrency || !valid || amount < minimumWager() || amount > availableBalance;
-    autoPickButton.disabled = busy;
-    clearButton.disabled = busy || selectedNumbers.size === 0;
-    riskButtons.forEach((button) => { button.disabled = busy; });
-    board.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
-    if (!busy && amount > availableBalance && amount > 0) setMessage("Your available balance is too low for that bet.");
-    else if (!busy) setMessage();
+    const locked = busy || autoRunning;
+    actionButton.textContent = autoRunning ? (autoStopRequested ? "Stopping…" : "Stop Autobet") : mode === "auto" ? "Start Autobet" : "Place Bet";
+    actionButton.disabled = autoRunning ? false : busy || !selectedCurrency || !valid || amount < minimumWager() || amount > availableBalance;
+    betInput.disabled = locked;
+    pickCount.disabled = locked;
+    autoPickButton.disabled = locked;
+    clearButton.disabled = locked || selectedNumbers.size === 0;
+    riskButtons.forEach((button) => { button.disabled = locked; });
+    modeButtons.forEach((button) => { button.disabled = locked; });
+    board.querySelectorAll("button").forEach((button) => { button.disabled = locked; });
+    if (autoRoundCount) autoRoundCount.disabled = locked || autoInfinite;
+    if (autoInfiniteButton) autoInfiniteButton.disabled = locked;
+    if (!locked && amount > availableBalance && amount > 0) setMessage("Your available balance is too low for that bet.");
+    else if (!locked) setMessage();
     renderPaytable();
+  }
+
+  function renderMode() {
+    modeButtons.forEach((button) => {
+      const active = button.dataset.kenoMode === mode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", String(active));
+    });
+    autoOnlyFields.forEach((field) => { field.hidden = mode !== "auto"; });
+    if (autoInfiniteButton) {
+      autoInfiniteButton.classList.toggle("active", autoInfinite);
+      autoInfiniteButton.setAttribute("aria-pressed", String(autoInfinite));
+    }
+    game.dataset.kenoMode = mode;
+    updateAvailability();
   }
 
   function clearDraw() {
@@ -179,7 +208,7 @@
   }
 
   function selectNumber(number) {
-    if (busy) return;
+    if (busy || autoRunning) return;
     clearDraw();
     if (selectedNumbers.has(number)) selectedNumbers.delete(number);
     else if (selectedNumbers.size < 10) selectedNumbers.add(number);
@@ -188,7 +217,7 @@
   }
 
   function secureAutoPick() {
-    if (busy) return;
+    if (busy || autoRunning) return;
     const count = Number(pickCount.value);
     const numbers = Array.from({ length: 40 }, (_, index) => index + 1);
     for (let index = numbers.length - 1; index > 0; index -= 1) {
@@ -284,9 +313,9 @@
   }
 
   async function play(existingBet = null) {
-    if (busy || !window.gamraceWallet?.request) return;
+    if (busy || !window.gamraceWallet?.request) return false;
     const amount = cleanAmount();
-    if (!existingBet && (selectedNumbers.size < 1 || selectedNumbers.size > 10 || amount < minimumWager() || amount > availableBalance)) return;
+    if (!existingBet && (selectedNumbers.size < 1 || selectedNumbers.size > 10 || amount < minimumWager() || amount > availableBalance)) return false;
     busy = true;
     setMessage();
     updateAvailability();
@@ -314,10 +343,43 @@
       await revealDraw(bet);
       const settledBet = await settleBet(bet);
       recordBet(displayedWager, settledBet);
+      return true;
     } catch (error) {
       setMessage(error.message || "That Keno bet could not be completed. It will be restored safely.");
+      return false;
     } finally {
       busy = false;
+      updateAvailability();
+    }
+  }
+
+  async function runAuto() {
+    if (autoRunning || busy) return;
+    const amount = cleanAmount();
+    if (!selectedCurrency || selectedNumbers.size < 1 || selectedNumbers.size > 10 || amount < minimumWager() || amount > availableBalance) {
+      updateAvailability();
+      return;
+    }
+    autoRunning = true;
+    autoStopRequested = false;
+    const rounds = autoInfinite ? Number.POSITIVE_INFINITY : Math.max(1, Math.min(100, Number.parseInt(autoRoundCount?.value || "1", 10) || 1));
+    if (autoRoundCount && !autoInfinite) autoRoundCount.value = String(rounds);
+    updateAvailability();
+    try {
+      let completed = 0;
+      while (!autoStopRequested && completed < rounds) {
+        if (cleanAmount() > availableBalance) {
+          setMessage("Autobet stopped because your available balance is too low.");
+          break;
+        }
+        const completedBet = await play();
+        if (!completedBet) break;
+        completed += 1;
+        if (!autoStopRequested && completed < rounds) await delay(turbo ? 80 : 250);
+      }
+    } finally {
+      autoRunning = false;
+      autoStopRequested = false;
       updateAvailability();
     }
   }
@@ -363,6 +425,7 @@
     settings.turbo = turbo;
     settings.mute = muted;
     settings.kenoRisk = risk;
+    settings.kenoAutoInfinite = autoInfinite;
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     turboButton.setAttribute("aria-checked", String(turbo));
     muteButton.setAttribute("aria-checked", String(muted));
@@ -408,6 +471,7 @@
 
   renderBoard();
   persistSettings();
+  renderMode();
   renderFavorite();
   renderSessionStats();
   autoPickButton.addEventListener("click", secureAutoPick);
@@ -424,7 +488,29 @@
   favoriteButton.addEventListener("click", toggleFavorite);
   toolButtons.forEach((button) => button.addEventListener("click", () => toggleTool(button.dataset.kenoGameTool)));
   game.querySelectorAll("[data-close-keno-tool]").forEach((button) => button.addEventListener("click", closeTools));
-  actionButton.addEventListener("click", () => play());
+  modeButtons.forEach((button) => button.addEventListener("click", () => {
+    if (busy || autoRunning || !["manual", "auto"].includes(button.dataset.kenoMode)) return;
+    mode = button.dataset.kenoMode;
+    renderMode();
+  }));
+  autoInfiniteButton?.addEventListener("click", () => {
+    if (busy || autoRunning) return;
+    autoInfinite = !autoInfinite;
+    persistSettings();
+    renderMode();
+  });
+  autoRoundCount?.addEventListener("change", () => {
+    autoRoundCount.value = String(Math.max(1, Math.min(100, Number.parseInt(autoRoundCount.value || "1", 10) || 1)));
+  });
+  actionButton.addEventListener("click", () => {
+    if (autoRunning) {
+      autoStopRequested = true;
+      updateAvailability();
+      return;
+    }
+    if (mode === "auto") runAuto();
+    else play();
+  });
   betInput.addEventListener("input", updateAvailability);
   game.querySelectorAll("[data-keno-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(button.dataset.kenoBetAction)));
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
