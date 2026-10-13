@@ -145,12 +145,13 @@
 
       const shouldLabel = values.length <= 20 || multiplier > 2.7 || (values.length <= 30 && index % 2 === 0);
       if (shouldLabel) {
+        const labelAngle = start + arc / 2;
         context.save();
-        context.rotate(start + arc / 2);
-        context.translate(radius * .73, 0);
-        context.rotate(Math.PI / 2);
+        context.rotate(labelAngle);
+        context.translate(radius * .67, 0);
+        if (Math.cos(labelAngle) < 0) context.rotate(Math.PI);
         context.fillStyle = multiplier > 0 ? "#ffffff" : "#9ba2ad";
-        context.font = `800 ${values.length >= 30 ? 18 : 23}px Inter, Arial, sans-serif`;
+        context.font = `800 ${values.length >= 30 ? 15 : values.length >= 20 ? 18 : 22}px Inter, Arial, sans-serif`;
         context.textAlign = "center";
         context.textBaseline = "middle";
         context.fillText(multiplier === 0 ? "0×" : formatMultiplier(multiplier), 0, 0);
