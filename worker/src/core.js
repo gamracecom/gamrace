@@ -112,6 +112,28 @@ export function providerAmountToUnits(value) {
   return units;
 }
 
+export function hiloChoice(rankValue, directionValue) {
+  const rank = Number(rankValue);
+  const direction = String(directionValue || "").toLowerCase();
+  if (!Number.isInteger(rank) || rank < 1 || rank > 13) throw new Error("Invalid Hi-Lo card rank");
+  if (!["higher", "lower"].includes(direction)) throw new Error("Invalid Hi-Lo direction");
+  const favorableCards = direction === "higher" ? 14 - rank : rank;
+  return {
+    favorableCards,
+    chanceBasisPoints: Math.round(favorableCards / 13 * 10_000),
+    multiplierMicros: Math.floor(990_000 * 13 / favorableCards),
+  };
+}
+
+export function hiloWins(currentRankValue, nextRankValue, directionValue) {
+  const currentRank = Number(currentRankValue);
+  const nextRank = Number(nextRankValue);
+  const direction = String(directionValue || "").toLowerCase();
+  hiloChoice(currentRank, direction);
+  if (!Number.isInteger(nextRank) || nextRank < 1 || nextRank > 13) throw new Error("Invalid Hi-Lo card rank");
+  return direction === "higher" ? nextRank >= currentRank : nextRank <= currentRank;
+}
+
 export function dicePayout(wagerUnits, targetBasisPoints, direction, rollBasisPoints) {
   const wager = Number(wagerUnits);
   const target = Number(targetBasisPoints);

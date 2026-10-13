@@ -15,7 +15,7 @@ test("site surfaces use the neutral palette with blue primary actions and no gam
   assert.match(modern, /\.game-page,[\s\S]*background: var\(--bg\)/);
   assert.match(modern, /\.mines-board-panel,[\s\S]*background: #0f1115/);
   assert.match(modern, /\.mines-primary-button,[\s\S]*background: #168cf2/);
-  assert.match(gameHtml, /styles\.css\?v=game-polish-1/);
+  assert.match(gameHtml, /styles\.css\?v=hilo-1/);
   assert.match(indexHtml, /styles\.css\?v=compact-results-1/);
 });
 

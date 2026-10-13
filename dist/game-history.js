@@ -2,14 +2,15 @@
   "use strict";
 
   const gameName = new URLSearchParams(window.location.search).get("game")?.toLowerCase();
-  if (!["mines", "dice", "plinko", "roulette", "keno", "wheel"].includes(gameName)) return;
-  const section = document.querySelector(`.${gameName}-history`) || (gameName === "mines" ? document.querySelector(".mines-history:not(.dice-history):not(.plinko-history):not(.roulette-history):not(.keno-history):not(.wheel-history)") : null);
+  if (!["mines", "dice", "plinko", "roulette", "keno", "wheel", "hi-lo"].includes(gameName)) return;
+  const historyClass = gameName === "hi-lo" ? "hilo" : gameName;
+  const section = document.querySelector(`.${historyClass}-history`) || (gameName === "mines" ? document.querySelector(".mines-history:not(.dice-history):not(.plinko-history):not(.roulette-history):not(.keno-history):not(.wheel-history):not(.hilo-history)") : null);
   if (!section) return;
 
-  const gameLabel = `${gameName.charAt(0).toUpperCase()}${gameName.slice(1)}`;
+  const gameLabel = gameName === "hi-lo" ? "Hi-Lo" : `${gameName.charAt(0).toUpperCase()}${gameName.slice(1)}`;
   const body = section.querySelector("tbody");
   const select = section.querySelector("select");
-  const tabSelector = gameName === "mines" ? "[data-history-view]" : `[data-${gameName}-history-view]`;
+  const tabSelector = gameName === "mines" ? "[data-history-view]" : `[data-${historyClass}-history-view]`;
   const tabs = [...section.querySelectorAll(tabSelector)];
   let activeView = "top";
   let loading = false;
@@ -220,7 +221,7 @@
   }
 
   tabs.forEach((tab) => tab.addEventListener("click", () => {
-    activeView = (tab.dataset[`${gameName}HistoryView`] || tab.dataset.historyView) === "lucky" ? "lucky" : "top";
+    activeView = (tab.dataset[`${historyClass}HistoryView`] || tab.dataset.historyView) === "lucky" ? "lucky" : "top";
     tabs.forEach((item) => {
       const active = item === tab;
       item.classList.toggle("active", active);

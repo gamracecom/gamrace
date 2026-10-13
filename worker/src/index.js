@@ -2,6 +2,8 @@ import {
   assetUnitsToString,
   createRawHmacSignature,
   dicePayout,
+  hiloChoice,
+  hiloWins,
   kenoPayout,
   maskAddress,
   minesMultiplierMicros,
@@ -479,7 +481,7 @@ async function enforceCooldown(env, uid, action, seconds) {
 }
 
 async function listActivity(env, uid) {
-  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult] = await Promise.all([
+  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult, hiloResult] = await Promise.all([
     env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
            pay_currency AS currency, created_at
@@ -513,6 +515,10 @@ async function listActivity(env, uid) {
     env.DB.prepare(`
       SELECT id, currency, wager_units, payout_units, multiplier_micros, outcome, status, created_at
       FROM wheel_bets WHERE uid = ? ORDER BY created_at DESC LIMIT 50
+    `).bind(uid).all(),
+    env.DB.prepare(`
+      SELECT id, currency, wager_units, payout_units, multiplier_micros, status, created_at
+      FROM hilo_rounds WHERE uid = ? ORDER BY created_at DESC LIMIT 50
     `).bind(uid).all(),
   ]);
   const walletRows = (walletResult.results || []).map((row) => ({
@@ -589,7 +595,18 @@ async function listActivity(env, uid) {
     currency: row.currency,
     createdAt: Number(row.created_at),
   }));
-  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
+  const hiloRows = (hiloResult.results || []).map((row) => ({
+    id: row.id,
+    type: "bet",
+    game: "Hi-Lo",
+    status: row.status === "active" ? "open" : row.status === "cashed_out" ? "win" : "loss",
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
 async function handleGetWallet(request, env, user) {
@@ -1112,6 +1129,157 @@ async function handleSettleKenoBet(request, env, user, betIdValue) {
   return json(request, env, 200, { bet: kenoBetResponse(row), wallet: await walletResponse(env, user.sub) });
 }
 
+function hiloCards(row) {
+  try {
+    const parsed = JSON.parse(String(row?.card_history || "[]"));
+    return Array.isArray(parsed) ? parsed.filter((card) => Number(card?.rank) >= 1 && Number(card?.rank) <= 13 && Number(card?.suit) >= 0 && Number(card?.suit) <= 3) : [];
+  } catch { return []; }
+}
+
+function hiloRoundResponse(row) {
+  if (!row) return null;
+  const currentRank = Number(row.current_rank);
+  const higher = hiloChoice(currentRank, "higher");
+  const lower = hiloChoice(currentRank, "lower");
+  return {
+    id: row.id,
+    game: "hi-lo",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    currentCard: { rank: currentRank, suit: Number(row.current_suit) },
+    cards: hiloCards(row),
+    guesses: Number(row.guesses),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    choices: {
+      higher: { chance: higher.chanceBasisPoints / 100, multiplier: higher.multiplierMicros / 1_000_000 },
+      lower: { chance: lower.chanceBasisPoints / 100, multiplier: lower.multiplierMicros / 1_000_000 },
+    },
+    status: row.status,
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleGetActiveHiloRound(request, env, user) {
+  const currency = normalizeCurrency(new URL(request.url).searchParams.get("currency"));
+  const row = await env.DB.prepare(`
+    SELECT * FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, currency).first();
+  return json(request, env, 200, { round: hiloRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleStartHiloRound(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { round: hiloRoundResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const active = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+  if (active) return json(request, env, 200, { round: hiloRoundResponse(active), wallet: await walletResponse(env, user.sub) });
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const rank = secureRandomInt(13) + 1;
+  const suit = secureRandomInt(4);
+  const timestamp = now();
+  const id = crypto.randomUUID();
+  const history = JSON.stringify([{ rank, suit }]);
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO hilo_rounds(
+          id, request_id, uid, currency, wager_units, payout_units,
+          current_rank, current_suit, card_history, guesses, multiplier_micros,
+          status, created_at, updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1000000, 'active', ?, ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+          AND NOT EXISTS(SELECT 1 FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active')
+      `).bind(id, requestId, user.sub, asset.code, wagerUnits, wagerUnits, rank, suit, history, timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM hilo_rounds WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'hilo_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
+        FROM hilo_rounds WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) {
+      const current = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+      if (current) return json(request, env, 200, { round: hiloRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+      throw httpError(409, "Your available balance is too low");
+    }
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { round: hiloRoundResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    const current = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+    if (current) return json(request, env, 200, { round: hiloRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { round: hiloRoundResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleHiloGuess(request, env, user, roundIdValue) {
+  const roundId = String(roundIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{12,80}$/.test(roundId)) throw httpError(400, "Invalid Hi-Lo round");
+  const body = await requestJson(request);
+  const direction = String(body.direction || "").toLowerCase();
+  if (!['higher', 'lower'].includes(direction)) throw httpError(400, "Choose higher or lower");
+  const row = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  if (!row) throw httpError(404, "That Hi-Lo round was not found");
+  if (row.status !== "active") return json(request, env, 200, { round: hiloRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+  const nextRank = secureRandomInt(13) + 1;
+  const nextSuit = secureRandomInt(4);
+  const currentRank = Number(row.current_rank);
+  const won = hiloWins(currentRank, nextRank, direction);
+  const stepMicros = hiloChoice(currentRank, direction).multiplierMicros;
+  const cumulativeMicros = Number((BigInt(Number(row.multiplier_micros)) * BigInt(stepMicros)) / 1_000_000n);
+  const cappedMicros = Math.min(cumulativeMicros, 1_000_000_000_000);
+  const payoutUnits = won ? Number((BigInt(Number(row.wager_units)) * BigInt(cappedMicros) / 1_000_000n) > 1_000_000_000_000_000n ? 1_000_000_000_000_000n : (BigInt(Number(row.wager_units)) * BigInt(cappedMicros) / 1_000_000n)) : 0;
+  const cards = hiloCards(row);
+  cards.push({ rank: nextRank, suit: nextSuit, direction, won });
+  const timestamp = now();
+  const result = await env.DB.prepare(`
+    UPDATE hilo_rounds SET current_rank = ?, current_suit = ?, card_history = ?, guesses = guesses + 1,
+      multiplier_micros = ?, payout_units = ?, status = ?, updated_at = ?, settled_at = ?
+    WHERE id = ? AND uid = ? AND status = 'active' AND updated_at = ?
+  `).bind(nextRank, nextSuit, JSON.stringify(cards), won ? cappedMicros : Number(row.multiplier_micros), payoutUnits, won ? "active" : "lost", timestamp, won ? null : timestamp, roundId, user.sub, Number(row.updated_at)).run();
+  const updated = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  if (Number(result.meta?.changes || 0) !== 1 && updated?.status === "active") throw httpError(409, "That card has already been played");
+  return json(request, env, 200, { round: hiloRoundResponse(updated), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleHiloCashout(request, env, user, roundIdValue) {
+  const roundId = String(roundIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{12,80}$/.test(roundId)) throw httpError(400, "Invalid Hi-Lo round");
+  let row = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  if (!row) throw httpError(404, "That Hi-Lo round was not found");
+  if (row.status === "cashed_out") return json(request, env, 200, { round: hiloRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+  if (row.status !== "active" || Number(row.guesses) < 1) throw httpError(409, "Win at least one prediction before cashing out");
+  const timestamp = now();
+  const results = await env.DB.batch([
+    env.DB.prepare("UPDATE hilo_rounds SET status = 'cashed_out', updated_at = ?, settled_at = ? WHERE id = ? AND uid = ? AND status = 'active'").bind(timestamp, timestamp, roundId, user.sub),
+    env.DB.prepare(`
+      UPDATE crypto_balances SET available_units = available_units + ?, updated_at = ?
+      WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM hilo_rounds WHERE id = ? AND uid = ? AND status = 'cashed_out' AND settled_at = ?)
+    `).bind(Number(row.payout_units), timestamp, user.sub, row.currency, roundId, user.sub, timestamp),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'hilo_payout_' || id, uid, currency, 'game_payout', payout_units, id, ?
+      FROM hilo_rounds WHERE id = ? AND uid = ? AND status = 'cashed_out' AND settled_at = ? AND payout_units > 0
+    `).bind(timestamp, roundId, user.sub, timestamp),
+  ]);
+  if (Number(results[0]?.meta?.changes || 0) !== 1) {
+    row = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+    if (row?.status !== "cashed_out") throw httpError(409, "That Hi-Lo round could not be cashed out");
+  }
+  row = await env.DB.prepare("SELECT * FROM hilo_rounds WHERE id = ? AND uid = ?").bind(roundId, user.sub).first();
+  return json(request, env, 200, { round: hiloRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
 async function handleGameHistory(request, env, user) {
   const url = new URL(request.url);
   const game = String(url.searchParams.get("game") || "").toLowerCase();
@@ -1124,6 +1292,7 @@ async function handleGameHistory(request, env, user) {
     roulette: { table: "roulette_rounds", where: "1 = 1" },
     keno: { table: "keno_bets", where: "b.status = 'settled'" },
     wheel: { table: "wheel_bets", where: "b.status = 'settled'" },
+    "hi-lo": { table: "hilo_rounds", where: "b.status = 'cashed_out'" },
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
@@ -2661,6 +2830,12 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);
+  if (request.method === "GET" && path === "/games/hi-lo/rounds/active") return handleGetActiveHiloRound(request, env, user);
+  if (request.method === "POST" && path === "/games/hi-lo/rounds") return handleStartHiloRound(request, env, user);
+  const hiloGuessMatch = path.match(/^\/games\/hi-lo\/rounds\/([A-Za-z0-9-]+)\/guess$/);
+  if (request.method === "POST" && hiloGuessMatch) return handleHiloGuess(request, env, user, hiloGuessMatch[1]);
+  const hiloCashoutMatch = path.match(/^\/games\/hi-lo\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
+  if (request.method === "POST" && hiloCashoutMatch) return handleHiloCashout(request, env, user, hiloCashoutMatch[1]);
   if (request.method === "POST" && path === "/games/dice/bets") return handleDiceBet(request, env, user);
   if (request.method === "POST" && path === "/games/plinko/bets") return handlePlinkoBet(request, env, user);
   if (request.method === "GET" && path === "/games/wheel/bets/active") return handleGetActiveWheelBet(request, env, user);

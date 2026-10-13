@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=game-polish-1" />
+    <link rel="stylesheet" href="styles.css?v=hilo-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -524,6 +524,69 @@
               <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Wheel results"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
             </section>
           </section>
+          <section class="hilo-game" id="hilo-game" hidden aria-label="Hi-Lo">
+            <div class="hilo-stage">
+              <section class="hilo-controls" aria-label="Hi-Lo controls">
+                <div class="hilo-mode-tabs" role="tablist" aria-label="Game mode"><button class="active" type="button" role="tab" aria-selected="true" data-hilo-mode="manual">Manual</button><button type="button" role="tab" aria-selected="false" data-hilo-mode="auto">Auto</button></div>
+                <div class="hilo-control-stack">
+                  <label class="hilo-field">
+                    <span><strong>Bet Amount</strong><small data-hilo-balance>0.00000000 COIN</small></span>
+                    <span class="hilo-input-shell"><span data-hilo-currency>$</span><input id="hilo-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Hi-Lo bet amount" /><button type="button" data-hilo-bet-action="half">½</button><button type="button" data-hilo-bet-action="double">2×</button></span>
+                  </label>
+                  <label class="hilo-field hilo-auto-field" data-hilo-auto-only hidden><span><strong>Strategy</strong><small>Prediction for each card</small></span><span class="hilo-select-shell"><select id="hilo-auto-strategy"><option value="smart">Best odds</option><option value="higher">Higher or same</option><option value="lower">Lower or same</option></select></span></label>
+                  <label class="hilo-field hilo-auto-field" data-hilo-auto-only hidden><span><strong>Cash Out After</strong><small>Successful predictions</small></span><span class="hilo-select-shell"><select id="hilo-auto-target"><option value="1">1 card</option><option value="2">2 cards</option><option value="3" selected>3 cards</option><option value="4">4 cards</option><option value="5">5 cards</option><option value="6">6 cards</option><option value="8">8 cards</option><option value="10">10 cards</option></select></span></label>
+                  <label class="hilo-field hilo-auto-field" data-hilo-auto-only hidden><span><strong>Number of Bets</strong><small>1–100 or unlimited</small></span><span class="hilo-input-shell"><input id="hilo-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Hi-Lo rounds" /><button class="hilo-infinite-button" id="hilo-auto-infinite" type="button" aria-pressed="false" aria-label="Toggle unlimited automatic Hi-Lo rounds">∞</button></span></label>
+                  <button class="hilo-primary-button" id="hilo-action" type="button" disabled>Start Round</button>
+                  <p class="hilo-message" id="hilo-message" role="status" aria-live="polite" hidden></p>
+                </div>
+              </section>
+              <section class="hilo-board-panel" aria-label="Hi-Lo game board">
+                <div class="game-result-strip hilo-result-strip" data-hilo-result-strip aria-label="Last 10 Hi-Lo rounds" aria-live="polite" hidden></div>
+                <div class="hilo-card-history" id="hilo-card-history" aria-label="Cards in this round"></div>
+                <div class="hilo-table">
+                  <span class="hilo-suit-mark mark-spade" aria-hidden="true">♠</span><span class="hilo-suit-mark mark-diamond" aria-hidden="true">♦</span>
+                  <article class="hilo-card is-empty" id="hilo-current-card" aria-live="polite"><span class="hilo-card-corner"><strong>?</strong><i>♠</i></span><strong class="hilo-card-suit">♠</strong><span class="hilo-card-corner bottom"><strong>?</strong><i>♠</i></span></article>
+                </div>
+                <div class="hilo-round-meta"><span id="hilo-round-label">Start a round to reveal your first card</span><strong id="hilo-round-multiplier">1.00×</strong></div>
+                <div class="hilo-choice-grid">
+                  <button class="hilo-choice higher" id="hilo-higher" type="button" disabled><span><strong>Higher or Same</strong><small data-hilo-high-chance>—</small></span><b data-hilo-high-multiplier>—</b></button>
+                  <button class="hilo-choice lower" id="hilo-lower" type="button" disabled><span><strong>Lower or Same</strong><small data-hilo-low-chance>—</small></span><b data-hilo-low-multiplier>—</b></button>
+                </div>
+                <button class="hilo-cashout" id="hilo-cashout" type="button" disabled>Cash Out</button>
+              </section>
+              <footer class="hilo-stage-footer">
+                <div class="game-tools" data-hilo-game-tools aria-label="Game tools">
+                  <button class="game-tool-button" type="button" data-hilo-game-tool="settings" aria-label="Game settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-hilo-game-favorite="hi-lo" aria-label="Add Hi-Lo to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-hilo-game-tool="stats" aria-label="Session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-hilo-game-tool="info" aria-label="Game information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
+                  <section class="game-tool-panel settings-panel" data-hilo-game-tool-panel="settings" aria-label="Hi-Lo settings" hidden>
+                    <header><div><strong>Game settings</strong><span>Choose how Hi-Lo plays</span></div><button type="button" data-close-hilo-tool aria-label="Close settings">×</button></header>
+                    <button class="game-setting-row" id="hilo-turbo-toggle" type="button" role="switch" aria-checked="false"><span><strong>Turbo mode</strong><small>Deal cards with a shorter animation</small></span><i aria-hidden="true"></i></button>
+                    <button class="game-setting-row" id="hilo-mute-toggle" type="button" role="switch" aria-checked="false"><span><strong>Mute</strong><small>Turn off game sounds</small></span><i aria-hidden="true"></i></button>
+                  </section>
+                  <section class="game-tool-panel stats-panel" data-hilo-game-tool-panel="stats" aria-label="Hi-Lo session statistics" hidden>
+                    <header><div><strong>Session statistics</strong><span>Resets when this page closes</span></div><button type="button" data-close-hilo-tool aria-label="Close statistics">×</button></header>
+                    <div class="game-stats-grid"><article><span>Profit</span><strong data-hilo-stat="profit">0.00</strong></article><article><span>Wins</span><strong data-hilo-stat="wins">0</strong></article><article><span>Wagered</span><strong data-hilo-stat="wagered">0.00</strong></article><article><span>Losses</span><strong data-hilo-stat="losses">0</strong></article></div>
+                    <div class="game-stats-chart" aria-label="Cumulative Hi-Lo profit chart"><div><span>Round performance</span><small data-hilo-chart-label>No completed rounds yet</small></div><svg viewBox="0 0 320 116" role="img" aria-label="Cumulative profit over completed Hi-Lo rounds" preserveAspectRatio="none"><line x1="0" y1="58" x2="320" y2="58" data-hilo-chart-zero></line><path d="M0 58 L320 58" data-hilo-chart-area></path><polyline points="0,58 320,58" data-hilo-chart-line></polyline></svg></div>
+                  </section>
+                  <section class="game-tool-panel info-panel" data-hilo-game-tool-panel="info" aria-label="Hi-Lo information" hidden>
+                    <header><div><strong>Hi-Lo</strong><span>Game information</span></div><button type="button" data-close-hilo-tool aria-label="Close game information">×</button></header>
+                    <p>Predict whether the next card will be higher or lower. Equal cards count as a win on either choice. Cash out after any correct prediction.</p>
+                    <dl><div><dt>Card order</dt><dd>Ace to King</dd></div><div><dt>Minimum bet</dt><dd>0.01</dd></div><div><dt>Return to player</dt><dd>99%</dd></div><div><dt>Draws</dt><dd>With replacement</dd></div></dl>
+                  </section>
+                </div>
+                <span>GamRace</span><button class="fairness-label" type="button">Fair Play</button>
+              </footer>
+            </div>
+            <section class="mines-history hilo-history" hidden aria-labelledby="hilo-history-heading">
+              <div class="history-toolbar">
+                <div class="history-tabs" role="tablist" aria-label="Hi-Lo results"><button class="history-tab active" id="hilo-history-heading" type="button" role="tab" aria-selected="true" data-hilo-history-view="top">Top Wins</button><button class="history-tab" type="button" role="tab" aria-selected="false" data-hilo-history-view="lucky">Lucky Wins</button></div>
+                <label class="history-period"><span class="sr-only">Results period</span><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label>
+              </div>
+              <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Hi-Lo results"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
+            </section>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -544,7 +607,8 @@
     <script src="roulette.js?v=slower-spins-1" defer></script>
     <script src="keno.js?v=keno-clean-1" defer></script>
     <script src="wheel.js?v=wheel-results-1" defer></script>
-    <script src="game-history.js?v=wheel-1" defer></script>
+    <script src="hilo.js?v=hilo-1" defer></script>
+    <script src="game-history.js?v=hilo-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

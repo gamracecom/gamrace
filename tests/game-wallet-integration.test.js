@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [gameHtml, styles, wallet, dice, mines, plinko, roulette, wheel, worker, migration, plinkoMigration, rouletteMigration, rouletteLiveMigration, rouletteSharedMigration, wheelMigration] = await Promise.all([
+const [gameHtml, styles, wallet, dice, mines, plinko, roulette, wheel, hilo, worker, migration, plinkoMigration, rouletteMigration, rouletteLiveMigration, rouletteSharedMigration, wheelMigration, hiloMigration] = await Promise.all([
   read("../dist/game.html"),
   read("../dist/styles.css"),
   read("../dist/wallet.js"),
@@ -12,6 +12,7 @@ const [gameHtml, styles, wallet, dice, mines, plinko, roulette, wheel, worker, m
   read("../dist/plinko.js"),
   read("../dist/roulette.js"),
   read("../dist/wheel.js"),
+  read("../dist/hilo.js"),
   read("../worker/src/index.js"),
   read("../worker/migrations/0005_game_ledger.sql"),
   read("../worker/migrations/0007_plinko_bets.sql"),
@@ -19,6 +20,7 @@ const [gameHtml, styles, wallet, dice, mines, plinko, roulette, wheel, worker, m
   read("../worker/migrations/0010_roulette_live_rounds.sql"),
   read("../worker/migrations/0013_shared_roulette_rounds.sql"),
   read("../worker/migrations/0015_wheel_bets.sql"),
+  read("../worker/migrations/0016_hilo_rounds.sql"),
 ]);
 
 test("game outcomes are settled against the authenticated wallet", () => {
@@ -29,6 +31,8 @@ test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(worker, /GET" && path === "\/games\/roulette\/live"/);
   assert.match(worker, /POST" && path === "\/games\/wheel\/bets"/);
   assert.match(worker, /GET" && path === "\/games\/wheel\/bets\/active"/);
+  assert.match(worker, /POST" && path === "\/games\/hi-lo\/rounds"/);
+  assert.match(worker, /GET" && path === "\/games\/hi-lo\/rounds\/active"/);
   assert.match(worker, /handleRevealMinesTile/);
   assert.match(worker, /handleCashoutMinesRound/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS dice_bets/);
@@ -39,6 +43,7 @@ test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(rouletteLiveMigration, /CREATE TABLE IF NOT EXISTS roulette_wagers/);
   assert.match(rouletteSharedMigration, /CREATE TABLE IF NOT EXISTS roulette_live_rounds/);
   assert.match(wheelMigration, /CREATE TABLE IF NOT EXISTS wheel_bets/);
+  assert.match(hiloMigration, /CREATE TABLE IF NOT EXISTS hilo_rounds/);
   assert.match(migration, /settled INTEGER NOT NULL DEFAULT 0/);
   assert.match(worker, /env\.DB\.batch/);
   assert.match(worker, /available_units >= \?/);
@@ -47,6 +52,7 @@ test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(plinko, /gamraceWallet\.applyGameResult/);
   assert.match(roulette, /gamraceWallet\.applyGameResult/);
   assert.match(wheel, /gamraceWallet\.applyGameResult/);
+  assert.match(hilo, /gamraceWallet\.applyGameResult/);
   assert.match(wallet, /applyGameResult/);
 });
 
@@ -90,6 +96,7 @@ test("visible tick glyphs are absent from the site UI", async () => {
     "../dist/plinko.js",
     "../dist/roulette.js",
     "../dist/wheel.js",
+    "../dist/hilo.js",
   ].map(read));
   for (const source of sources) assert.doesNotMatch(source, /[✓✔☑]/u);
 });
