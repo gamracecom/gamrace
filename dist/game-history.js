@@ -69,7 +69,8 @@
 
   function formatAmount(value, currency) {
     const amount = Number(value) || 0;
-    return `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${String(currency || "").toUpperCase()}`;
+    const symbol = String(currency || "").split("_")[0].toUpperCase();
+    return `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${symbol}`;
   }
 
   function formatMultiplier(value) {
