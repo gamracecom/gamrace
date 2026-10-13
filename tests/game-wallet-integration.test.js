@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [gameHtml, styles, wallet, dice, mines, plinko, roulette, worker, migration, plinkoMigration, rouletteMigration] = await Promise.all([
+const [gameHtml, styles, wallet, dice, mines, plinko, roulette, worker, migration, plinkoMigration, rouletteMigration, rouletteLiveMigration] = await Promise.all([
   read("../dist/game.html"),
   read("../dist/styles.css"),
   read("../dist/wallet.js"),
@@ -15,19 +15,23 @@ const [gameHtml, styles, wallet, dice, mines, plinko, roulette, worker, migratio
   read("../worker/migrations/0005_game_ledger.sql"),
   read("../worker/migrations/0007_plinko_bets.sql"),
   read("../worker/migrations/0009_roulette_rounds.sql"),
+  read("../worker/migrations/0010_roulette_live_rounds.sql"),
 ]);
 
 test("game outcomes are settled against the authenticated wallet", () => {
   assert.match(worker, /POST" && path === "\/games\/dice\/bets"/);
   assert.match(worker, /POST" && path === "\/games\/mines\/rounds"/);
   assert.match(worker, /POST" && path === "\/games\/plinko\/bets"/);
-  assert.match(worker, /POST" && path === "\/games\/roulette\/bets"/);
+  assert.match(worker, /POST" && path === "\/games\/roulette\/wagers"/);
+  assert.match(worker, /rouletteSettleMatch/);
   assert.match(worker, /handleRevealMinesTile/);
   assert.match(worker, /handleCashoutMinesRound/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS dice_bets/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS mines_rounds/);
   assert.match(plinkoMigration, /CREATE TABLE IF NOT EXISTS plinko_bets/);
   assert.match(rouletteMigration, /CREATE TABLE IF NOT EXISTS roulette_rounds/);
+  assert.match(rouletteLiveMigration, /CREATE TABLE IF NOT EXISTS roulette_spins/);
+  assert.match(rouletteLiveMigration, /CREATE TABLE IF NOT EXISTS roulette_wagers/);
   assert.match(migration, /settled INTEGER NOT NULL DEFAULT 0/);
   assert.match(worker, /env\.DB\.batch/);
   assert.match(worker, /available_units >= \?/);

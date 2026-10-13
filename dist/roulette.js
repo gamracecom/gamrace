@@ -17,9 +17,7 @@
   const progress = game.querySelector("#roulette-progress");
   const recent = game.querySelector("#roulette-recent-results");
   const betInput = game.querySelector("#roulette-bet-amount");
-  const balanceLabel = game.querySelector("[data-roulette-balance]");
   const message = game.querySelector("#roulette-message");
-  const clearButton = game.querySelector("#roulette-clear");
   const optionButtons = [...game.querySelectorAll("[data-roulette-option]")];
   const countFields = Object.fromEntries(["blue", "cyan", "purple", "gold"].map((key) => [key, game.querySelector(`#roulette-${key}-count`)]));
 
@@ -34,20 +32,31 @@
     "purple", "gold", "purple",
     "cyan", "blue", "cyan", "blue", "cyan", "blue", "cyan",
   ]);
-  const ROUND_LENGTH_MS = 8000;
-  const queuedBets = { blue: 0, cyan: 0, purple: 0, gold: 0 };
+  const ROUND_LENGTH_MS = 12000;
+  const displayedStakes = { blue: 0, cyan: 0, purple: 0, gold: 0 };
 
   let selectedCurrency = "";
   let selectedSymbol = "COIN";
   let displayFiat = true;
   let availableBalance = 0;
+  let roundId = "";
+  let roundClosesAt = 0;
+  let roundCurrency = "";
+  let twoXSelection = null;
   let settling = false;
-  let roundStartedAt = 0;
+  let placingBet = false;
   let countdownFrame = 0;
   let recentLoaded = false;
+  let recoveryAttempted = false;
+  let recoveredAssetStakes = false;
+
+  function requestId() {
+    return crypto.randomUUID().replaceAll("-", "");
+  }
 
   function iconMarkup(outcome) {
-    return `<img class="roulette-tile-icon" src="assets/icons/roulette/${outcome === "blue" ? "blue-2x" : outcome === "cyan" ? "cyan-2x" : outcome === "purple" ? "purple-7x" : "gold-14x"}.png" alt="" aria-hidden="true" />`;
+    const name = outcome === "blue" ? "blue-2x" : outcome === "cyan" ? "cyan-2x" : outcome === "purple" ? "purple-7x" : "gold-14x";
+    return `<img class="roulette-tile-icon" src="assets/icons/roulette/${name}.png" alt="" aria-hidden="true" />`;
   }
 
   function tile(outcome, compact = false) {
@@ -59,7 +68,7 @@
   }
 
   function renderIdleTrack() {
-    track.classList.remove("is-spinning");
+    track.classList.remove("is-spinning", "is-centering");
     track.style.transform = "translateX(-46px)";
     track.replaceChildren(...Array.from({ length: 35 }, (_, index) => tile(TRACK_PATTERN[index % TRACK_PATTERN.length])));
   }
@@ -68,33 +77,34 @@
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
   }
 
-  async function spinToOutcome(outcome) {
-    const baseIndex = 42;
-    const items = Array.from({ length: 64 }, (_, index) => TRACK_PATTERN[index % TRACK_PATTERN.length]);
-    const matchingOffset = TRACK_PATTERN.indexOf(outcome);
-    const finalIndex = baseIndex + ((matchingOffset - (baseIndex % TRACK_PATTERN.length) + TRACK_PATTERN.length) % TRACK_PATTERN.length);
-    track.classList.remove("is-spinning");
+  async function spinToOutcome(outcome, landingBasisPoints = 0) {
+    const items = Array.from({ length: 72 }, (_, index) => TRACK_PATTERN[index % TRACK_PATTERN.length]);
+    const matching = items.map((item, index) => item === outcome ? index : -1).filter((index) => index >= 42);
+    const finalIndex = matching[Math.abs(Number(landingBasisPoints) || 0) % Math.min(matching.length, 6)];
+    track.classList.remove("is-spinning", "is-centering");
     track.replaceChildren(...items.map((item) => tile(item)));
     const firstTile = track.firstElementChild;
     const tileWidth = firstTile.getBoundingClientRect().width;
     const gap = Number.parseFloat(getComputedStyle(track).columnGap) || 0;
     const step = tileWidth + gap;
-    const finish = viewport.clientWidth / 2 - (finalIndex * step + tileWidth / 2);
-    track.style.transform = `translateX(${finish + step * 23}px)`;
+    const centre = viewport.clientWidth / 2 - (finalIndex * step + tileWidth / 2);
+    const landed = centre - (Math.max(-3200, Math.min(3200, Number(landingBasisPoints) || 0)) / 10000) * tileWidth;
+    track.style.transform = `translateX(${landed + step * 24}px)`;
     void track.offsetWidth;
     track.classList.add("is-spinning");
-    requestAnimationFrame(() => { track.style.transform = `translateX(${finish}px)`; });
-    await delay(window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 80 : 3520);
+    requestAnimationFrame(() => { track.style.transform = `translateX(${landed}px)`; });
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    await delay(reducedMotion ? 80 : 3520);
     track.classList.remove("is-spinning");
+    track.classList.add("is-centering");
+    track.style.transform = `translateX(${centre}px)`;
+    await delay(reducedMotion ? 40 : 360);
+    track.classList.remove("is-centering");
   }
 
   function cleanAmount() {
     const value = Number.parseFloat(betInput.value);
     return Number.isFinite(value) ? Math.max(0, Math.round(value * 100000000) / 100000000) : 0;
-  }
-
-  function queuedTotal() {
-    return Object.values(queuedBets).reduce((total, value) => total + value, 0);
   }
 
   function minimumWager() {
@@ -107,25 +117,36 @@
     return `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${selectedSymbol}`;
   }
 
+  function formatStake(value) {
+    if (recoveredAssetStakes && displayFiat) return `${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${selectedSymbol}`;
+    return formatAmount(value);
+  }
+
   function setMessage(text = "") {
     message.textContent = text;
     message.hidden = !text;
   }
 
+  function hasStakes() {
+    return Object.values(displayedStakes).some((value) => value > 0);
+  }
+
   function updateAvailability() {
     const amount = cleanAmount();
-    const remaining = Math.max(0, availableBalance - queuedTotal());
-    balanceLabel.textContent = `${formatAmount(remaining)} available`;
+    const currencyChanged = hasStakes() && roundCurrency && selectedCurrency !== roundCurrency;
     optionButtons.forEach((button) => {
-      button.disabled = settling || !selectedCurrency || amount < minimumWager() || amount > remaining;
+      const outcome = button.dataset.rouletteOption;
+      const oppositeTwoX = (outcome === "blue" || outcome === "cyan") && twoXSelection && twoXSelection !== outcome;
+      button.disabled = settling || placingBet || !roundId || !selectedCurrency || currencyChanged || oppositeTwoX || amount < minimumWager() || amount > availableBalance;
+      button.closest(".roulette-option")?.classList.toggle("is-locked", Boolean(oppositeTwoX));
     });
-    clearButton.disabled = settling || queuedTotal() <= 0;
-    Object.entries(queuedBets).forEach(([key, value]) => {
+    Object.entries(displayedStakes).forEach(([key, value]) => {
       const field = game.querySelector(`[data-roulette-stake="${key}"]`);
-      if (field) field.textContent = formatAmount(value);
+      if (field) field.textContent = formatStake(value);
     });
-    if (amount > remaining && amount > 0 && !settling) setMessage(`Only ${formatAmount(remaining)} is available for this round.`);
-    else if (!settling) setMessage();
+    if (amount > availableBalance && amount > 0 && !settling) setMessage("Your available balance is too low for that bet.");
+    else if (currencyChanged && !settling) setMessage(`This spin is using ${roundCurrency}. Switch back to place another bet.`);
+    else if (!settling && !placingBet) setMessage();
   }
 
   function applyWalletSelection(detail) {
@@ -139,13 +160,13 @@
     game.querySelectorAll("[data-roulette-currency]").forEach((field) => { field.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
     updateAvailability();
     if (!recentLoaded) loadRecent();
+    if (!recoveryAttempted) restoreActiveRound();
   }
 
   function adjustBet(action) {
     const amount = cleanAmount();
-    const remaining = Math.max(0, availableBalance - queuedTotal());
-    let next = action === "half" ? amount / 2 : action === "double" ? amount * 2 : remaining;
-    next = Math.min(remaining, next);
+    let next = action === "half" ? amount / 2 : action === "double" ? amount * 2 : availableBalance;
+    next = Math.min(availableBalance, next);
     betInput.value = next.toFixed(displayFiat ? 2 : 8);
     updateAvailability();
   }
@@ -171,14 +192,10 @@
   function stopCountdown() {
     if (countdownFrame) cancelAnimationFrame(countdownFrame);
     countdownFrame = 0;
-    roundStartedAt = 0;
-    progress.style.width = "0";
   }
 
-  function countdownTick(timestamp) {
-    if (!roundStartedAt) roundStartedAt = timestamp;
-    const elapsed = timestamp - roundStartedAt;
-    const remaining = Math.max(0, ROUND_LENGTH_MS - elapsed);
+  function countdownTick() {
+    const remaining = Math.max(0, roundClosesAt - Date.now());
     status.innerHTML = `Rolling in <strong>${(remaining / 1000).toFixed(2)}</strong>`;
     progress.style.width = `${Math.max(0, Math.min(100, (remaining / ROUND_LENGTH_MS) * 100))}%`;
     if (remaining <= 0) {
@@ -190,76 +207,138 @@
   }
 
   function startCountdown() {
-    if (countdownFrame || settling) return;
-    roundStartedAt = 0;
+    stopCountdown();
     countdownFrame = requestAnimationFrame(countdownTick);
   }
 
-  function queueBet(outcome) {
-    const amount = cleanAmount();
-    const remaining = availableBalance - queuedTotal();
-    if (settling || !OUTCOMES[outcome] || amount < minimumWager() || amount > remaining) return;
-    if (!selectedCurrency || !window.gamraceWallet?.request) {
-      setMessage("Sign in and wait for your wallet to load before betting.");
-      return;
-    }
-    queuedBets[outcome] = Math.round((queuedBets[outcome] + amount) * 100000000) / 100000000;
+  function resetRoundStakes() {
+    Object.keys(displayedStakes).forEach((key) => { displayedStakes[key] = 0; });
+    twoXSelection = null;
+    recoveredAssetStakes = false;
+  }
+
+  function startNewRound() {
+    settling = false;
+    roundId = requestId();
+    roundClosesAt = Date.now() + ROUND_LENGTH_MS;
+    roundCurrency = selectedCurrency;
+    resetRoundStakes();
+    progress.style.width = "100%";
     updateAvailability();
     startCountdown();
   }
 
-  function clearBets() {
-    if (settling) return;
-    Object.keys(queuedBets).forEach((key) => { queuedBets[key] = 0; });
-    stopCountdown();
-    status.textContent = "Place a bet to start the round";
+  async function restoreActiveRound() {
+    recoveryAttempted = true;
+    if (!selectedCurrency || !window.gamraceWallet?.request) return;
+    placingBet = true;
     updateAvailability();
-  }
-
-  async function settleRound() {
-    if (settling || queuedTotal() <= 0) return;
-    settling = true;
-    status.textContent = "Bets closed";
-    updateAvailability();
-    const submittedBets = Object.fromEntries(Object.entries(queuedBets)
-      .filter(([, value]) => value > 0)
-      .map(([key, value]) => [key, value.toFixed(displayFiat ? 2 : 8)]));
     try {
-      const response = await window.gamraceWallet.request("/games/roulette/bets", {
-        method: "POST",
-        body: JSON.stringify({
-          requestId: crypto.randomUUID().replaceAll("-", ""),
-          currency: selectedCurrency,
-          bets: submittedBets,
-          displayFiat,
-        }),
-      });
-      status.textContent = "Rolling…";
-      await spinToOutcome(response.bet.result);
-      window.gamraceWallet.applyGameResult(response);
-      renderRecent(response.recent);
-      const won = response.bet.payout !== "0.00000000";
-      status.innerHTML = won
-        ? `<strong>${OUTCOMES[response.bet.result].label} wins · ${OUTCOMES[response.bet.result].multiplier}×</strong>`
-        : `${OUTCOMES[response.bet.result].label} landed · No winning bet`;
-      Object.keys(queuedBets).forEach((key) => { queuedBets[key] = 0; });
+      const response = await window.gamraceWallet.request(`/games/roulette/rounds/active?currency=${encodeURIComponent(selectedCurrency)}`);
+      if (response.round) {
+        stopCountdown();
+        roundId = response.round.id;
+        roundClosesAt = Number(response.round.closesAtMs);
+        roundCurrency = response.round.currency;
+        twoXSelection = response.round.twoXSelection;
+        Object.keys(displayedStakes).forEach((key) => { displayedStakes[key] = Number(response.round.bets?.[key] || 0); });
+        recoveredAssetStakes = displayFiat && hasStakes();
+      }
     } catch (error) {
-      setMessage(error.message || "The Roulette round could not be completed.");
-      status.textContent = "Round cancelled — your balance was not charged";
+      setMessage(error.message || "Your previous Roulette spin could not be restored.");
     } finally {
-      settling = false;
-      progress.style.width = "0";
+      placingBet = false;
+      if (!roundId || Number.isNaN(roundClosesAt)) startNewRound();
+      else if (roundClosesAt <= Date.now()) settleRound();
+      else startCountdown();
       updateAvailability();
     }
   }
 
-  optionButtons.forEach((button) => button.addEventListener("click", () => queueBet(button.dataset.rouletteOption)));
+  async function placeWager(outcome) {
+    const amount = cleanAmount();
+    if (settling || placingBet || !OUTCOMES[outcome] || amount < minimumWager() || amount > availableBalance) return;
+    if ((outcome === "blue" || outcome === "cyan") && twoXSelection && twoXSelection !== outcome) return;
+    if (!selectedCurrency || !window.gamraceWallet?.request) {
+      setMessage("Sign in and wait for your wallet to load before betting.");
+      return;
+    }
+    placingBet = true;
+    setMessage();
+    updateAvailability();
+    try {
+      const response = await window.gamraceWallet.request("/games/roulette/wagers", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId: requestId(),
+          roundId,
+          closesAt: roundClosesAt,
+          currency: selectedCurrency,
+          selection: outcome,
+          wager: amount.toFixed(displayFiat ? 2 : 8),
+          displayFiat,
+        }),
+      });
+      roundCurrency = response.round.currency;
+      twoXSelection = response.round.twoXSelection;
+      displayedStakes[outcome] = Math.round((displayedStakes[outcome] + amount) * 100000000) / 100000000;
+      recoveredAssetStakes = false;
+      window.gamraceWallet.applyGameResult(response);
+    } catch (error) {
+      setMessage(error.message || "That Roulette bet could not be placed.");
+    } finally {
+      placingBet = false;
+      updateAvailability();
+    }
+  }
+
+  async function settleRound() {
+    if (settling || !roundId) return;
+    if (!selectedCurrency || !window.gamraceWallet?.request) {
+      settling = true;
+      status.textContent = "Rolling…";
+      progress.style.width = "0";
+      updateAvailability();
+      const previewOutcome = TRACK_PATTERN[Math.floor(Date.now() / ROUND_LENGTH_MS) % TRACK_PATTERN.length];
+      await spinToOutcome(previewOutcome, 0);
+      startNewRound();
+      return;
+    }
+    settling = true;
+    status.textContent = "Rolling…";
+    progress.style.width = "0";
+    updateAvailability();
+    try {
+      const response = await window.gamraceWallet.request(`/games/roulette/rounds/${encodeURIComponent(roundId)}/settle`, {
+        method: "POST",
+        body: JSON.stringify({ currency: roundCurrency || selectedCurrency, closesAt: roundClosesAt }),
+      });
+      await spinToOutcome(response.round.result, response.round.landingBasisPoints);
+      window.gamraceWallet.applyGameResult(response);
+      renderRecent(response.recent);
+      startNewRound();
+    } catch (error) {
+      settling = false;
+      setMessage(error.message || "The Roulette spin could not be completed. Retrying…");
+      updateAvailability();
+      window.setTimeout(settleRound, 1000);
+    }
+  }
+
+  optionButtons.forEach((button) => button.addEventListener("click", () => placeWager(button.dataset.rouletteOption)));
   game.querySelectorAll("[data-roulette-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(button.dataset.rouletteBetAction)));
+  game.querySelectorAll("[data-roulette-history-view]").forEach((button) => button.addEventListener("click", () => {
+    game.querySelectorAll("[data-roulette-history-view]").forEach((tab) => {
+      const active = tab === button;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+  }));
   betInput.addEventListener("input", updateAvailability);
-  clearButton.addEventListener("click", clearBets);
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
 
   renderIdleTrack();
+  startNewRound();
   updateAvailability();
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
 })();

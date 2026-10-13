@@ -1145,6 +1145,7 @@ body.modal-open { overflow: hidden; }
 .roulette-track-viewport { position: relative; min-height: 118px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
 .roulette-track { height: 106px; display: flex; align-items: center; gap: 8px; width: max-content; transform: translateX(0); will-change: transform; }
 .roulette-track.is-spinning { transition: transform 3.4s cubic-bezier(.1, .7, .08, 1); }
+.roulette-track.is-centering { transition: transform .32s cubic-bezier(.22, .8, .3, 1); }
 .roulette-track-tile { width: 86px; height: 86px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: #fff; }
 .roulette-tile-icon,
 .roulette-lane-icon { width: 58%; height: 58%; display: block; object-fit: contain; }
@@ -1170,7 +1171,7 @@ body.modal-open { overflow: hidden; }
 .roulette-recent > div { min-width: 0; display: flex; gap: 5px; margin-left: auto; overflow: hidden; }
 .roulette-recent-tile { width: 27px; height: 27px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 6px; }
 .roulette-betting-panel { padding: 22px clamp(16px, 2.6vw, 30px) 28px; border-top: 1px solid #173143; background: #07131d; }
-.roulette-stake-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.roulette-stake-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: 12px; }
 .roulette-field { display: grid; gap: 9px; }
 .roulette-field > span:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .roulette-field strong { color: #edf7fb; font-size: .78rem; }
@@ -1179,8 +1180,6 @@ body.modal-open { overflow: hidden; }
 .roulette-input-shell > span { padding-left: 15px; font-size: .75rem; font-weight: 900; }
 .roulette-input-shell input { min-width: 0; height: 46px; flex: 1; padding: 0 12px; border: 0; outline: 0; background: transparent; color: #fff; font-weight: 800; }
 .roulette-input-shell button { min-width: 52px; height: 36px; margin-right: 5px; border: 0; border-radius: 6px; background: #142b3a; color: #d9e8ef; cursor: pointer; font-weight: 800; }
-.roulette-clear { min-height: 48px; padding: 0 16px; border: 1px solid #254253; border-radius: 8px; background: transparent; color: #9db1bd; cursor: pointer; font-weight: 800; }
-.roulette-clear:disabled { cursor: default; opacity: .38; }
 .roulette-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
 .roulette-option { min-width: 0; overflow: hidden; border-radius: 9px; background: #091722; }
 .roulette-option header { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; color: #dfeaf0; font-size: .76rem; font-weight: 800; }
@@ -1192,6 +1191,7 @@ body.modal-open { overflow: hidden; }
 .roulette-option.gold { --lane-color: #f5b942; color: #f5b942; }
 .roulette-option > button { width: calc(100% - 12px); min-height: 42px; margin: 0 6px; border: 0; border-radius: 7px; background: var(--lane-color); color: #031019; cursor: pointer; font-size: .72rem; font-weight: 950; }
 .roulette-option > button:disabled { cursor: not-allowed; opacity: .4; }
+.roulette-option.is-locked { opacity: .52; }
 .roulette-option footer { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; color: #778f9e; font-size: .64rem; }
 .roulette-option footer strong { overflow: hidden; color: #d9e6ec; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
 .roulette-message { margin: 12px 0 0; color: #ff8fa0; font-size: .7rem; font-weight: 700; text-align: center; }
@@ -1199,6 +1199,7 @@ body.modal-open { overflow: hidden; }
 .roulette-stage-footer { min-height: 52px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 20px; border-top: 1px solid #1a3445; background: #07121b; }
 .roulette-stage-footer > span { color: #315268; font-size: .95rem; font-weight: 900; letter-spacing: .05em; }
 .roulette-stage-footer .fairness-label { justify-self: end; min-height: 35px; border: 0; background: transparent; color: #8299a8; cursor: pointer; font-size: .63rem; text-decoration: underline; }
+.roulette-history { margin-top: 16px; }
 @media (max-width: 780px) {
   .roulette-track-panel { padding: 24px 10px 18px; }
   .roulette-track-viewport { min-height: 104px; }
@@ -1210,7 +1211,6 @@ body.modal-open { overflow: hidden; }
 @media (max-width: 480px) {
   .roulette-betting-panel { padding: 18px 12px 24px; }
   .roulette-stake-row { grid-template-columns: 1fr; }
-  .roulette-clear { min-height: 38px; }
   .roulette-input-shell button { min-width: 46px; }
   .roulette-option header { min-height: 54px; padding: 8px 10px; }
   .roulette-lane-icon { width: 32px; height: 32px; }

@@ -346,7 +346,7 @@
                   <div class="roulette-track" id="roulette-track"></div>
                   <span class="roulette-pointer" aria-hidden="true"></span>
                 </div>
-                <div class="roulette-round-status" id="roulette-round-status" role="status" aria-live="polite">Place a bet to start the round</div>
+                <div class="roulette-round-status" id="roulette-round-status" role="status" aria-live="polite">Rolling in <strong>12.00</strong></div>
                 <div class="roulette-progress" aria-hidden="true"><i id="roulette-progress"></i></div>
                 <div class="roulette-recent">
                   <strong>Last 100</strong>
@@ -361,10 +361,9 @@
               <section class="roulette-betting-panel" aria-label="Roulette betting controls">
                 <div class="roulette-stake-row">
                   <label class="roulette-field">
-                    <span><strong>Bet Amount</strong><small data-roulette-balance>0.00000000 COIN</small></span>
+                    <span><strong>Bet Amount</strong></span>
                     <span class="roulette-input-shell"><span data-roulette-currency>$</span><input id="roulette-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Roulette bet amount" /><button type="button" data-roulette-bet-action="half">½</button><button type="button" data-roulette-bet-action="double">2×</button><button type="button" data-roulette-bet-action="max">Max</button></span>
                   </label>
-                  <button class="roulette-clear" id="roulette-clear" type="button" disabled>Clear bets</button>
                 </div>
                 <div class="roulette-options" aria-label="Roulette betting lanes">
                   <article class="roulette-option blue">
@@ -393,6 +392,25 @@
 
               <footer class="roulette-stage-footer"><div></div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button></footer>
             </div>
+            <section class="mines-history roulette-history" aria-labelledby="roulette-history-heading">
+              <div class="history-toolbar">
+                <div class="history-tabs" role="tablist" aria-label="Roulette results">
+                  <button class="history-tab active" id="roulette-history-heading" type="button" role="tab" aria-selected="true" data-roulette-history-view="top">Top Wins</button>
+                  <button class="history-tab" type="button" role="tab" aria-selected="false" data-roulette-history-view="lucky">Lucky Wins</button>
+                </div>
+                <label class="history-period"><span class="sr-only">Results period</span><select id="roulette-history-period"><option>Lifetime</option><option>Today</option><option>This week</option></select></label>
+              </div>
+              <div class="history-table-wrap">
+                <table class="history-table">
+                  <thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead>
+                  <tbody aria-label="Roulette results not available yet">
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                    <tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
@@ -410,7 +428,7 @@
     <script src="mines.js?v=plinko-1" defer></script>
     <script src="dice.js?v=dice-rolls-1" defer></script>
     <script src="plinko.js?v=plinko-2" defer></script>
-    <script src="roulette.js?v=roulette-3" defer></script>
+    <script src="roulette.js?v=roulette-live-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
