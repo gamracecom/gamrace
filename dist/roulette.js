@@ -33,8 +33,8 @@
     "cyan", "blue", "cyan", "blue", "cyan", "blue", "cyan",
   ]);
   const BETTING_MS = 12_000;
-  const SPIN_MS = 5_000;
-  const CENTRE_MS = 900;
+  const SPIN_MS = 6_500;
+  const CENTRE_MS = 1_300;
   const displayedStakes = { blue: 0, cyan: 0, purple: 0, gold: 0 };
 
   let selectedCurrency = "";
@@ -249,7 +249,7 @@
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0);
     betInput.min = minimumWager().toFixed(displayFiat ? 2 : 8);
     betInput.step = betInput.min;
-    game.querySelectorAll("[data-roulette-currency]").forEach((field) => { field.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
+    window.GamRaceBetCurrency?.render(game.querySelectorAll("[data-roulette-currency]"), detail);
     if (changed) activeRound = null;
     updateAvailability();
     syncRound();

@@ -18,6 +18,8 @@ test("Wheel has responsive manual and auto controls with all risk and segment op
   for (const risk of ["low", "medium", "high"]) assert.match(html, new RegExp(`data-wheel-risk="${risk}"`));
   for (const segments of [10, 20, 30, 40, 50]) assert.match(html, new RegExp(`<option value="${segments}"`));
   assert.match(html, /id="wheel-canvas"/);
+  assert.match(html, /data-wheel-result-strip/);
+  assert.doesNotMatch(html, /id="wheel-result"/);
   assert.match(html, /class="mines-history wheel-history"/);
   assert.match(styles, /\.wheel-stage/);
   assert.match(styles, /@media \(max-width: 780px\)[\s\S]*\.wheel-stage/);
@@ -38,8 +40,11 @@ test("Wheel outcomes are server-authoritative and refresh-safe", () => {
 
 test("Wheel animates before settlement and supports safe autobet stops", () => {
   assert.match(script, /requestAnimationFrame\(frame\)/);
-  assert.match(script, /duration = turbo \|\| reduceMotion\.matches \? 520 : 4200/);
+  assert.match(script, /duration = turbo \|\| reduceMotion\.matches \? 800 : 6200/);
   assert.match(script, /await animateWheel\(bet\);[\s\S]*await settleBet\(bet\)/);
   assert.match(script, /autoStopRequested/);
   assert.match(script, /cleanAmount\(\) > availableBalance/);
+  assert.match(script, /resultStrip\.children\.length > 10/);
+  assert.match(script, /game-result-pill/);
+  assert.doesNotMatch(script, /segment\$\{count === 1/);
 });

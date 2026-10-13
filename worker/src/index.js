@@ -1189,7 +1189,7 @@ function rouletteBetResponse(row) {
 }
 
 const ROULETTE_BETTING_MS = 12_000;
-const ROULETTE_ANIMATION_MS = 6_000;
+const ROULETTE_ANIMATION_MS = 8_000;
 const ROULETTE_CYCLE_MS = ROULETTE_BETTING_MS + ROULETTE_ANIMATION_MS;
 
 async function rouletteRecent(env) {

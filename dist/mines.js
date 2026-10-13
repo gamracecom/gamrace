@@ -6,7 +6,7 @@
   const blankState = document.querySelector("#game-blank-state");
 
   if (gameName !== "mines") {
-    if (!["dice", "plinko", "roulette", "keno"].includes(gameName)) {
+    if (!["dice", "plinko", "roulette", "keno", "wheel"].includes(gameName)) {
       document.title = "GamRace";
       blankState.hidden = false;
     }
@@ -41,6 +41,7 @@
   let balance = 0;
   let selectedCurrency = "";
   let selectedSymbol = "COIN";
+  let selectedAssetIcon = "usdt";
   let displayFiat = true;
   let activeRound = null;
   let betPending = false;
@@ -125,7 +126,10 @@
   }
 
   function renderBalance() {
-    document.querySelectorAll(".bet-currency").forEach((label) => { label.textContent = displayFiat ? "$" : selectedSymbol; });
+    window.GamRaceBetCurrency?.render(document.querySelectorAll(".bet-currency"), {
+      displayFiat,
+      asset: { symbol: selectedSymbol, icon: selectedAssetIcon },
+    });
     updateBetDisplay();
   }
 
@@ -156,6 +160,7 @@
     statCurrency = selectedCurrency;
     displayFiat = nextDisplayFiat;
     selectedSymbol = detail.asset.symbol || selectedCurrency.toUpperCase();
+    selectedAssetIcon = detail.asset.icon || selectedCurrency;
     balance = Math.max(0, displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0));
     if (previousCurrency && previousCurrency !== selectedCurrency) {
       activeRound = null;

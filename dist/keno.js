@@ -59,7 +59,6 @@
   const PAYTABLES = Object.freeze(Object.fromEntries(Object.entries(RISK_MODELS).map(([name, model]) => [name, buildPaytable(model)])));
   const SETTINGS_KEY = "gamrace-game-settings-v1";
   const board = game.querySelector("#keno-board");
-  const drawStrip = game.querySelector("#keno-draw-strip");
   const betInput = game.querySelector("#keno-bet-amount");
   const pickCount = game.querySelector("#keno-pick-count");
   const modeButtons = [...game.querySelectorAll("[data-keno-mode]")];
@@ -76,9 +75,6 @@
   const favoriteButton = game.querySelector('[data-keno-game-favorite="keno"]');
   const actionButton = game.querySelector("#keno-action");
   const message = game.querySelector("#keno-message");
-  const result = game.querySelector("#keno-result");
-  const resultTitle = game.querySelector("#keno-result-title");
-  const resultPayout = game.querySelector("#keno-result-payout");
   const paytable = game.querySelector("#keno-paytable");
   const selectedNumbers = new Set();
   let selectedCurrency = "";
@@ -133,10 +129,6 @@
     const amount = Number(value) || 0;
     if (displayFiat) return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${selectedSymbol}`;
-  }
-
-  function formatCoinAmount(value) {
-    return `${(Number(value) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${selectedSymbol}`;
   }
 
   function renderPaytable(highlightedHits = null) {
@@ -197,8 +189,6 @@
 
   function clearDraw() {
     board.querySelectorAll("button").forEach((button) => button.classList.remove("drawn", "hit", "miss"));
-    drawStrip.replaceChildren();
-    result.hidden = true;
     renderPaytable();
   }
 
@@ -255,17 +245,8 @@
       const tile = board.querySelector(`[data-number="${number}"]`);
       const hit = selected.has(Number(number));
       tile?.classList.add("drawn", hit ? "hit" : "miss");
-      const drawn = document.createElement("span");
-      drawn.className = hit ? "hit" : "miss";
-      drawn.textContent = String(number);
-      drawStrip.append(drawn);
       if (!turbo) await delay(260);
     }
-    resultTitle.textContent = `${bet.hits} hit${bet.hits === 1 ? "" : "s"}`;
-    resultPayout.textContent = `${formatMultiplier(bet.multiplier)} · ${formatCoinAmount(bet.payout)}`;
-    result.classList.toggle("win", bet.outcome === "win");
-    result.classList.toggle("loss", bet.outcome !== "win");
-    result.hidden = false;
     renderPaytable(bet.hits);
   }
 
@@ -405,7 +386,7 @@
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0);
     betInput.min = minimumWager().toFixed(displayFiat ? 2 : 8);
     betInput.step = betInput.min;
-    game.querySelectorAll("[data-keno-currency]").forEach((element) => { element.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
+    window.GamRaceBetCurrency?.render(game.querySelectorAll("[data-keno-currency]"), detail);
     const balanceLabel = game.querySelector("[data-keno-balance]");
     if (balanceLabel) balanceLabel.textContent = formatAmount(availableBalance);
     if (changed) recoveryAttempted = false;

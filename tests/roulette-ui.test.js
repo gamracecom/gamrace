@@ -39,7 +39,9 @@ test("Roulette animates only the server-authoritative result and settles the wal
   assert.match(liveMigration, /CREATE TABLE IF NOT EXISTS roulette_wagers/);
   assert.match(sharedMigration, /CREATE TABLE IF NOT EXISTS roulette_live_rounds/);
   assert.match(script, /BETTING_MS = 12_000/);
-  assert.match(script, /SPIN_MS = 5_000/);
+  assert.match(script, /SPIN_MS = 6_500/);
+  assert.match(script, /CENTRE_MS = 1_300/);
+  assert.match(worker, /ROULETTE_ANIMATION_MS = 8_000/);
   assert.match(script, /twoXSelection/);
   assert.match(worker, /You already backed the other 2× tile this spin/);
   assert.match(worker, /available_units = available_units - \?/);

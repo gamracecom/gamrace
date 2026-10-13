@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=wheel-1" />
+    <link rel="stylesheet" href="styles.css?v=game-polish-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -430,10 +430,8 @@
                 </div>
               </section>
               <section class="keno-board-panel" aria-label="Choose Keno numbers">
-                <div class="keno-result" id="keno-result" hidden aria-live="assertive"><strong id="keno-result-title">0 hits</strong><span id="keno-result-payout">0.00×</span></div>
                 <div class="keno-board" id="keno-board" role="group" aria-label="Keno numbers 1 to 40"></div>
                 <section class="keno-paytable" id="keno-paytable" aria-label="Keno payout multipliers"></section>
-                <div class="keno-draw-strip" id="keno-draw-strip" aria-label="Drawn Keno numbers"></div>
               </section>
               <footer class="keno-stage-footer">
                 <div class="game-tools" data-keno-game-tools aria-label="Game tools">
@@ -485,7 +483,7 @@
                 </div>
               </section>
               <section class="wheel-board-panel" aria-label="Wheel game board">
-                <div class="wheel-result" id="wheel-result" hidden aria-live="assertive"><strong id="wheel-result-multiplier">0.00×</strong><span id="wheel-result-payout">0.00000000 COIN</span></div>
+                <div class="game-result-strip wheel-result-strip" data-wheel-result-strip aria-label="Last 10 Wheel spins" aria-live="polite" hidden></div>
                 <div class="wheel-visual" id="wheel-visual">
                   <span class="wheel-pointer" aria-hidden="true"></span>
                   <canvas id="wheel-canvas" width="620" height="620" role="img" aria-label="Wheel with twenty payout segments"></canvas>
@@ -539,12 +537,13 @@
       <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" aria-hidden="true" /><strong>Chat</strong></button>
     </nav>
     <script type="module" src="region-access.js?v=region-access-1"></script>
-    <script src="mines.js?v=plinko-1" defer></script>
-    <script src="dice.js?v=dice-rolls-1" defer></script>
-    <script src="plinko.js?v=plinko-2" defer></script>
-    <script src="roulette.js?v=roulette-shared-1" defer></script>
-    <script src="keno.js?v=keno-auto-1" defer></script>
-    <script src="wheel.js?v=wheel-2" defer></script>
+    <script src="game-currency.js?v=crypto-icons-1" defer></script>
+    <script src="mines.js?v=crypto-icons-1" defer></script>
+    <script src="dice.js?v=crypto-icons-1" defer></script>
+    <script src="plinko.js?v=crypto-icons-1" defer></script>
+    <script src="roulette.js?v=slower-spins-1" defer></script>
+    <script src="keno.js?v=keno-clean-1" defer></script>
+    <script src="wheel.js?v=wheel-results-1" defer></script>
     <script src="game-history.js?v=wheel-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>

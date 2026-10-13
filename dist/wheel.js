@@ -27,9 +27,7 @@
   const autoInfiniteButton = game.querySelector("#wheel-auto-infinite");
   const actionButton = game.querySelector("#wheel-action");
   const message = game.querySelector("#wheel-message");
-  const result = game.querySelector("#wheel-result");
-  const resultMultiplier = game.querySelector("#wheel-result-multiplier");
-  const resultPayout = game.querySelector("#wheel-result-payout");
+  const resultStrip = game.querySelector("[data-wheel-result-strip]");
   const legend = game.querySelector("#wheel-legend");
   const turboButton = game.querySelector("#wheel-turbo-toggle");
   const muteButton = game.querySelector("#wheel-mute-toggle");
@@ -78,10 +76,6 @@
     const amount = Number(value) || 0;
     if (displayFiat) return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${selectedSymbol}`;
-  }
-
-  function formatCoinAmount(value) {
-    return `${(Number(value) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })} ${selectedSymbol}`;
   }
 
   function requestId() {
@@ -169,9 +163,9 @@
   function renderLegend() {
     const counts = new Map();
     multipliersFor().forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
-    legend.replaceChildren(...[...counts.entries()].sort((left, right) => right[0] - left[0]).map(([value, count]) => {
+    legend.replaceChildren(...[...counts.entries()].sort((left, right) => right[0] - left[0]).map(([value]) => {
       const item = document.createElement("span");
-      item.innerHTML = `<i style="--wheel-key:${segmentPalette(value, 0)[0]}"></i><strong>${formatMultiplier(value)}</strong><small>${count} segment${count === 1 ? "" : "s"}</small>`;
+      item.innerHTML = `<i style="--wheel-key:${segmentPalette(value, 0)[0]}"></i><strong>${formatMultiplier(value)}</strong>`;
       return item;
     }));
     canvas.setAttribute("aria-label", `Wheel with ${segmentCount} payout segments at ${risk} risk`);
@@ -224,7 +218,7 @@
     const currentModulo = ((rotation % TAU) + TAU) % TAU;
     const turns = turbo || reduceMotion.matches ? 1 : 7;
     const target = rotation + ((targetModulo - currentModulo + TAU) % TAU) + turns * TAU;
-    const duration = turbo || reduceMotion.matches ? 520 : 4200;
+    const duration = turbo || reduceMotion.matches ? 800 : 6200;
     const started = performance.now();
     return new Promise((resolve) => {
       function frame(now) {
@@ -251,12 +245,15 @@
     return response.bet;
   }
 
-  function showResult(bet) {
-    resultMultiplier.textContent = formatMultiplier(bet.multiplier);
-    resultPayout.textContent = formatCoinAmount(bet.payout);
-    result.classList.toggle("win", bet.outcome === "win");
-    result.classList.toggle("loss", bet.outcome !== "win");
-    result.hidden = false;
+  function addSpinResult(bet) {
+    if (!resultStrip) return;
+    const pill = document.createElement("span");
+    pill.className = `game-result-pill${bet.outcome === "win" ? " win" : ""}`;
+    pill.textContent = formatMultiplier(bet.multiplier);
+    resultStrip.hidden = false;
+    resultStrip.append(pill);
+    while (resultStrip.children.length > 10) resultStrip.firstElementChild.remove();
+    resultStrip.scrollLeft = resultStrip.scrollWidth;
   }
 
   function renderSessionStats() {
@@ -299,7 +296,6 @@
     const amount = cleanAmount();
     if (!existingBet && (amount < minimumWager() || amount > availableBalance)) return false;
     busy = true;
-    result.hidden = true;
     setMessage();
     updateAvailability();
     try {
@@ -321,7 +317,7 @@
       const displayedWager = existingBet ? Number(bet.wager || 0) : amount;
       await animateWheel(bet);
       const settled = await settleBet(bet);
-      showResult(settled);
+      addSpinResult(settled);
       recordBet(displayedWager, settled);
       return true;
     } catch (error) {
@@ -381,7 +377,7 @@
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0);
     betInput.min = minimumWager().toFixed(displayFiat ? 2 : 8);
     betInput.step = betInput.min;
-    game.querySelectorAll("[data-wheel-currency]").forEach((element) => { element.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
+    window.GamRaceBetCurrency?.render(game.querySelectorAll("[data-wheel-currency]"), detail);
     const balanceLabel = game.querySelector("[data-wheel-balance]");
     if (balanceLabel) balanceLabel.textContent = formatAmount(availableBalance);
     if (changed) recoveryAttempted = false;
@@ -456,7 +452,6 @@
   riskButtons.forEach((button) => button.addEventListener("click", () => {
     if (busy || autoRunning || !["low", "medium", "high"].includes(button.dataset.wheelRisk)) return;
     risk = button.dataset.wheelRisk;
-    result.hidden = true;
     persistSettings();
     renderWheel();
   }));
@@ -465,7 +460,6 @@
     const selected = Number(segmentsSelect.value);
     if (SEGMENT_OPTIONS.includes(selected)) segmentCount = selected;
     rotation = 0;
-    result.hidden = true;
     persistSettings();
     renderWheel();
   });

@@ -23,6 +23,8 @@ test("Keno uses a forty-number board with one to ten selectable numbers", () => 
   assert.match(html, /data-keno-mode="manual"/);
   assert.match(html, /data-keno-mode="auto"/);
   assert.match(html, /id="keno-auto-round-count"/);
+  assert.doesNotMatch(html, /id="keno-result"/);
+  assert.doesNotMatch(html, /id="keno-draw-strip"/);
   assert.match(script, /async function runAuto\(\)/);
   assert.match(script, /autoStopRequested/);
   assert.doesNotMatch(script, /Select numbers to see the payout table/);
@@ -39,7 +41,7 @@ test("Keno outcomes are generated and settled by the worker", () => {
   assert.match(script, /if \(!turbo\) await delay\(260\)/);
 });
 
-test("Keno has distinctive responsive tiles and live result history", () => {
+test("Keno has distinctive responsive tiles and live leaderboard history", () => {
   assert.match(styles, /\.keno-tile[\s\S]*clip-path: polygon/);
   assert.match(styles, /\.keno-tile\.selected/);
   assert.match(styles, /\.keno-tile\.drawn\.hit/);

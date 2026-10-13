@@ -319,7 +319,7 @@
       input.min = minimum.toFixed(displayFiat ? 2 : 8);
       input.step = input.min;
     });
-    diceGame.querySelectorAll("[data-dice-currency]").forEach((field) => { field.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
+    window.GamRaceBetCurrency?.render(diceGame.querySelectorAll("[data-dice-currency]"), detail);
     if (selectionChanged) {
       wagerError = "";
       betInput.value = displayFiat ? "0.00" : "0.00000000";

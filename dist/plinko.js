@@ -330,7 +330,7 @@
       input.min = minimum.toFixed(displayFiat ? 2 : 8);
       input.step = input.min;
     });
-    game.querySelectorAll("[data-plinko-currency]").forEach((field) => { field.textContent = displayFiat ? "$" : selectedSymbol.slice(0, 4); });
+    window.GamRaceBetCurrency?.render(game.querySelectorAll("[data-plinko-currency]"), detail);
     updateAvailability();
   }
 
