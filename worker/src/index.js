@@ -13,6 +13,7 @@ import {
   parseNonNegativeAssetUnits,
   plinkoPayout,
   roulettePayout,
+  wheelPayout,
   payoutFromMultiplier,
   oxaDepositStatus,
   oxaPayoutStatus,
@@ -478,7 +479,7 @@ async function enforceCooldown(env, uid, action, seconds) {
 }
 
 async function listActivity(env, uid) {
-  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult] = await Promise.all([
+  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult] = await Promise.all([
     env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
            pay_currency AS currency, created_at
@@ -508,6 +509,10 @@ async function listActivity(env, uid) {
     env.DB.prepare(`
       SELECT id, currency, wager_units, payout_units, multiplier_micros, outcome, status, created_at
       FROM keno_bets WHERE uid = ? ORDER BY created_at DESC LIMIT 50
+    `).bind(uid).all(),
+    env.DB.prepare(`
+      SELECT id, currency, wager_units, payout_units, multiplier_micros, outcome, status, created_at
+      FROM wheel_bets WHERE uid = ? ORDER BY created_at DESC LIMIT 50
     `).bind(uid).all(),
   ]);
   const walletRows = (walletResult.results || []).map((row) => ({
@@ -573,7 +578,18 @@ async function listActivity(env, uid) {
     currency: row.currency,
     createdAt: Number(row.created_at),
   }));
-  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
+  const wheelRows = (wheelResult.results || []).map((row) => ({
+    id: row.id,
+    type: "bet",
+    game: "Wheel",
+    status: row.status === "spinning" ? "open" : row.outcome,
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
 async function handleGetWallet(request, env, user) {
@@ -841,6 +857,122 @@ async function handlePlinkoBet(request, env, user) {
   return json(request, env, 201, { bet: plinkoBetResponse(created), wallet: await walletResponse(env, user.sub) });
 }
 
+function wheelBetResponse(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    game: "wheel",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    risk: row.risk,
+    segments: Number(row.segments),
+    resultIndex: Number(row.result_index),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    outcome: row.outcome,
+    status: row.status,
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleGetActiveWheelBet(request, env, user) {
+  const currency = normalizeCurrency(new URL(request.url).searchParams.get("currency"));
+  const row = await env.DB.prepare(`
+    SELECT * FROM wheel_bets
+    WHERE uid = ? AND currency = ? AND status = 'spinning'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, currency).first();
+  return json(request, env, 200, { bet: wheelBetResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleStartWheelBet(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM wheel_bets WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { bet: wheelBetResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const active = await env.DB.prepare(`
+    SELECT * FROM wheel_bets WHERE uid = ? AND currency = ? AND status = 'spinning'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, asset.code).first();
+  if (active) return json(request, env, 200, { bet: wheelBetResponse(active), wallet: await walletResponse(env, user.sub) });
+  const segments = Number(body.segments);
+  const risk = String(body.risk || "medium").toLowerCase();
+  if (![10, 20, 30, 40, 50].includes(segments)) throw httpError(400, "Choose a valid Wheel segment count");
+  if (!["low", "medium", "high"].includes(risk)) throw httpError(400, "Choose a valid Wheel risk level");
+  const resultIndex = secureRandomInt(segments);
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  let settlement;
+  try { settlement = wheelPayout(wagerUnits, segments, risk, resultIndex); }
+  catch (error) { throw httpError(400, error.message); }
+  const timestamp = now();
+  const id = crypto.randomUUID();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO wheel_bets(
+          id, request_id, uid, currency, wager_units, payout_units, risk,
+          segments, result_index, multiplier_micros, outcome, status, created_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'spinning', ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+      `).bind(
+        id, requestId, user.sub, asset.code, wagerUnits, settlement.payoutUnits,
+        risk, segments, resultIndex, settlement.multiplierMicros, settlement.outcome, timestamp,
+        user.sub, asset.code, wagerUnits,
+      ),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM wheel_bets WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'wheel_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
+        FROM wheel_bets WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM wheel_bets WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { bet: wheelBetResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM wheel_bets WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { bet: wheelBetResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleSettleWheelBet(request, env, user, betIdValue) {
+  const betId = String(betIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{12,80}$/.test(betId)) throw httpError(400, "Invalid Wheel bet");
+  let row = await env.DB.prepare("SELECT * FROM wheel_bets WHERE id = ? AND uid = ?").bind(betId, user.sub).first();
+  if (!row) throw httpError(404, "That Wheel bet was not found");
+  if (row.status === "settled") return json(request, env, 200, { bet: wheelBetResponse(row), wallet: await walletResponse(env, user.sub) });
+  const timestamp = now();
+  const results = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE wheel_bets SET status = 'settled', settled_at = ?
+      WHERE id = ? AND uid = ? AND status = 'spinning'
+    `).bind(timestamp, betId, user.sub),
+    env.DB.prepare(`
+      UPDATE crypto_balances SET available_units = available_units + ?, updated_at = ?
+      WHERE uid = ? AND currency = ?
+        AND EXISTS(SELECT 1 FROM wheel_bets WHERE id = ? AND uid = ? AND status = 'settled' AND settled_at = ?)
+    `).bind(Number(row.payout_units), timestamp, user.sub, row.currency, betId, user.sub, timestamp),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'wheel_payout_' || id, uid, currency, 'game_payout', payout_units, id, ?
+      FROM wheel_bets WHERE id = ? AND uid = ? AND status = 'settled' AND settled_at = ? AND payout_units > 0
+    `).bind(timestamp, betId, user.sub, timestamp),
+  ]);
+  if (Number(results[0]?.meta?.changes || 0) !== 1) {
+    row = await env.DB.prepare("SELECT * FROM wheel_bets WHERE id = ? AND uid = ?").bind(betId, user.sub).first();
+    if (row?.status !== "settled") throw httpError(409, "That Wheel bet could not be settled");
+  }
+  row = await env.DB.prepare("SELECT * FROM wheel_bets WHERE id = ? AND uid = ?").bind(betId, user.sub).first();
+  return json(request, env, 200, { bet: wheelBetResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
 function parseKenoNumbers(value, label = "Keno numbers") {
   const numbers = Array.isArray(value) ? value.map(Number) : [];
   if (numbers.length < 1 || numbers.length > 10 || numbers.some((number) => !Number.isInteger(number) || number < 1 || number > 40)) {
@@ -991,6 +1123,7 @@ async function handleGameHistory(request, env, user) {
     plinko: { table: "plinko_bets", where: "1 = 1" },
     roulette: { table: "roulette_rounds", where: "1 = 1" },
     keno: { table: "keno_bets", where: "b.status = 'settled'" },
+    wheel: { table: "wheel_bets", where: "b.status = 'settled'" },
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
@@ -2530,6 +2663,10 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);
   if (request.method === "POST" && path === "/games/dice/bets") return handleDiceBet(request, env, user);
   if (request.method === "POST" && path === "/games/plinko/bets") return handlePlinkoBet(request, env, user);
+  if (request.method === "GET" && path === "/games/wheel/bets/active") return handleGetActiveWheelBet(request, env, user);
+  if (request.method === "POST" && path === "/games/wheel/bets") return handleStartWheelBet(request, env, user);
+  const wheelSettleMatch = path.match(/^\/games\/wheel\/bets\/([A-Za-z0-9-]+)\/settle$/);
+  if (request.method === "POST" && wheelSettleMatch) return handleSettleWheelBet(request, env, user, wheelSettleMatch[1]);
   if (request.method === "GET" && path === "/games/keno/bets/active") return handleGetActiveKenoBet(request, env, user);
   if (request.method === "POST" && path === "/games/keno/bets") return handleStartKenoBet(request, env, user);
   const kenoSettleMatch = path.match(/^\/games\/keno\/bets\/([A-Za-z0-9-]+)\/settle$/);

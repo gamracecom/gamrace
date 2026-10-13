@@ -19,6 +19,8 @@ import {
   plinkoMultipliers,
   plinkoPayout,
   roulettePayout,
+  wheelMultipliers,
+  wheelPayout,
   payoutFromMultiplier,
   oxaDepositStatus,
   oxaPayoutStatus,
@@ -116,6 +118,24 @@ test("Plinko paytables are symmetric and preserve a 99% expected return", () => 
   const settlement = plinkoPayout(100_000_000, 8, "high", 0);
   assert.equal(settlement.outcome, "win");
   assert.ok(settlement.payoutUnits > 100_000_000);
+});
+
+test("Wheel paytables preserve 99% RTP at every risk and segment count", () => {
+  for (const risk of ["low", "medium", "high"]) {
+    for (const segments of [10, 20, 30, 40, 50]) {
+      const multipliers = wheelMultipliers(segments, risk);
+      assert.equal(multipliers.length, segments);
+      const expectedReturn = multipliers.reduce((total, multiplier) => total + multiplier, 0) / segments / 1_000_000;
+      assert.ok(Math.abs(expectedReturn - 0.99) < 0.000001, `${risk} ${segments} RTP`);
+    }
+  }
+  assert.equal(Math.max(...wheelMultipliers(50, "high")), 49_500_000);
+  assert.deepEqual(wheelPayout(100_000_000, 10, "low", 0), {
+    multiplierMicros: 1_080_000,
+    payoutUnits: 108_000_000,
+    outcome: "win",
+  });
+  assert.equal(wheelPayout(100_000_000, 20, "medium", 1).payoutUnits, 0);
 });
 
 test("Roulette settles multiple lane bets against one authoritative result", () => {

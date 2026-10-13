@@ -180,6 +180,31 @@ export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue) {
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }
 
+const WHEEL_SEGMENT_OPTIONS = Object.freeze([10, 20, 30, 40, 50]);
+const WHEEL_LOW_PATTERN = Object.freeze([1_080_000, 1_120_000, 1_180_000, 1_070_000, 500_000]);
+const WHEEL_MEDIUM_PATTERN = Object.freeze([1_500_000, 0, 1_800_000, 0, 2_400_000, 0, 1_500_000, 0, 2_700_000, 0]);
+
+export function wheelMultipliers(segmentsValue, riskValue) {
+  const segments = Number(segmentsValue);
+  const risk = String(riskValue || "").toLowerCase();
+  if (!WHEEL_SEGMENT_OPTIONS.includes(segments)) throw new Error("Choose 10, 20, 30, 40, or 50 Wheel segments");
+  if (!['low', 'medium', 'high'].includes(risk)) throw new Error("Choose a valid Wheel risk level");
+  if (risk === "low") return Array.from({ length: segments }, (_, index) => WHEEL_LOW_PATTERN[index % WHEEL_LOW_PATTERN.length]);
+  if (risk === "medium") return Array.from({ length: segments }, (_, index) => WHEEL_MEDIUM_PATTERN[index % WHEEL_MEDIUM_PATTERN.length]);
+  return Array.from({ length: segments }, (_, index) => index === segments - 1 ? segments * 990_000 : 0);
+}
+
+export function wheelPayout(wagerUnits, segmentsValue, riskValue, resultIndexValue) {
+  const wager = Number(wagerUnits);
+  const resultIndex = Number(resultIndexValue);
+  const multipliers = wheelMultipliers(segmentsValue, riskValue);
+  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Wheel wager");
+  if (!Number.isInteger(resultIndex) || resultIndex < 0 || resultIndex >= multipliers.length) throw new Error("Invalid Wheel result");
+  const multiplierMicros = multipliers[resultIndex];
+  const payoutUnits = payoutFromMultiplier(wager, multiplierMicros);
+  return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
+}
+
 const KENO_RISK_MODELS = Object.freeze({
   easy: Object.freeze({ thresholds: Object.freeze([0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4]), growth: 1.6 }),
   medium: Object.freeze({ thresholds: Object.freeze([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]), growth: 3 }),

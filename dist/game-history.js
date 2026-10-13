@@ -2,8 +2,8 @@
   "use strict";
 
   const gameName = new URLSearchParams(window.location.search).get("game")?.toLowerCase();
-  if (!["mines", "dice", "plinko", "roulette", "keno"].includes(gameName)) return;
-  const section = document.querySelector(`.${gameName}-history`) || (gameName === "mines" ? document.querySelector(".mines-history:not(.dice-history):not(.plinko-history):not(.roulette-history):not(.keno-history)") : null);
+  if (!["mines", "dice", "plinko", "roulette", "keno", "wheel"].includes(gameName)) return;
+  const section = document.querySelector(`.${gameName}-history`) || (gameName === "mines" ? document.querySelector(".mines-history:not(.dice-history):not(.plinko-history):not(.roulette-history):not(.keno-history):not(.wheel-history)") : null);
   if (!section) return;
 
   const gameLabel = `${gameName.charAt(0).toUpperCase()}${gameName.slice(1)}`;

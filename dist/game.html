@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=compact-results-1" />
+    <link rel="stylesheet" href="styles.css?v=wheel-1" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -468,6 +468,64 @@
               <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Keno results"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
             </section>
           </section>
+          <section class="wheel-game" id="wheel-game" hidden aria-label="Wheel">
+            <div class="wheel-stage">
+              <section class="wheel-controls" aria-label="Wheel controls">
+                <div class="wheel-mode-tabs" role="tablist" aria-label="Game mode"><button class="active" type="button" role="tab" aria-selected="true" data-wheel-mode="manual">Manual</button><button type="button" role="tab" aria-selected="false" data-wheel-mode="auto">Auto</button></div>
+                <div class="wheel-control-stack">
+                  <label class="wheel-field">
+                    <span><strong>Bet Amount</strong><small data-wheel-balance>0.00000000 COIN</small></span>
+                    <span class="wheel-input-shell"><span data-wheel-currency>$</span><input id="wheel-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Wheel bet amount" /><button type="button" data-wheel-bet-action="half">½</button><button type="button" data-wheel-bet-action="double">2×</button></span>
+                  </label>
+                  <div class="wheel-risk-field"><span><strong>Risk</strong><small>99% RTP</small></span><div class="wheel-risk-options" role="group" aria-label="Wheel risk level"><button class="active" type="button" data-wheel-risk="low">Low</button><button type="button" data-wheel-risk="medium">Medium</button><button type="button" data-wheel-risk="high">High</button></div></div>
+                  <label class="wheel-field"><span><strong>Segments</strong><small>10–50</small></span><span class="wheel-select-shell"><select id="wheel-segments" aria-label="Number of Wheel segments"><option value="10">10</option><option value="20" selected>20</option><option value="30">30</option><option value="40">40</option><option value="50">50</option></select></span></label>
+                  <label class="wheel-field wheel-auto-field" data-wheel-auto-only hidden><span><strong>Number of Bets</strong><small>1–100 or unlimited</small></span><span class="wheel-input-shell"><input id="wheel-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Wheel bets" /><button class="wheel-infinite-button" id="wheel-auto-infinite" type="button" aria-pressed="false" aria-label="Toggle unlimited automatic Wheel bets">∞</button></span></label>
+                  <button class="wheel-primary-button" id="wheel-action" type="button" disabled>Spin Wheel</button>
+                  <p class="wheel-message" id="wheel-message" role="status" aria-live="polite" hidden></p>
+                </div>
+              </section>
+              <section class="wheel-board-panel" aria-label="Wheel game board">
+                <div class="wheel-result" id="wheel-result" hidden aria-live="assertive"><strong id="wheel-result-multiplier">0.00×</strong><span id="wheel-result-payout">0.00000000 COIN</span></div>
+                <div class="wheel-visual" id="wheel-visual">
+                  <span class="wheel-pointer" aria-hidden="true"></span>
+                  <canvas id="wheel-canvas" width="620" height="620" role="img" aria-label="Wheel with twenty payout segments"></canvas>
+                  <span class="wheel-hub" aria-hidden="true"><i></i></span>
+                </div>
+                <div class="wheel-legend" id="wheel-legend" aria-label="Wheel payout values"></div>
+              </section>
+              <footer class="wheel-stage-footer">
+                <div class="game-tools" data-wheel-game-tools aria-label="Game tools">
+                  <button class="game-tool-button" type="button" data-wheel-game-tool="settings" aria-label="Game settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-wheel-game-favorite="wheel" aria-label="Add Wheel to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-wheel-game-tool="stats" aria-label="Session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-wheel-game-tool="info" aria-label="Game information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
+                  <section class="game-tool-panel settings-panel" data-wheel-game-tool-panel="settings" aria-label="Wheel settings" hidden>
+                    <header><div><strong>Game settings</strong><span>Choose how Wheel plays</span></div><button type="button" data-close-wheel-tool aria-label="Close settings">×</button></header>
+                    <button class="game-setting-row" id="wheel-turbo-toggle" type="button" role="switch" aria-checked="false"><span><strong>Turbo mode</strong><small>Use a shorter wheel animation</small></span><i aria-hidden="true"></i></button>
+                    <button class="game-setting-row" id="wheel-mute-toggle" type="button" role="switch" aria-checked="false"><span><strong>Mute</strong><small>Turn off game sounds</small></span><i aria-hidden="true"></i></button>
+                  </section>
+                  <section class="game-tool-panel stats-panel" data-wheel-game-tool-panel="stats" aria-label="Wheel session statistics" hidden>
+                    <header><div><strong>Session statistics</strong><span>Resets when this page closes</span></div><button type="button" data-close-wheel-tool aria-label="Close statistics">×</button></header>
+                    <div class="game-stats-grid"><article><span>Profit</span><strong data-wheel-stat="profit">0.00</strong></article><article><span>Wins</span><strong data-wheel-stat="wins">0</strong></article><article><span>Wagered</span><strong data-wheel-stat="wagered">0.00</strong></article><article><span>Losses</span><strong data-wheel-stat="losses">0</strong></article></div>
+                    <div class="game-stats-chart" aria-label="Cumulative Wheel profit chart"><div><span>Bet performance</span><small data-wheel-chart-label>No completed bets yet</small></div><svg viewBox="0 0 320 116" role="img" aria-label="Cumulative profit over completed Wheel bets" preserveAspectRatio="none"><line x1="0" y1="58" x2="320" y2="58" data-wheel-chart-zero></line><path d="M0 58 L320 58" data-wheel-chart-area></path><polyline points="0,58 320,58" data-wheel-chart-line></polyline></svg></div>
+                  </section>
+                  <section class="game-tool-panel info-panel" data-wheel-game-tool-panel="info" aria-label="Wheel information" hidden>
+                    <header><div><strong>Wheel</strong><span>Game information</span></div><button type="button" data-close-wheel-tool aria-label="Close game information">×</button></header>
+                    <p>Choose a risk and segment count, then spin. The server fixes the result before the animation begins.</p>
+                    <dl><div><dt>Maximum win</dt><dd>49.50×</dd></div><div><dt>Minimum bet</dt><dd>0.01</dd></div><div><dt>Return to player</dt><dd>99%</dd></div><div><dt>Segments</dt><dd>10–50</dd></div></dl>
+                  </section>
+                </div>
+                <span>GamRace</span><button class="fairness-label" type="button">Fair Play</button>
+              </footer>
+            </div>
+            <section class="mines-history wheel-history" hidden aria-labelledby="wheel-history-heading">
+              <div class="history-toolbar">
+                <div class="history-tabs" role="tablist" aria-label="Wheel results"><button class="history-tab active" id="wheel-history-heading" type="button" role="tab" aria-selected="true" data-wheel-history-view="top">Top Wins</button><button class="history-tab" type="button" role="tab" aria-selected="false" data-wheel-history-view="lucky">Lucky Wins</button></div>
+                <label class="history-period"><span class="sr-only">Results period</span><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label>
+              </div>
+              <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Wheel results"><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr><tr class="history-skeleton" aria-hidden="true"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div>
+            </section>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -486,7 +544,8 @@
     <script src="plinko.js?v=plinko-2" defer></script>
     <script src="roulette.js?v=roulette-shared-1" defer></script>
     <script src="keno.js?v=keno-auto-1" defer></script>
-    <script src="game-history.js?v=compact-results-1" defer></script>
+    <script src="wheel.js?v=wheel-1" defer></script>
+    <script src="game-history.js?v=wheel-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
