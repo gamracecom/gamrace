@@ -240,6 +240,7 @@
       const roll = Number(response.bet.roll);
       await animateRoll(roll);
       window.gamraceWallet.applyGameResult(response);
+      window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
       const profit = won ? amount * (Number(response.bet.multiplier) - 1) : -amount;
       renderResult(roll, won);
       addRollResult(roll, won);

@@ -6,7 +6,7 @@
   const blankState = document.querySelector("#game-blank-state");
 
   if (gameName !== "mines") {
-    if (!["dice", "plinko"].includes(gameName)) {
+    if (!["dice", "plinko", "roulette", "keno"].includes(gameName)) {
       document.title = "GamRace";
       blankState.hidden = false;
     }
@@ -364,6 +364,7 @@
         }),
       });
       window.gamraceWallet.applyGameResult(response);
+      if (response.round?.status !== "active") window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
       adoptActiveRound(response.round, { fallbackAmount: amount, automated });
       return true;
     } catch (error) {
@@ -405,6 +406,7 @@
         method: "POST", body: JSON.stringify({ tile: index }),
       });
       window.gamraceWallet.applyGameResult(response);
+      window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
       activeRound.revealed = new Set(response.round.revealed || []);
       activeRound.minePositions = new Set(response.round.minePositions || []);
       activeRound.multiplier = Number(response.round.multiplier || 1);

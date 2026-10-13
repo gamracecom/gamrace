@@ -180,6 +180,63 @@ export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue) {
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }
 
+const KENO_RISK_MODELS = Object.freeze({
+  easy: Object.freeze({ thresholds: Object.freeze([0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4]), growth: 1.6 }),
+  medium: Object.freeze({ thresholds: Object.freeze([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]), growth: 3 }),
+  hard: Object.freeze({ thresholds: Object.freeze([0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6]), growth: 5 }),
+  extreme: Object.freeze({ thresholds: Object.freeze([0, 1, 2, 3, 4, 4, 5, 6, 7, 7, 7]), growth: 4 }),
+});
+
+function kenoCombinations(total, chosen) {
+  if (chosen < 0 || chosen > total) return 0;
+  let result = 1;
+  const count = Math.min(chosen, total - chosen);
+  for (let index = 1; index <= count; index += 1) result = result * (total - count + index) / index;
+  return result;
+}
+
+function buildKenoPaytable(model) {
+  const paytable = {};
+  const totalDraws = kenoCombinations(40, 10);
+  for (let selected = 1; selected <= 10; selected += 1) {
+    const threshold = model.thresholds[selected];
+    let weightedProbability = 0;
+    for (let hits = threshold; hits <= selected; hits += 1) {
+      const probability = kenoCombinations(selected, hits) * kenoCombinations(40 - selected, 10 - hits) / totalDraws;
+      weightedProbability += probability * (model.growth ** (hits - threshold));
+    }
+    const scale = 0.99 / weightedProbability;
+    const multipliers = {};
+    for (let hits = threshold; hits <= selected; hits += 1) {
+      multipliers[hits] = Math.floor(scale * (model.growth ** (hits - threshold)) * 1_000_000);
+    }
+    paytable[selected] = Object.freeze(multipliers);
+  }
+  return Object.freeze(paytable);
+}
+
+export const KENO_PAYTABLE_MICROS = Object.freeze(Object.fromEntries(
+  Object.entries(KENO_RISK_MODELS).map(([risk, model]) => [risk, buildKenoPaytable(model)]),
+));
+
+export function kenoMultiplierMicros(selectedCountValue, hitsValue, riskValue = "medium") {
+  const selectedCount = Number(selectedCountValue);
+  const hits = Number(hitsValue);
+  const risk = String(riskValue || "").toLowerCase();
+  if (!Number.isInteger(selectedCount) || selectedCount < 1 || selectedCount > 10) throw new Error("Choose between 1 and 10 Keno numbers");
+  if (!Number.isInteger(hits) || hits < 0 || hits > selectedCount) throw new Error("Invalid Keno hit count");
+  if (!Object.hasOwn(KENO_PAYTABLE_MICROS, risk)) throw new Error("Choose a valid Keno risk level");
+  return KENO_PAYTABLE_MICROS[risk][selectedCount][hits] || 0;
+}
+
+export function kenoPayout(wagerUnits, selectedCountValue, hitsValue, riskValue = "medium") {
+  const wager = Number(wagerUnits);
+  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Keno wager");
+  const multiplierMicros = kenoMultiplierMicros(selectedCountValue, hitsValue, riskValue);
+  const payoutUnits = payoutFromMultiplier(wager, multiplierMicros);
+  return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
+}
+
 export function roulettePayout(betsValue, resultValue) {
   const result = String(resultValue || "").toLowerCase();
   const multipliers = { blue: 2_000_000, cyan: 2_000_000, purple: 7_000_000, gold: 14_000_000 };

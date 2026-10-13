@@ -373,6 +373,7 @@
       reservedBalance = Math.max(0, Math.round((reservedBalance - amount) * 100000000) / 100000000);
       activeRequests = Math.max(0, activeRequests - 1);
       window.gamraceWallet.applyGameResult(response);
+      window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
       const multiplier = Number(response.bet.multiplier || 0);
       const payout = amount * multiplier;
       resultMultiplier.textContent = `${multiplier.toFixed(2)}×`;

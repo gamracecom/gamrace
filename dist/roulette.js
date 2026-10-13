@@ -94,11 +94,11 @@
     track.classList.add("is-spinning");
     requestAnimationFrame(() => { track.style.transform = `translateX(${landed}px)`; });
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    await delay(reducedMotion ? 80 : 3520);
+    await delay(reducedMotion ? 80 : 5100);
     track.classList.remove("is-spinning");
     track.classList.add("is-centering");
     track.style.transform = `translateX(${centre}px)`;
-    await delay(reducedMotion ? 40 : 360);
+    await delay(reducedMotion ? 40 : 920);
     track.classList.remove("is-centering");
   }
 
@@ -316,6 +316,7 @@
       await spinToOutcome(response.round.result, response.round.landingBasisPoints);
       window.gamraceWallet.applyGameResult(response);
       renderRecent(response.recent);
+      window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
       startNewRound();
     } catch (error) {
       settling = false;
