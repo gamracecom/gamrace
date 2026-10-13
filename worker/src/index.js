@@ -992,7 +992,7 @@ async function handleGameHistory(request, env, user) {
     FROM ${config.table} AS b
     LEFT JOIN player_profiles AS p ON p.uid = b.uid
     WHERE ${config.where} AND b.created_at >= ?
-    ORDER BY ${order} LIMIT 10
+    ORDER BY ${order} LIMIT 5
   `).bind(cutoff).all();
   const entries = (result.results || []).map((row, index) => ({
     rank: index + 1,
@@ -1032,16 +1032,246 @@ function rouletteBetResponse(row) {
   };
 }
 
-async function rouletteRecent(env, uid) {
+const ROULETTE_BETTING_MS = 12_000;
+const ROULETTE_ANIMATION_MS = 6_000;
+const ROULETTE_CYCLE_MS = ROULETTE_BETTING_MS + ROULETTE_ANIMATION_MS;
+
+async function rouletteRecent(env) {
   const result = await env.DB.prepare(`
-    SELECT result FROM roulette_spins
-    WHERE uid = ? AND status = 'settled' AND result IS NOT NULL
+    SELECT result FROM roulette_live_rounds
+    WHERE status = 'settled'
     ORDER BY settled_at DESC LIMIT 100
-  `).bind(uid).all();
+  `).all();
   const results = (result.results || []).map((row) => String(row.result || "")).filter((value) => ["blue", "cyan", "purple", "gold"].includes(value));
   const counts = { blue: 0, cyan: 0, purple: 0, gold: 0 };
   results.forEach((value) => { counts[value] += 1; });
   return { counts, results: results.slice(0, 10), total: results.length };
+}
+
+async function ensureSharedRouletteRound(env, timestamp = now()) {
+  const startsAt = Math.floor(timestamp / ROULETTE_CYCLE_MS) * ROULETTE_CYCLE_MS;
+  const closesAt = startsAt + ROULETTE_BETTING_MS;
+  const endsAt = startsAt + ROULETTE_CYCLE_MS;
+  const id = `roulette_${startsAt}`;
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO roulette_live_rounds(
+      id, starts_at, closes_at, ends_at, result, landing_basis_points, status, created_at
+    ) VALUES(?, ?, ?, ?, ?, ?, 'open', ?)
+  `).bind(id, startsAt, closesAt, endsAt, secureRouletteResult(), secureRandomInt(6401) - 3200, timestamp).run();
+  return env.DB.prepare("SELECT * FROM roulette_live_rounds WHERE id = ?").bind(id).first();
+}
+
+async function settleSharedRouletteRound(env, round, timestamp = now()) {
+  if (!round || timestamp < Number(round.closes_at) || round.status === "settled") return round;
+  const token = crypto.randomUUID();
+  const multiplierMicros = round.result === "gold" ? 14_000_000 : round.result === "purple" ? 7_000_000 : 2_000_000;
+  const results = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE roulette_live_rounds
+      SET status = 'settling', settlement_token = ?, settled_at = ?
+      WHERE id = ? AND status = 'open' AND closes_at <= ?
+    `).bind(token, timestamp, round.id, timestamp),
+    env.DB.prepare(`
+      UPDATE roulette_wagers
+      SET status = 'settled',
+          payout_units = CASE WHEN selection = ? THEN CAST(wager_units * ? / 1000000 AS INTEGER) ELSE 0 END,
+          settled_at = ?
+      WHERE spin_id = ? AND status = 'open'
+        AND EXISTS(
+          SELECT 1 FROM roulette_live_rounds
+          WHERE id = ? AND status = 'settling' AND settlement_token = ?
+        )
+    `).bind(round.result, multiplierMicros, timestamp, round.id, round.id, token),
+    env.DB.prepare(`
+      WITH lane_totals AS (
+        SELECT spin_id, uid, currency, selection,
+          SUM(wager_units) AS wager_units, SUM(payout_units) AS payout_units
+        FROM roulette_wagers
+        WHERE spin_id = ? AND status = 'settled'
+        GROUP BY spin_id, uid, currency, selection
+      ), user_totals AS (
+        SELECT spin_id, uid, currency,
+          SUM(wager_units) AS wager_units,
+          SUM(payout_units) AS payout_units,
+          json_group_object(selection, wager_units) AS bets_json
+        FROM lane_totals GROUP BY spin_id, uid, currency
+      )
+      INSERT OR IGNORE INTO roulette_rounds(
+        id, request_id, uid, currency, wager_units, payout_units, bets_json, result,
+        winning_multiplier_micros, multiplier_micros, outcome, created_at
+      )
+      SELECT spin_id || '_' || uid || '_' || currency,
+        spin_id || '_' || currency,
+        uid, currency, wager_units, payout_units, bets_json, ?, ?,
+        CAST(payout_units * 1000000 / wager_units AS INTEGER),
+        CASE WHEN payout_units >= wager_units THEN 'win' ELSE 'loss' END, ?
+      FROM user_totals
+      WHERE EXISTS(
+        SELECT 1 FROM roulette_live_rounds
+        WHERE id = ? AND status = 'settling' AND settlement_token = ?
+      )
+    `).bind(round.id, round.result, multiplierMicros, timestamp, round.id, token),
+    env.DB.prepare(`
+      UPDATE crypto_balances AS balance
+      SET available_units = available_units + (
+        SELECT COALESCE(SUM(wager.payout_units), 0)
+        FROM roulette_wagers AS wager
+        WHERE wager.spin_id = ? AND wager.uid = balance.uid
+          AND wager.currency = balance.currency AND wager.status = 'settled'
+      ), updated_at = ?
+      WHERE EXISTS(
+        SELECT 1 FROM roulette_wagers AS wager
+        WHERE wager.spin_id = ? AND wager.uid = balance.uid
+          AND wager.currency = balance.currency AND wager.status = 'settled' AND wager.payout_units > 0
+      ) AND EXISTS(
+        SELECT 1 FROM roulette_live_rounds
+        WHERE id = ? AND status = 'settling' AND settlement_token = ?
+      )
+    `).bind(round.id, timestamp, round.id, round.id, token),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'roulette_live_payout_' || spin_id || '_' || uid || '_' || currency,
+        uid, currency, 'game_payout', SUM(payout_units), spin_id, ?
+      FROM roulette_wagers
+      WHERE spin_id = ? AND status = 'settled' AND payout_units > 0
+        AND EXISTS(
+          SELECT 1 FROM roulette_live_rounds
+          WHERE id = ? AND status = 'settling' AND settlement_token = ?
+        )
+      GROUP BY spin_id, uid, currency
+    `).bind(timestamp, round.id, round.id, token),
+    env.DB.prepare(`
+      UPDATE roulette_live_rounds
+      SET status = 'settled'
+      WHERE id = ? AND status = 'settling' AND settlement_token = ?
+    `).bind(round.id, token),
+  ]);
+  if (Number(results[0]?.meta?.changes || 0) !== 1) {
+    return env.DB.prepare("SELECT * FROM roulette_live_rounds WHERE id = ?").bind(round.id).first();
+  }
+  return env.DB.prepare("SELECT * FROM roulette_live_rounds WHERE id = ?").bind(round.id).first();
+}
+
+async function settleDueSharedRouletteRounds(env, timestamp = now()) {
+  const due = await env.DB.prepare(`
+    SELECT * FROM roulette_live_rounds
+    WHERE status <> 'settled' AND closes_at <= ?
+    ORDER BY closes_at ASC LIMIT 12
+  `).bind(timestamp).all();
+  for (const round of due.results || []) await settleSharedRouletteRound(env, round, timestamp);
+}
+
+async function sharedRouletteRoundResponse(env, row, user, currency, timestamp = now()) {
+  if (!row) return null;
+  const wagerResult = currency ? await env.DB.prepare(`
+    SELECT selection, SUM(wager_units) AS wager_units
+    FROM roulette_wagers
+    WHERE spin_id = ? AND uid = ? AND currency = ?
+    GROUP BY selection
+  `).bind(row.id, user.sub, currency).all() : { results: [] };
+  const bets = { blue: 0, cyan: 0, purple: 0, gold: 0 };
+  for (const wager of wagerResult.results || []) bets[wager.selection] = Number(wager.wager_units || 0);
+  const twoXSelection = bets.blue > 0 ? "blue" : bets.cyan > 0 ? "cyan" : null;
+  const spinning = timestamp >= Number(row.closes_at);
+  return {
+    id: row.id,
+    game: "roulette",
+    phase: spinning ? "spinning" : "betting",
+    startsAtMs: Number(row.starts_at),
+    closesAtMs: Number(row.closes_at),
+    endsAtMs: Number(row.ends_at),
+    result: spinning ? row.result : null,
+    landingBasisPoints: spinning ? Number(row.landing_basis_points) : null,
+    twoXSelection,
+    bets: Object.fromEntries(Object.entries(bets).map(([selection, units]) => [selection, assetUnitsToString(units, false)])),
+  };
+}
+
+async function handleSharedRouletteRound(request, env, user) {
+  const timestamp = now();
+  const currencyValue = new URL(request.url).searchParams.get("currency");
+  const currency = currencyValue ? normalizeCurrency(currencyValue) : "";
+  await settleDueSharedRouletteRounds(env, timestamp);
+  let round = await ensureSharedRouletteRound(env, timestamp);
+  if (timestamp >= Number(round.closes_at)) round = await settleSharedRouletteRound(env, round, timestamp);
+  return json(request, env, 200, {
+    serverNow: timestamp,
+    round: await sharedRouletteRoundResponse(env, round, user, currency, timestamp),
+    recent: await rouletteRecent(env),
+  });
+}
+
+async function handleSharedRouletteWager(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM roulette_wagers WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const timestamp = now();
+  await settleDueSharedRouletteRounds(env, timestamp);
+  if (existing) {
+    const storedRound = await env.DB.prepare("SELECT * FROM roulette_live_rounds WHERE id = ?").bind(existing.spin_id).first();
+    return json(request, env, 200, {
+      serverNow: timestamp,
+      round: await sharedRouletteRoundResponse(env, storedRound, user, asset.code, timestamp),
+      wallet: await walletResponse(env, user.sub),
+    });
+  }
+  const selection = String(body.selection || "").toLowerCase();
+  if (!["blue", "cyan", "purple", "gold"].includes(selection)) throw httpError(400, "Choose a valid Roulette tile");
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const round = await ensureSharedRouletteRound(env, timestamp);
+  if (timestamp >= Number(round.closes_at) - 250) throw httpError(409, "Betting has closed for this spin");
+  const id = crypto.randomUUID();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO roulette_wagers(id, request_id, spin_id, uid, currency, selection, wager_units, status, created_at)
+        SELECT ?, ?, spin.id, ?, ?, ?, ?, 'open', ?
+        FROM roulette_live_rounds AS spin
+        JOIN crypto_balances AS balance ON balance.uid = ? AND balance.currency = ?
+        WHERE spin.id = ? AND spin.status = 'open' AND spin.closes_at > ?
+          AND balance.available_units >= ?
+          AND (
+            ? NOT IN ('blue', 'cyan') OR NOT EXISTS(
+              SELECT 1 FROM roulette_wagers AS other
+              WHERE other.spin_id = spin.id AND other.uid = ?
+                AND other.selection IN ('blue', 'cyan') AND other.selection <> ?
+            )
+          )
+      `).bind(
+        id, requestId, user.sub, asset.code, selection, wagerUnits, timestamp,
+        user.sub, asset.code, round.id, timestamp, wagerUnits,
+        selection, user.sub, selection,
+      ),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ?
+          AND EXISTS(SELECT 1 FROM roulette_wagers WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'roulette_wager_' || id, uid, currency, 'game_wager', -wager_units, spin_id, created_at
+        FROM roulette_wagers WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) {
+      const opposite = await env.DB.prepare(`
+        SELECT selection FROM roulette_wagers
+        WHERE spin_id = ? AND uid = ? AND selection IN ('blue', 'cyan') LIMIT 1
+      `).bind(round.id, user.sub).first();
+      if (["blue", "cyan"].includes(selection) && opposite?.selection && opposite.selection !== selection) throw httpError(409, "You already backed the other 2× tile this spin");
+      throw httpError(409, "Betting has closed or your available balance is too low");
+    }
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM roulette_wagers WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (!duplicate) throw error;
+  }
+  const current = await env.DB.prepare("SELECT * FROM roulette_live_rounds WHERE id = ?").bind(round.id).first();
+  return json(request, env, 201, {
+    serverNow: timestamp,
+    round: await sharedRouletteRoundResponse(env, current, user, asset.code, timestamp),
+    wallet: await walletResponse(env, user.sub),
+  });
 }
 
 async function rouletteSpinResponse(env, row) {
@@ -2282,8 +2512,9 @@ async function route(request, env) {
   const kenoSettleMatch = path.match(/^\/games\/keno\/bets\/([A-Za-z0-9-]+)\/settle$/);
   if (request.method === "POST" && kenoSettleMatch) return handleSettleKenoBet(request, env, user, kenoSettleMatch[1]);
   if (request.method === "GET" && path === "/games/roulette/recent") return handleRouletteRecent(request, env, user);
+  if (request.method === "GET" && path === "/games/roulette/live") return handleSharedRouletteRound(request, env, user);
   if (request.method === "GET" && path === "/games/roulette/rounds/active") return handleRouletteActiveRound(request, env, user);
-  if (request.method === "POST" && path === "/games/roulette/wagers") return handleRouletteWager(request, env, user);
+  if (request.method === "POST" && path === "/games/roulette/wagers") return handleSharedRouletteWager(request, env, user);
   const rouletteSettleMatch = path.match(/^\/games\/roulette\/rounds\/([A-Za-z0-9_-]+)\/settle$/);
   if (request.method === "POST" && rouletteSettleMatch) return handleRouletteSettle(request, env, user, rouletteSettleMatch[1]);
   if (request.method === "GET" && path === "/games/mines/rounds/active") return handleGetActiveMinesRound(request, env, user);

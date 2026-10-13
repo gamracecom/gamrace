@@ -13,6 +13,31 @@
   let loading = false;
   let loadedOnce = false;
 
+  function installToggle() {
+    const footer = document.querySelector(`.${gameName}-stage-footer`) || (gameName === "mines" ? document.querySelector(".mines-stage-footer") : null);
+    const tools = footer?.querySelector(".game-tools") || footer?.firstElementChild;
+    if (!tools) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "game-tool-button game-history-toggle";
+    button.setAttribute("aria-label", "Show Top Wins and Lucky Wins");
+    button.setAttribute("aria-expanded", "false");
+    const icon = document.createElement("span");
+    icon.className = "game-history-toggle-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.append(document.createElement("i"), document.createElement("i"), document.createElement("i"));
+    button.append(icon);
+    button.addEventListener("click", () => {
+      const open = section.hidden;
+      section.hidden = !open;
+      button.classList.toggle("active", open);
+      button.setAttribute("aria-expanded", String(open));
+      button.setAttribute("aria-label", `${open ? "Hide" : "Show"} Top Wins and Lucky Wins`);
+      if (open) refresh();
+    });
+    tools.append(button);
+  }
+
   function periodValue() {
     const label = String(select?.value || "lifetime").toLowerCase();
     if (label.includes("today")) return "today";
@@ -49,7 +74,7 @@
       body.append(row);
       return;
     }
-    entries.forEach((entry, index) => {
+    entries.slice(0, 5).forEach((entry, index) => {
       const row = document.createElement("tr");
       if (entry.isYou) row.classList.add("is-you");
       const username = entry.isYou && entry.username === "Player" ? "You" : entry.username;
@@ -81,7 +106,7 @@
   }
 
   async function refresh() {
-    if (loading || document.hidden || !window.gamraceWallet?.request) return;
+    if (loading || section.hidden || document.hidden || !window.gamraceWallet?.request) return;
     loading = true;
     showSkeleton();
     try {
@@ -110,5 +135,7 @@
   window.addEventListener("gamrace:game-history-refresh", refresh);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   window.setInterval(refresh, 4000);
+  section.hidden = true;
+  installToggle();
   window.setTimeout(refresh, 250);
 })();
