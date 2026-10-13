@@ -26,9 +26,13 @@
   const autoCount = game.querySelector("#coinflip-auto-count");
   const turboButton = game.querySelector("#coinflip-turbo");
   const favoriteButton = game.querySelector("[data-coinflip-favorite]");
+  const toolButtons = [...game.querySelectorAll("[data-coinflip-tool]")];
+  const toolPanels = [...game.querySelectorAll("[data-coinflip-tool-panel]")];
   let selectedCurrency = "", selectedSymbol = "COIN", displayFiat = true, availableBalance = 0, usdRate = 0;
   let currentRound = null, mode = "manual", busy = false, autoRunning = false, stopAuto = false, turbo = false, restored = false, alternatingSide = "heads";
   const displayWagers = new Map();
+  const recordedRounds = new Set();
+  const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0 };
 
   try { turbo = Boolean(JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}").turbo); } catch {}
   const requestId = () => crypto.randomUUID().replaceAll("-", "");
@@ -95,11 +99,18 @@
     window.gamraceWallet.applyGameResult(response); renderRound(response.round); finish(response.round); return response.round;
   }
   function finish(round) {
+    if (recordedRounds.has(round.id)) return;
+    recordedRounds.add(round.id);
     const pill = document.createElement("span");
     pill.className = `game-result-pill${round.status === "cashed_out" ? " win" : ""}`;
     pill.textContent = fmtX(round.status === "cashed_out" ? round.multiplier : 0);
     resultStrip.hidden = false; resultStrip.append(pill);
     while (resultStrip.children.length > 10) resultStrip.firstElementChild.remove();
+    const wager = displayWagers.get(round.id) ?? Number(round.wager || 0);
+    const payout = round.status === "cashed_out" ? wager * Number(round.multiplier || 0) : 0;
+    sessionStats.wagered += wager; sessionStats.profit += payout - wager;
+    if (round.status === "cashed_out") sessionStats.wins += 1; else sessionStats.losses += 1;
+    Object.entries(sessionStats).forEach(([key, value]) => { const field = game.querySelector(`[data-coinflip-stat="${key}"]`); if (field) field.textContent = ["wins", "losses"].includes(key) ? String(value) : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }); });
     window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
   }
   async function manualStart() { if (busy || currentRound?.status === "active") return; busy = true; setMessage(); updateAvailability(); try { await startRound(); } catch (error) { setMessage(error.message); } finally { busy = false; renderRound(); } }
@@ -141,14 +152,18 @@
     renderRound(); restore();
   }
   function favorites() { try { return new Set(JSON.parse(localStorage.getItem("gamrace-favourites-v1") || "[]")); } catch { return new Set(); } }
-  function renderFavorite() { const active = favorites().has("coinflip"); favoriteButton.setAttribute("aria-pressed", String(active)); favoriteButton.textContent = active ? "Favorited" : "Favorite"; }
+  function renderFavorite() { const active = favorites().has("coinflip"); favoriteButton.setAttribute("aria-pressed", String(active)); favoriteButton.setAttribute("aria-label", active ? "Remove Coinflip from favourites" : "Add Coinflip to favourites"); }
+  function closeTools() { toolPanels.forEach((panel) => { panel.hidden = true; }); toolButtons.forEach((button) => { button.classList.remove("active"); button.setAttribute("aria-expanded", "false"); }); }
+  function toggleTool(name) { const panel = game.querySelector(`[data-coinflip-tool-panel="${name}"]`); const button = game.querySelector(`[data-coinflip-tool="${name}"]`); if (!panel || !button) return; const open = panel.hidden; closeTools(); if (open) { panel.hidden = false; button.classList.add("active"); button.setAttribute("aria-expanded", "true"); } }
   modeButtons.forEach((button) => button.addEventListener("click", () => { mode = button.dataset.coinflipMode; modeButtons.forEach((item) => item.classList.toggle("active", item === button)); autoFields.forEach((field) => { field.hidden = mode !== "auto"; }); updateAvailability(); }));
   game.querySelectorAll("[data-coinflip-bet-action]").forEach((button) => button.addEventListener("click", () => { betInput.value = Math.min(availableBalance, button.dataset.coinflipBetAction === "half" ? cleanAmount() / 2 : cleanAmount() * 2).toFixed(displayFiat ? 2 : 8); updateAvailability(); }));
   actionButton.addEventListener("click", () => { if (autoRunning) { stopAuto = true; updateAvailability(); } else if (mode === "auto") runAuto(); else manualStart(); });
   headsButton.addEventListener("click", () => manualFlip("heads")); tailsButton.addEventListener("click", () => manualFlip("tails")); cashoutButton.addEventListener("click", manualCashout); betInput.addEventListener("input", updateAvailability);
-  turboButton.addEventListener("click", () => { turbo = !turbo; turboButton.setAttribute("aria-pressed", String(turbo)); let settings = {}; try { settings = JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}"); } catch {} settings.turbo = turbo; localStorage.setItem("gamrace-game-settings-v1", JSON.stringify(settings)); });
+  turboButton.addEventListener("click", () => { turbo = !turbo; turboButton.setAttribute("aria-checked", String(turbo)); let settings = {}; try { settings = JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}"); } catch {} settings.turbo = turbo; localStorage.setItem("gamrace-game-settings-v1", JSON.stringify(settings)); });
   favoriteButton.addEventListener("click", () => { const set = favorites(); if (set.has("coinflip")) set.delete("coinflip"); else set.add("coinflip"); localStorage.setItem("gamrace-favourites-v1", JSON.stringify([...set])); renderFavorite(); });
-  turboButton.setAttribute("aria-pressed", String(turbo)); renderFavorite(); renderRound();
+  toolButtons.forEach((button) => button.addEventListener("click", () => toggleTool(button.dataset.coinflipTool)));
+  game.querySelectorAll("[data-close-coinflip-tool]").forEach((button) => button.addEventListener("click", closeTools));
+  turboButton.setAttribute("aria-checked", String(turbo)); renderFavorite(); renderRound();
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWallet(event.detail));
   if (window.gamraceWalletSelection) applyWallet(window.gamraceWalletSelection);
 })();
