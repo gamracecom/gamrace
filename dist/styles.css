@@ -1,13 +1,13 @@
 :root {
   color-scheme: dark;
-  --bg: #020b12;
-  --panel: #071621;
-  --panel-2: #0b1b28;
-  --line: #18364a;
-  --muted: #8699ab;
-  --text: #f5f9fc;
-  --cyan: #26d3ff;
-  --blue: #008ef4;
+  --bg: #0a0c10;
+  --panel: #12151a;
+  --panel-2: #1b1f27;
+  --line: #2c313a;
+  --muted: #9299a5;
+  --text: #f4f6f8;
+  --cyan: #249cff;
+  --blue: #168cf2;
   --yellow: #ffca32;
   --icon-white-filter: brightness(0) saturate(100%) invert(100%);
   --icon-blue-filter: brightness(0) saturate(100%) invert(69%) sepia(83%) saturate(1351%) hue-rotate(158deg) brightness(105%) contrast(102%);
@@ -1497,3 +1497,190 @@ body.modal-open { overflow: hidden; }
   .transaction-row { grid-template-columns: 1fr; gap: 7px; }
   .transaction-row > strong { text-align: left; }
 }
+
+/* Modern neutral surface system */
+body,
+.game-page,
+.region-block-screen { background: var(--bg); }
+
+.topbar,
+.mobile-tabbar { border-color: #252a32; background: #0d0f13; box-shadow: none; }
+.sidebar { border-color: #252a32; background: #0d0f13; }
+.nav-link:hover,
+.nav-link.active,
+.category.active { background: #242830; color: #fff; }
+.utility,
+.auth,
+.lobby-category-nav,
+.search-box,
+.section-heading .view-all-button,
+.section-heading .carousel-arrow { border-color: #2c313a; background: #171a20; }
+.category:hover,
+.section-heading .view-all-button:hover,
+.section-heading .carousel-arrow:not(:disabled):hover { border-color: #3a414c; background: #20242b; }
+
+.auth-modal,
+.profile-modal,
+.profile-modal.account-workspace,
+.wallet-modal,
+.account-menu,
+.balance-menu { border-color: #303641; background: #12151a; box-shadow: 0 22px 58px rgba(0, 0, 0, .48); }
+.auth-panel,
+.profile-content { background: #14171d; }
+.auth-tab.active,
+.hero-copy h1,
+.hero-player .hero-copy h1,
+.placeholder-art { text-shadow: none; }
+.auth-tab.active::after { box-shadow: none; }
+.auth-input-wrap:focus-within,
+.wallet-form input:focus,
+.wallet-form select:focus,
+.wallet-input-shell:focus-within { border-color: #249cff; box-shadow: none; }
+.profile-avatar { background: #249cff; color: #fff; }
+
+.auth.register,
+.auth-submit,
+.wallet-primary,
+.mines-primary-button,
+.dice-primary-button,
+.plinko-primary-button,
+.keno-primary-button { border-color: #168cf2; background: #168cf2; color: #fff; box-shadow: none; }
+.auth.register:hover,
+.auth-submit:hover,
+.wallet-primary:hover,
+.mines-primary-button:hover:not(:disabled),
+.dice-primary-button:hover:not(:disabled),
+.plinko-primary-button:hover:not(:disabled),
+.keno-primary-button:hover:not(:disabled) { background: #2899fa; filter: none; }
+
+.hero-card::after { display: none; }
+.hero-house,
+.hero-player,
+.hero-house:hover,
+.hero-house.active,
+.hero-player:hover,
+.hero-player.active { box-shadow: none; }
+
+.mines-stage,
+.dice-stage,
+.plinko-stage,
+.roulette-stage,
+.keno-stage { border-color: #2c313a; background: #0f1115; box-shadow: none; }
+.mines-controls,
+.dice-controls,
+.plinko-controls,
+.keno-controls,
+.roulette-betting-panel { border-color: #2c313a; background: #14171c; }
+.mines-board-panel,
+.dice-play-panel,
+.plinko-board-panel,
+.keno-board-panel,
+.roulette-track-panel { background: #0f1115; }
+.mines-stage-footer,
+.dice-stage-footer,
+.plinko-stage-footer,
+.roulette-stage-footer,
+.keno-stage-footer { border-color: #2c313a; background: #111419; }
+
+.mines-mode-tabs,
+.dice-mode-tabs,
+.plinko-mode-tabs,
+.keno-mode-tabs { background: #20242b; }
+.mines-mode-tab.active,
+.dice-mode-tab.active,
+.plinko-mode-tab.active,
+.keno-mode-tabs button.active { background: #393e48; color: #fff; box-shadow: none; }
+
+.bet-input-shell,
+.select-shell,
+.dice-input-shell,
+.dice-metric > span:last-child,
+.plinko-input-shell,
+.plinko-select-shell,
+.roulette-input-shell,
+.keno-input-shell,
+.keno-select-shell,
+.wallet-stack input,
+.wallet-stack select,
+.wallet-asset-trigger,
+.wallet-input-shell { border-color: #303641; background: #22262e; color: #f5f7f9; }
+.bet-input-shell button,
+.dice-input-shell button,
+.dice-metric button,
+.plinko-input-shell button,
+.roulette-input-shell button,
+.keno-input-shell button,
+.keno-pick-actions button,
+.wallet-percentages button { border-color: #393f49; background: #303540; color: #f0f2f5; }
+.bet-input-shell:focus-within,
+.select-shell:focus-within,
+.dice-input-shell:focus-within,
+.plinko-input-shell:focus-within,
+.plinko-select-shell:focus-within,
+.roulette-input-shell:focus-within,
+.keno-input-shell:focus-within,
+.keno-select-shell:focus-within { border-color: #249cff; box-shadow: none; }
+
+.plinko-risk-options,
+.keno-risk-options { gap: 8px; padding: 0; border: 0; background: transparent; }
+.plinko-risk-options button,
+.keno-risk-options button { min-height: 44px; border: 1px solid #343a44; border-radius: 8px; background: #282c34; }
+.plinko-risk-options button:nth-child(1) { color: #35d889; }
+.plinko-risk-options button:nth-child(2) { color: #ff914d; }
+.plinko-risk-options button:nth-child(3) { color: #ff5064; }
+.keno-risk-options button:nth-child(1) { color: #3ba3ff; }
+.keno-risk-options button:nth-child(2) { color: #35d889; }
+.keno-risk-options button:nth-child(3) { color: #ff914d; }
+.keno-risk-options button:nth-child(4) { color: #ff5064; }
+.plinko-risk-options button:nth-child(1).active,
+.keno-risk-options button:nth-child(2).active { border-color: #35d889; background: #1e9f65; color: #fff; }
+.plinko-risk-options button:nth-child(2).active,
+.keno-risk-options button:nth-child(3).active { border-color: #ff914d; background: #d9682c; color: #fff; }
+.plinko-risk-options button:nth-child(3).active,
+.keno-risk-options button:nth-child(4).active { border-color: #ff5064; background: #dc354c; color: #fff; }
+.keno-risk-options button:nth-child(1).active { border-color: #3ba3ff; background: #197fd4; color: #fff; }
+
+.mine-tile,
+.mine-tile.revealed,
+.mine-tile.auto-selected { border-color: #343a44; background: #1d2128; box-shadow: none; }
+.mine-tile:not(:disabled):hover { border-color: #249cff; background: #252a32; box-shadow: none; }
+.mine-tile.is-gem { border-color: #249cff; background: #173653; }
+.mine-tile.is-mine { border-color: #d44b5c; background: #3a2026; }
+.mine-tile.exploded,
+.mines-result { box-shadow: none; }
+.mine-tile img,
+.mine-tile.is-mine img { filter: none; }
+
+.keno-tile { background: #3a404a; color: #b2b7c0; }
+.keno-tile > span { background: #1c2026; }
+.keno-tile:hover:not(:disabled) { background: #4a535f; color: #fff; }
+.keno-tile.selected { background: #249cff; color: #fff; }
+.keno-tile.selected > span { background: #176fba; }
+.keno-tile.drawn.miss { background: #59616d; }
+.keno-tile.drawn.miss > span { background: #303640; }
+.keno-tile.drawn.hit { background: #36d98b; color: #07140e; }
+.keno-tile.drawn.hit > span { background: #1fa568; }
+.keno-paytable-cell { border-color: #303641; background: #1b1f25; }
+
+.roulette-option,
+.history-tabs,
+.transaction-tabs { background: #1b1f25; }
+.history-tab.active,
+.transaction-tab.active { border-color: #249cff; background: #197fd4; color: #fff; box-shadow: none; }
+.mines-history { border-color: #2c313a; background: #111419; box-shadow: none; }
+.game-tool-panel { border-color: #303641; background: #15181e; box-shadow: 0 18px 44px rgba(0, 0, 0, .46); }
+.game-stats-chart polyline { filter: none; }
+
+.wallet-tabs,
+.wallet-body,
+.balance-menu-footer { border-color: #2c313a; background: #12151a; }
+.wallet-form,
+.wallet-network-card,
+.wallet-activity-row,
+.transaction-row,
+.wallet-vault-balances article { border-color: #303641; background: #181b21; }
+.wallet-asset-menu { border-color: #303641; background: #171a20; }
+.wallet-asset-option:hover,
+.balance-option:hover { background: #242932; }
+.wallet-asset-option.selected,
+.balance-option.selected { background: #26384b; }

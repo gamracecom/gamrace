@@ -14,8 +14,10 @@
     easy: { thresholds: [0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4], growth: 1.6 },
     medium: { thresholds: [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5], growth: 3 },
     hard: { thresholds: [0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6], growth: 5 },
-    extreme: { thresholds: [0, 1, 2, 3, 4, 4, 5, 6, 7, 7, 7], growth: 4 },
+    extreme: { thresholds: [0, 1, 2, 3, 4, 4, 5, 5, 6, 6, 6], growth: 4 },
   });
+  const TARGET_RTP = 0.99;
+  const MAX_MULTIPLIER_MICROS = 1_000_000_000;
 
   function combinations(total, chosen) {
     if (chosen < 0 || chosen > total) return 0;
@@ -30,14 +32,26 @@
     const totalDraws = combinations(40, 10);
     for (let selected = 1; selected <= 10; selected += 1) {
       const threshold = model.thresholds[selected];
-      let weightedProbability = 0;
+      const outcomes = [];
       for (let hits = threshold; hits <= selected; hits += 1) {
         const probability = combinations(selected, hits) * combinations(40 - selected, 10 - hits) / totalDraws;
-        weightedProbability += probability * (model.growth ** (hits - threshold));
+        outcomes.push({ hits, probability, weight: model.growth ** (hits - threshold) });
       }
-      const scale = 0.99 / weightedProbability;
+      const expectedReturn = (scale) => outcomes.reduce((total, outcome) => (
+        total + outcome.probability * Math.min(MAX_MULTIPLIER_MICROS, Math.floor(scale * outcome.weight * 1_000_000)) / 1_000_000
+      ), 0);
+      let lower = 0;
+      let upper = 1;
+      while (expectedReturn(upper) < TARGET_RTP && upper < 1_000_000_000) upper *= 2;
+      for (let iteration = 0; iteration < 96; iteration += 1) {
+        const middle = (lower + upper) / 2;
+        if (expectedReturn(middle) < TARGET_RTP) lower = middle;
+        else upper = middle;
+      }
       table[selected] = {};
-      for (let hits = threshold; hits <= selected; hits += 1) table[selected][hits] = Math.floor(scale * (model.growth ** (hits - threshold)) * 1_000_000) / 1_000_000;
+      for (const outcome of outcomes) {
+        table[selected][outcome.hits] = Math.min(MAX_MULTIPLIER_MICROS, Math.floor(lower * outcome.weight * 1_000_000)) / 1_000_000;
+      }
     }
     return table;
   }
