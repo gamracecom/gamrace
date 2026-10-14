@@ -18,7 +18,6 @@
   const line = game.querySelector("#crash-line");
   const area = game.querySelector("#crash-area");
   const recentNode = game.querySelector("#crash-recent");
-  const playerNode = game.querySelector("#crash-players");
   const messageNode = game.querySelector("#crash-message");
   const slips = [...game.querySelectorAll("[data-crash-slip]")].map((root) => ({
     root,
@@ -257,7 +256,6 @@
         knownStatuses.set(wager.id, wager.status);
       });
       renderRecent(Array.isArray(response.recent) ? response.recent : []);
-      playerNode.textContent = String(round?.players || 0);
       if (response.wallet) window.gamraceWallet.applyGameResult(response);
       renderSlips();
     } catch (error) {

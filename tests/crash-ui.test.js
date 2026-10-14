@@ -24,6 +24,8 @@ test("Crash has a live flight surface, four independent Dual slips and full anim
   assert.match(styles, /data-power="overdrive"/);
   assert.match(html, /class="crash-speed-streaks"/);
   assert.match(script, /requestAnimationFrame\(renderFlight\)/);
+  assert.doesNotMatch(html, /id="crash-players"/);
+  assert.doesNotMatch(html, /Shared live round/);
 });
 
 test("Crash is a shared server-authoritative round with immediate wallet debits", () => {
