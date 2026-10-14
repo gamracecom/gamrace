@@ -40,7 +40,10 @@
   let animationFrame = 0;
   let nextBallId = 0;
   let houseFactorMicros = 990_000;
+  let turbo = false;
   const activeBalls = new Map();
+
+  try { turbo = Boolean(JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}").plinkoTurbo); } catch {}
 
   for (let rows = 8; rows <= 16; rows += 1) {
     const option = document.createElement("option");
@@ -302,7 +305,7 @@
         bucket: Number(bucket),
         points,
         startedAt: performance.now(),
-        duration: Math.max(980, path.length * 96),
+        duration: turbo ? Math.max(360, path.length * 30) : Math.max(980, path.length * 96),
         resolve,
       });
       if (!animationFrame) animationFrame = requestAnimationFrame(animateBalls);
@@ -395,6 +398,7 @@
       result.classList.toggle("loss", response.bet.outcome !== "win");
       result.hidden = false;
       animatePath(response.bet.path || [], response.bet.bucket);
+      window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "plinko", wager: amount, payout } }));
       updateAvailability();
       return response.bet;
     } catch (error) {
@@ -469,6 +473,7 @@
   actionButton.addEventListener("click", () => dropBall(cleanAmount(betInput)));
   autoActionButton.addEventListener("click", runAutoplay);
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
+  window.addEventListener("gamrace:game-setting-changed", (event) => { if (event.detail?.game === "plinko" && event.detail?.name === "turbo") turbo = Boolean(event.detail.value); });
   window.addEventListener("resize", () => drawBoard([...activeBalls.values()].map((ball) => ballPosition(ball, performance.now()))));
 
   renderPayouts();

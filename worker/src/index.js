@@ -41,7 +41,7 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "coinflip", name: "Coinflip", editable: true },
   { id: "plinko", name: "Plinko", editable: true },
   { id: "keno", name: "Keno", editable: true },
-  { id: "roulette", name: "Roulette", editable: false, reason: "Determined by the live tile distribution" },
+  { id: "roulette", name: "Roulette", editable: false, fixedHouseEdgeBasisPoints: 1765, reason: "Determined by the live 17-tile distribution" },
 ]);
 
 async function gameHouseEdgeBasisPoints(env, gameId) {
@@ -59,7 +59,7 @@ async function handleGameSettings(request, env) {
     games: Object.fromEntries(games.map((game) => [game.id, {
       houseEdgeBasisPoints: game.houseEdgeBasisPoints,
       houseEdgePercent: game.houseEdgePercent,
-      houseFactorMicros: 1_000_000 - game.houseEdgeBasisPoints * 100,
+      houseFactorMicros: Math.round(game.rtpPercent * 10_000),
       rtpPercent: game.rtpPercent,
     }])),
   });
@@ -2572,11 +2572,14 @@ async function readGameEdges(env) {
   const settings = new Map((result.results || []).map((row) => [row.game_id, row]));
   return GAME_EDGE_DEFINITIONS.map((definition) => {
     const row = settings.get(definition.id);
+    const houseEdgeBasisPoints = Number.isInteger(definition.fixedHouseEdgeBasisPoints)
+      ? definition.fixedHouseEdgeBasisPoints
+      : Number(row?.house_edge_basis_points ?? 100);
     return {
       ...definition,
-      houseEdgeBasisPoints: Number(row?.house_edge_basis_points ?? 100),
-      houseEdgePercent: Number(row?.house_edge_basis_points ?? 100) / 100,
-      rtpPercent: 100 - Number(row?.house_edge_basis_points ?? 100) / 100,
+      houseEdgeBasisPoints,
+      houseEdgePercent: houseEdgeBasisPoints / 100,
+      rtpPercent: 100 - houseEdgeBasisPoints / 100,
       updatedAt: row?.updated_at ? new Date(Number(row.updated_at)).toISOString() : null,
     };
   });

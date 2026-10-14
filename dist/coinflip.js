@@ -15,6 +15,7 @@
   const tailsButton = game.querySelector("#coinflip-tails");
   const cashoutButton = game.querySelector("#coinflip-cashout");
   const coin = game.querySelector("#coinflip-coin");
+  const coinFaceIcon = game.querySelector("#coinflip-face-icon");
   const message = game.querySelector("#coinflip-message");
   const resultStrip = game.querySelector("[data-coinflip-result-strip]");
   const modeButtons = [...game.querySelectorAll("[data-coinflip-mode]")];
@@ -23,17 +24,22 @@
   const autoTarget = game.querySelector("#coinflip-auto-target");
   const autoCount = game.querySelector("#coinflip-auto-count");
   const turboButton = game.querySelector("#coinflip-turbo");
+  const muteButton = game.querySelector("#coinflip-mute");
   const favoriteButton = game.querySelector("[data-coinflip-favorite]");
   const toolButtons = [...game.querySelectorAll("[data-coinflip-tool]")];
   const toolPanels = [...game.querySelectorAll("[data-coinflip-tool-panel]")];
   let selectedCurrency = "", selectedSymbol = "COIN", displayFiat = true, availableBalance = 0, usdRate = 0;
-  let currentRound = null, mode = "manual", busy = false, autoRunning = false, stopAuto = false, turbo = false, restored = false, alternatingSide = "heads";
+  let currentRound = null, mode = "manual", busy = false, autoRunning = false, stopAuto = false, turbo = false, muted = false, restored = false, alternatingSide = "heads", visibleSide = "heads";
   let houseFactor = 0.99;
   const displayWagers = new Map();
   const recordedRounds = new Set();
   const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0 };
 
-  try { turbo = Boolean(JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}").turbo); } catch {}
+  try {
+    const settings = JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}");
+    turbo = Boolean(settings.coinflipTurbo ?? settings.turbo);
+    muted = Boolean(settings.coinflipMute);
+  } catch {}
   const requestId = () => crypto.randomUUID().replaceAll("-", "");
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const cleanAmount = () => Math.max(0, Math.round((Number(betInput.value) || 0) * 1e8) / 1e8);
@@ -73,11 +79,28 @@
     } catch { /* Keep the safe default until live configuration is reachable. */ }
   }
 
+  function setCoinFace(side) {
+    visibleSide = side === "tails" ? "tails" : "heads";
+    coin.dataset.side = visibleSide;
+    coinFaceIcon.src = visibleSide === "heads" ? "assets/games/coinflip/helmet.png" : "assets/games/coinflip/wheel.png";
+    coinFaceIcon.alt = visibleSide === "heads" ? "Heads helmet" : "Tails steering wheel";
+  }
+
   async function animateCoin(result) {
-    coin.classList.remove("flip-heads", "flip-tails");
+    coin.classList.remove("is-flipping");
     void coin.offsetWidth;
-    coin.classList.add(result === "heads" ? "flip-heads" : "flip-tails");
-    await delay(turbo ? 360 : 1350);
+    coin.classList.add("is-flipping");
+    const duration = turbo ? 420 : 1350;
+    const interval = turbo ? 85 : 135;
+    let elapsed = 0;
+    while (elapsed + interval < duration) {
+      await delay(interval);
+      elapsed += interval;
+      setCoinFace(visibleSide === "heads" ? "tails" : "heads");
+    }
+    await delay(Math.max(0, duration - elapsed));
+    setCoinFace(result);
+    coin.classList.remove("is-flipping");
   }
 
   async function startRound() {
@@ -161,11 +184,13 @@
   game.querySelectorAll("[data-coinflip-bet-action]").forEach((button) => button.addEventListener("click", () => { betInput.value = Math.min(availableBalance, button.dataset.coinflipBetAction === "half" ? cleanAmount() / 2 : cleanAmount() * 2).toFixed(displayFiat ? 2 : 8); updateAvailability(); }));
   actionButton.addEventListener("click", () => { if (autoRunning) { stopAuto = true; updateAvailability(); } else if (mode === "auto") runAuto(); else manualStart(); });
   headsButton.addEventListener("click", () => manualFlip("heads")); tailsButton.addEventListener("click", () => manualFlip("tails")); cashoutButton.addEventListener("click", manualCashout); betInput.addEventListener("input", updateAvailability);
-  turboButton.addEventListener("click", () => { turbo = !turbo; turboButton.setAttribute("aria-checked", String(turbo)); let settings = {}; try { settings = JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}"); } catch {} settings.turbo = turbo; localStorage.setItem("gamrace-game-settings-v1", JSON.stringify(settings)); });
+  function persistSetting(name, value) { let settings = {}; try { settings = JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}"); } catch {} settings[name] = value; localStorage.setItem("gamrace-game-settings-v1", JSON.stringify(settings)); }
+  turboButton.addEventListener("click", () => { turbo = !turbo; turboButton.setAttribute("aria-checked", String(turbo)); persistSetting("coinflipTurbo", turbo); });
+  muteButton.addEventListener("click", () => { muted = !muted; muteButton.setAttribute("aria-checked", String(muted)); persistSetting("coinflipMute", muted); });
   favoriteButton.addEventListener("click", () => { const set = favorites(); if (set.has("coinflip")) set.delete("coinflip"); else set.add("coinflip"); localStorage.setItem("gamrace-favourites-v1", JSON.stringify([...set])); renderFavorite(); });
   toolButtons.forEach((button) => button.addEventListener("click", () => toggleTool(button.dataset.coinflipTool)));
   game.querySelectorAll("[data-close-coinflip-tool]").forEach((button) => button.addEventListener("click", closeTools));
-  turboButton.setAttribute("aria-checked", String(turbo)); renderFavorite(); renderRound();
+  turboButton.setAttribute("aria-checked", String(turbo)); muteButton.setAttribute("aria-checked", String(muted)); setCoinFace("heads"); renderFavorite(); renderRound();
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWallet(event.detail));
   if (window.gamraceWalletSelection) applyWallet(window.gamraceWalletSelection);
   loadLiveHouseEdge();

@@ -15,7 +15,7 @@ test("site surfaces use the neutral palette with blue primary actions and no gam
   assert.match(modern, /\.game-page,[\s\S]*background: var\(--bg\)/);
   assert.match(modern, /\.mines-board-panel,[\s\S]*background: #0f1115/);
   assert.match(modern, /\.mines-primary-button,[\s\S]*background: #168cf2/);
-  assert.match(gameHtml, /styles\.css\?v=coinflip-1/);
+  assert.match(gameHtml, /styles\.css\?v=game-tools-1/);
   assert.match(indexHtml, /styles\.css\?v=compact-results-1/);
 });
 
@@ -29,5 +29,5 @@ test("risk choices are separate colour-coded controls", () => {
 test("Keno advertises and renders the 1000x maximum", () => {
   assert.match(gameHtml, /<dt>Maximum win<\/dt><dd>1,000×<\/dd>/);
   assert.match(kenoScript, /MAX_MULTIPLIER_MICROS = 1_000_000_000/);
-  assert.match(gameHtml, /keno\.js\?v=keno-clean-1/);
+  assert.match(gameHtml, /keno\.js\?v=live-edge-1/);
 });

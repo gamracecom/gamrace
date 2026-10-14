@@ -52,6 +52,7 @@
   let animatedRoundId = "";
   let walletRefreshRoundId = "";
   let recoveredAssetStakes = false;
+  const recordedSessionRounds = new Set();
 
   function requestId() {
     return crypto.randomUUID().replaceAll("-", "");
@@ -197,6 +198,12 @@
     }
     if (round.phase === "spinning") {
       animateSharedRound(round, serverNow);
+      if (!recordedSessionRounds.has(round.id) && hasStakes() && OUTCOMES[round.result]) {
+        recordedSessionRounds.add(round.id);
+        const wager = Object.values(displayedStakes).reduce((total, value) => total + Number(value || 0), 0);
+        const payout = Number(displayedStakes[round.result] || 0) * OUTCOMES[round.result].multiplier;
+        window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "roulette", wager, payout } }));
+      }
       if (walletRefreshRoundId !== round.id) {
         walletRefreshRoundId = round.id;
         window.gamraceWallet?.request("/wallet").then((response) => window.gamraceWallet.applyGameResult(response)).catch(() => {});

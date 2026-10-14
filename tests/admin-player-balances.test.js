@@ -13,6 +13,9 @@ test("owner player controls expose an audited balance editor", () => {
   assert.match(workerScript, /requireAdminSession\(request, env, user\)/);
   assert.match(workerScript, /player\.balance\.set/);
   assert.match(workerScript, /admin_balance_set/);
+  assert.match(adminHtml, /id="cancel-balance-editor" type="button"/);
+  assert.match(adminHtml, /id="close-balance-editor" type="button"/);
+  assert.match(adminScript, /function closeBalanceEditor\(\)/);
 });
 
 test("player usernames are synchronized and rendered in the control panel", () => {

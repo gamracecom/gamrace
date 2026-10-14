@@ -36,6 +36,15 @@ test("Coinflip rounds are server authoritative, refresh safe and wager first", (
 test("owner game controls show editable and fixed house edges", () => {
   assert.match(admin, /id="game-edge-grid"/);
   assert.match(worker, /GAME_EDGE_DEFINITIONS/);
-  assert.match(worker, /editable: false, reason: "Determined by the live tile distribution"/);
+  assert.match(worker, /editable: false, fixedHouseEdgeBasisPoints: 1765, reason: "Determined by the live 17-tile distribution"/);
   assert.match(worker, /game\.house_edge\.updated/);
+});
+
+test("Coinflip renders both result faces reliably and uses the shared floating tools", () => {
+  assert.match(html, /id="coinflip-face-icon"/);
+  assert.match(html, /id="coinflip-mute"/);
+  assert.match(script, /function setCoinFace\(side\)/);
+  assert.match(script, /setCoinFace\(result\)/);
+  assert.match(styles, /\.coinflip-coin\[data-side="tails"\] \.coinflip-face \{ background: #8b5cf6/);
+  assert.match(styles, /\.game-tool-button:focus-visible,[\s\S]*background: transparent !important/);
 });

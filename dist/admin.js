@@ -531,6 +531,15 @@ function openBalanceEditor(player) {
 }
 
 document.querySelector("#balance-asset").addEventListener("change", refreshBalanceEditor);
+function closeBalanceEditor() {
+  if (!balanceDialog.open) return;
+  balanceDialog.close("cancel");
+}
+document.querySelector("#close-balance-editor").addEventListener("click", closeBalanceEditor);
+document.querySelector("#cancel-balance-editor").addEventListener("click", closeBalanceEditor);
+balanceDialog.addEventListener("click", (event) => {
+  if (event.target === balanceDialog) closeBalanceEditor();
+});
 document.querySelector("#balance-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!activePlayer) return;
@@ -560,7 +569,11 @@ document.querySelector("#balance-form").addEventListener("submit", async (event)
     button.textContent = "Save balance";
   }
 });
-balanceDialog.addEventListener("close", () => { activePlayer = null; });
+balanceDialog.addEventListener("close", () => {
+  activePlayer = null;
+  document.querySelector("#balance-form").reset();
+  document.querySelector("#balance-status").textContent = "";
+});
 
 document.querySelector("#player-search-button").addEventListener("click", () => loadPlayers().catch((error) => showToast(error.message, "error")));
 document.querySelector("#player-search").addEventListener("keydown", (event) => { if (event.key === "Enter") loadPlayers().catch((error) => showToast(error.message, "error")); });

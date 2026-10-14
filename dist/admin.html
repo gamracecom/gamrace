@@ -198,7 +198,7 @@
 
     <dialog class="review-dialog balance-dialog" id="balance-dialog">
       <form method="dialog" class="review-shell" id="balance-form">
-        <button class="dialog-close" value="cancel" aria-label="Close balance editor">×</button>
+        <button class="dialog-close" id="close-balance-editor" type="button" aria-label="Close balance editor">×</button>
         <p class="section-kicker">PLAYER WALLET</p>
         <h2>Edit available balance</h2>
         <div class="balance-player-summary"><strong id="balance-player-username">Player</strong><span id="balance-player-uid">—</span></div>
@@ -207,11 +207,11 @@
         <label>New available balance<input id="balance-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00000000" required /></label>
         <label>Audit reason<textarea id="balance-reason" maxlength="200" placeholder="Why is this balance being changed?" required></textarea></label>
         <p class="balance-safety-note">Held funds are protected and cannot be changed here.</p>
-        <div class="dialog-actions"><button class="outline-button" value="cancel">Cancel</button><button class="solid-button" id="confirm-balance-update" type="submit">Save balance</button></div>
+        <div class="dialog-actions"><button class="outline-button" id="cancel-balance-editor" type="button">Cancel</button><button class="solid-button" id="confirm-balance-update" type="submit">Save balance</button></div>
         <p class="dialog-status" id="balance-status" role="status"></p>
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=game-edges-1"></script>
+    <script type="module" src="admin.js?v=balance-cancel-1"></script>
   </body>
 </html>

@@ -53,3 +53,10 @@ test("Plinko displays and settles against the live owner house edge", () => {
   assert.match(worker, /plinkoPayout\(wagerUnits, rows, risk, bucket, houseFactorMicros\)/);
   assert.match(worker, /id: "plinko", name: "Plinko", editable: true/);
 });
+
+test("Plinko has the standard settings, favourite, statistics and information tools", () => {
+  assert.match(html, /data-shared-game-tools="plinko"/);
+  assert.match(html, /data-shared-game-favorite="plinko"/);
+  assert.match(html, /data-game-rtp="plinko"/);
+  assert.match(script, /gamrace:session-result/);
+});

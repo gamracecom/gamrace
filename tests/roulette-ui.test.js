@@ -60,3 +60,11 @@ test("Roulette stays simple and responsive", () => {
   assert.match(html, /data-roulette-history-view="lucky">Lucky Wins/);
   assert.doesNotMatch(script, /No winning bet/);
 });
+
+test("Roulette has standard tools and reports its fixed live-track return", () => {
+  assert.match(html, /data-shared-game-tools="roulette"/);
+  assert.match(html, /data-shared-game-favorite="roulette"/);
+  assert.match(html, /data-game-rtp="roulette">82\.35%/);
+  assert.match(script, /gamrace:session-result/);
+  assert.match(worker, /fixedHouseEdgeBasisPoints: 1765/);
+});
