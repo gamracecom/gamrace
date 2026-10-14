@@ -364,7 +364,7 @@ export function coinflipMultiplierMicros(streakValue, houseFactorMicrosValue = 9
 }
 
 const CRASH_MAX_MULTIPLIER_MICROS = 1_000_000_000;
-const CRASH_FLIGHT_MS = 15_000;
+const CRASH_FLIGHT_MS = 80_000;
 
 export function crashPointMicros(drawValue, houseFactorMicrosValue = 990_000) {
   const draw = Number(drawValue);

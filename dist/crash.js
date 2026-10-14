@@ -25,6 +25,7 @@
     slot: Number(root.dataset.crashSlip),
     wagerInput: root.querySelector("[data-crash-wager]"),
     autoInput: root.querySelector("[data-crash-auto]"),
+    infiniteButton: root.querySelector("[data-crash-auto-infinite]"),
     button: root.querySelector("[data-crash-action]"),
     state: root.querySelector("[data-crash-slip-state]"),
     busy: false,
@@ -47,6 +48,7 @@
   const recordedWagers = new Set();
   const knownStatuses = new Map();
   const displayWagers = new Map();
+  const autoTriggered = new Set();
 
   try {
     const settings = JSON.parse(localStorage.getItem("gamrace-game-settings-v1") || "{}");
@@ -62,10 +64,11 @@
   const fmtAmount = (value) => displayFiat ? `$${Number(value || 0).toFixed(2)}` : `${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} ${selectedSymbol}`;
   const currentMultiplier = (timestamp = logicalNow()) => {
     if (!round || timestamp < round.launchesAtMs) return 1;
-    const progress = Math.max(0, Math.min(1, (timestamp - round.launchesAtMs) / 15000));
-    return Math.min(round.crashMultiplier || 1000, Math.exp(Math.log(1000) * progress));
+    if (round.phase === "crashed") return Number(round.crashMultiplier || 1);
+    const progress = Math.max(0, Math.min(1, (timestamp - round.launchesAtMs) / 80000));
+    return Math.min(1000, Math.exp(Math.log(1000) * progress));
   };
-  const currentPhase = (timestamp = logicalNow()) => !round ? "betting" : timestamp < round.launchesAtMs ? "betting" : timestamp < round.crashesAtMs ? "flying" : "crashed";
+  const currentPhase = (timestamp = logicalNow()) => !round ? "betting" : round.phase === "crashed" ? "crashed" : timestamp < round.launchesAtMs ? "betting" : "flying";
   function setMessage(text = "") { messageNode.textContent = text; messageNode.hidden = !text; }
 
   function playTone(type) {
@@ -121,13 +124,16 @@
         if (oldStatus === "open" && wager.status !== "open") recordSettlement(wager);
       }
       const placed = wager?.status === "open";
+      const awaitingAuto = placed && autoTriggered.has(wager.id);
       const canPlace = phase === "betting" && !wager && !slip.busy && selectedCurrency && cleanAmount(slip.wagerInput) >= minBet() && cleanAmount(slip.wagerInput) <= availableBalance;
-      const canCashout = phase === "flying" && placed && !slip.busy;
+      const canCashout = phase === "flying" && placed && !awaitingAuto && !slip.busy;
       slip.wagerInput.disabled = Boolean(wager) || phase !== "betting" || slip.busy;
       slip.autoInput.disabled = Boolean(wager) || phase !== "betting" || slip.busy;
+      slip.infiniteButton.disabled = Boolean(wager) || phase !== "betting" || slip.busy;
       slip.root.querySelectorAll("[data-crash-amount-action]").forEach((button) => { button.disabled = Boolean(wager) || phase !== "betting" || slip.busy; });
       slip.button.classList.toggle("is-cashout", canCashout);
-      if (canCashout) {
+      if (awaitingAuto) slip.button.textContent = "Auto Cashing Out…";
+      else if (canCashout) {
         const amount = displayWagers.get(wager.id);
         slip.button.textContent = `Cash Out · ${Number.isFinite(amount) ? fmtAmount(amount * currentMultiplier()) : fmtX(currentMultiplier())}`;
       } else if (wager?.status === "cashed_out") slip.button.textContent = `Cashed Out · ${fmtX(wager.multiplier)}`;
@@ -135,7 +141,7 @@
       else if (placed) slip.button.textContent = phase === "betting" ? "Bet Placed" : "Flying";
       else slip.button.textContent = phase === "betting" ? "Place Bet" : "Next Round";
       slip.button.disabled = !(canPlace || canCashout);
-      slip.state.textContent = wager?.status === "cashed_out" ? fmtX(wager.multiplier) : wager?.status === "lost" ? "Lost" : placed ? "Active" : "Ready";
+      slip.state.textContent = wager?.status === "cashed_out" ? fmtX(wager.multiplier) : wager?.status === "lost" ? "Lost" : awaitingAuto ? "Auto cashing out…" : placed ? "Active" : "Ready";
     });
   }
 
@@ -163,6 +169,15 @@
     } else if (phase === "flying") {
       phaseNode.textContent = "Live";
       countdownNode.textContent = "Cash out before the crash";
+      slips.forEach((slip) => {
+        const wager = wagerFor(slip.slot);
+        const target = Number(wager?.autoCashout);
+        if (wager?.status === "open" && target > 1 && multiplier >= target && !autoTriggered.has(wager.id)) {
+          autoTriggered.add(wager.id);
+          slip.state.textContent = "Auto cashing out…";
+          refreshLive();
+        }
+      });
     } else {
       phaseNode.textContent = "Crashed at";
       countdownNode.textContent = "Next round incoming";
@@ -235,7 +250,7 @@
       serverOffset = Number(response.serverNow || Date.now()) - Date.now();
       const changedRound = response.round?.id !== previousRoundId;
       round = response.round;
-      if (changedRound) { previousRoundId = round?.id || ""; previousPhase = ""; setMessage(); }
+      if (changedRound) { previousRoundId = round?.id || ""; previousPhase = ""; autoTriggered.clear(); setMessage(); }
       (round?.wagers || []).forEach((wager) => {
         const oldStatus = knownStatuses.get(wager.id);
         if (oldStatus === "open" && wager.status !== "open") recordSettlement(wager);
@@ -262,7 +277,7 @@
       slip.wagerInput.step = slip.wagerInput.min;
     });
     window.GamRaceBetCurrency?.render(game.querySelectorAll("[data-crash-currency]"), detail);
-    if (changed) { round = null; previousRoundId = ""; knownStatuses.clear(); displayWagers.clear(); }
+    if (changed) { round = null; previousRoundId = ""; knownStatuses.clear(); displayWagers.clear(); autoTriggered.clear(); }
     renderSlips(); refreshLive();
   }
 
@@ -277,6 +292,12 @@
       if (wager?.status === "open" && currentPhase() === "flying") cashout(slip, wager); else placeBet(slip);
     });
     slip.wagerInput.addEventListener("input", renderSlips);
+    slip.autoInput.addEventListener("input", () => slip.root.classList.toggle("auto-infinite", !slip.autoInput.value));
+    slip.infiniteButton.addEventListener("click", () => {
+      slip.autoInput.value = "";
+      slip.autoInput.placeholder = "∞";
+      slip.root.classList.add("auto-infinite");
+    });
     slip.root.querySelectorAll("[data-crash-amount-action]").forEach((button) => button.addEventListener("click", () => {
       const next = button.dataset.crashAmountAction === "half" ? cleanAmount(slip.wagerInput) / 2 : cleanAmount(slip.wagerInput) * 2;
       slip.wagerInput.value = Math.min(availableBalance, next).toFixed(displayFiat ? 2 : 8);
@@ -290,7 +311,7 @@
     if (event.detail.name === "reducedMotion") reducedMotion = Boolean(event.detail.value);
   });
   if (window.gamraceWalletSelection) applyWallet(window.gamraceWalletSelection);
-  window.setInterval(refreshLive, 350);
+  window.setInterval(refreshLive, 250);
   window.addEventListener("focus", refreshLive);
   renderFlight();
 })();

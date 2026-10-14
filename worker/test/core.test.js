@@ -107,7 +107,9 @@ test("Crash points and time curves are bounded and inverse", () => {
   assert.equal(crashPointMicros(500_000, 990_000), 1_980_000);
   assert.equal(crashPointMicros(1, 990_000), 1_000_000_000);
   assert.equal(crashMultiplierMicros(0), 1_000_000);
-  assert.equal(crashMultiplierMicros(15_000), 1_000_000_000);
+  assert.equal(crashMultiplierMicros(80_000), 1_000_000_000);
+  assert.ok(crashDurationMs(2_000_000) > 7_900 && crashDurationMs(2_000_000) < 8_100);
+  assert.ok(crashDurationMs(10_000_000) > 26_500);
   const point = 12_340_000;
   assert.ok(Math.abs(crashMultiplierMicros(crashDurationMs(point)) - point) < 20_000);
   assert.throws(() => crashPointMicros(0));

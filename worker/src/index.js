@@ -1467,8 +1467,8 @@ async function handleCoinflipCashout(request, env, user, roundIdValue) {
 }
 
 const CRASH_BETTING_MS = 8_000;
-const CRASH_FLIGHT_MS = 15_000;
-const CRASH_CYCLE_MS = 26_000;
+const CRASH_POST_CRASH_MS = 3_000;
+const CRASH_ROUND_BUCKET_MS = 5_000;
 
 function crashRoundId(startsAt) {
   return `crash_${startsAt}`;
@@ -1486,25 +1486,49 @@ function crashCurrentMultiplier(row, timestamp = now()) {
 }
 
 async function ensureCrashRound(env, timestamp = now()) {
-  const startsAt = Math.floor(timestamp / CRASH_CYCLE_MS) * CRASH_CYCLE_MS;
-  let row = await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
+  let row = await env.DB.prepare(`
+    SELECT * FROM crash_live_rounds
+    WHERE starts_at <= ? AND ends_at > ?
+    ORDER BY starts_at DESC LIMIT 1
+  `).bind(timestamp, timestamp).first();
   if (row) return row;
+  const latest = await env.DB.prepare("SELECT * FROM crash_live_rounds ORDER BY starts_at DESC LIMIT 1").first();
+  const bucketStart = Math.floor(timestamp / CRASH_ROUND_BUCKET_MS) * CRASH_ROUND_BUCKET_MS;
+  const startsAt = Math.max(bucketStart, Number(latest?.ends_at || 0));
   const houseFactorMicros = await gameHouseFactorMicros(env, "crash");
   const crashMultiplierMicrosValue = crashPointMicros(secureRandomInt(1_000_000) + 1, houseFactorMicros);
   const launchesAt = startsAt + CRASH_BETTING_MS;
   const crashesAt = launchesAt + crashDurationMs(crashMultiplierMicrosValue);
+  const endsAt = crashesAt + CRASH_POST_CRASH_MS;
   await env.DB.prepare(`
     INSERT OR IGNORE INTO crash_live_rounds(
       id, starts_at, launches_at, crashes_at, ends_at, crash_multiplier_micros,
       house_factor_micros, status, created_at
     ) VALUES(?, ?, ?, ?, ?, ?, ?, 'open', ?)
   `).bind(
-    crashRoundId(startsAt), startsAt, launchesAt, crashesAt, startsAt + CRASH_CYCLE_MS,
+    crashRoundId(startsAt), startsAt, launchesAt, crashesAt, endsAt,
     crashMultiplierMicrosValue, houseFactorMicros, timestamp,
   ).run();
-  row = await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
+  row = await env.DB.prepare(`
+    SELECT * FROM crash_live_rounds
+    WHERE starts_at <= ? AND ends_at > ?
+    ORDER BY starts_at DESC LIMIT 1
+  `).bind(timestamp, timestamp).first();
+  row ||= await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
   if (!row) throw httpError(503, "The Crash round could not be opened");
   return row;
+}
+
+async function settleCrashAutomaticWagers(env, row, multiplierMicros, timestamp = now()) {
+  const automatic = await env.DB.prepare(`
+    SELECT * FROM crash_wagers
+    WHERE round_id = ? AND status = 'open' AND auto_cashout_micros IS NOT NULL
+      AND auto_cashout_micros <= ?
+    ORDER BY created_at ASC LIMIT 200
+  `).bind(row.id, multiplierMicros).all();
+  for (const wager of automatic.results || []) {
+    await settleCrashWager(env, wager, Number(wager.auto_cashout_micros), timestamp);
+  }
 }
 
 async function settleCrashWager(env, wager, multiplierMicros, timestamp = now()) {
@@ -1535,13 +1559,7 @@ async function settleCrashWager(env, wager, multiplierMicros, timestamp = now())
 
 async function settleCrashRoundIfDue(env, row, timestamp = now()) {
   if (!row || timestamp < Number(row.crashes_at) || row.status === "settled") return row;
-  const automatic = await env.DB.prepare(`
-    SELECT * FROM crash_wagers
-    WHERE round_id = ? AND status = 'open' AND auto_cashout_micros IS NOT NULL
-      AND auto_cashout_micros <= ?
-    ORDER BY created_at ASC LIMIT 200
-  `).bind(row.id, Number(row.crash_multiplier_micros)).all();
-  for (const wager of automatic.results || []) await settleCrashWager(env, wager, Number(wager.auto_cashout_micros), timestamp);
+  await settleCrashAutomaticWagers(env, row, Number(row.crash_multiplier_micros), timestamp);
   const token = crypto.randomUUID();
   await env.DB.batch([
     env.DB.prepare(`
@@ -1598,8 +1616,8 @@ async function crashRoundResponse(env, row, user, currency, timestamp = now()) {
     phase,
     startsAtMs: Number(row.starts_at),
     launchesAtMs: Number(row.launches_at),
-    crashesAtMs: Number(row.crashes_at),
-    endsAtMs: Number(row.ends_at),
+    crashesAtMs: phase === "crashed" ? Number(row.crashes_at) : null,
+    endsAtMs: phase === "crashed" ? Number(row.ends_at) : null,
     currentMultiplier: crashCurrentMultiplier(row, timestamp) / 1_000_000,
     crashMultiplier: phase === "crashed" ? Number(row.crash_multiplier_micros) / 1_000_000 : null,
     players: Number(activity?.players || 0),
@@ -1613,6 +1631,9 @@ async function handleCrashLive(request, env, user) {
   const currencyValue = new URL(request.url).searchParams.get("currency");
   const currency = currencyValue ? normalizeCurrency(currencyValue) : "";
   let round = await ensureCrashRound(env, timestamp);
+  if (crashPhase(round, timestamp) === "flying") {
+    await settleCrashAutomaticWagers(env, round, crashCurrentMultiplier(round, timestamp), timestamp);
+  }
   round = await settleCrashRoundIfDue(env, round, timestamp);
   return json(request, env, 200, {
     serverNow: timestamp,

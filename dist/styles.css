@@ -2081,3 +2081,40 @@ body,
 @media(prefers-reduced-motion:reduce){.crash-flame,.crash-rocket.is-taking-off,.crash-explosion>*{animation-duration:.01ms!important}}
 
 .crash-rocket .rocket-body{fill:url(#rocket-metal)}.crash-rocket .rocket-nose{fill:#168bff;stroke:#8edcff;stroke-width:2}.crash-rocket .rocket-window-mark{fill:#dff6ff}.crash-rocket .rocket-stripe{fill:none;stroke:#168bff;stroke-width:4;stroke-linecap:round}.crash-speed-streaks{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none}.crash-speed-streaks i{position:absolute;left:110%;width:clamp(80px,16vw,220px);height:2px;background:linear-gradient(90deg,transparent,#58c8ff);transform:rotate(-18deg);animation:crash-speed-line 1.1s linear infinite}.crash-speed-streaks i:nth-child(1){top:13%;animation-delay:-.1s}.crash-speed-streaks i:nth-child(2){top:25%;animation-delay:-.72s;width:140px}.crash-speed-streaks i:nth-child(3){top:39%;animation-delay:-.42s}.crash-speed-streaks i:nth-child(4){top:53%;animation-delay:-.95s;width:100px}.crash-speed-streaks i:nth-child(5){top:66%;animation-delay:-.22s}.crash-speed-streaks i:nth-child(6){top:76%;animation-delay:-.61s;width:170px}.crash-speed-streaks i:nth-child(7){top:86%;animation-delay:-.82s}.crash-speed-streaks i:nth-child(8){top:33%;animation-delay:-1.04s;width:90px}.crash-canvas[data-power="boost"] .crash-flame{left:-51px;width:68px;height:23px;background:linear-gradient(90deg,#ff6b35,#ffd166 42%,#8edcff 82%,#e7f8ff)}.crash-canvas[data-power="boost"] .crash-trail{width:230px;opacity:.7}.crash-canvas[data-power="streak"] .crash-speed-streaks,.crash-canvas[data-power="overdrive"] .crash-speed-streaks{opacity:.62}.crash-canvas[data-power="streak"] .crash-flame{left:-70px;width:88px;height:25px}.crash-canvas[data-power="streak"] .crash-trail{width:300px;height:4px;opacity:.8}.crash-canvas[data-power="overdrive"] .crash-speed-streaks{opacity:1}.crash-canvas[data-power="overdrive"] .crash-speed-streaks i{height:3px;animation-duration:.48s}.crash-canvas[data-power="overdrive"] .crash-rocket{filter:drop-shadow(0 0 8px rgba(88,200,255,.8))}.crash-canvas[data-power="overdrive"] .crash-flame{left:-96px;width:116px;height:30px;background:linear-gradient(90deg,transparent,#168bff 20%,#58c8ff 62%,#fff)}.crash-canvas[data-power="overdrive"] .crash-trail{width:390px;height:5px;opacity:1}.crash-canvas[data-power="overdrive"] .crash-line{stroke-width:7}.crash-canvas[data-power="overdrive"] .crash-area{opacity:.9}@keyframes crash-speed-line{from{transform:translateX(0) rotate(-18deg)}to{transform:translateX(-1450px) rotate(-18deg)}}
+
+/* Crash polish: premium spacecraft, deliberate infinite auto-cashout and clean tool panels. */
+.crash-auto-shell [data-crash-auto-infinite]{order:2;min-width:38px;margin:0 5px 0 0;border:0;background:transparent;color:#aeb8c3;font-size:18px;cursor:pointer}
+.crash-auto-shell [data-crash-auto-infinite]:hover{color:#58c8ff}
+.crash-slip.auto-infinite .crash-auto-shell input::placeholder{color:#fff;opacity:1;font-weight:900}
+.crash-slip.auto-infinite .crash-auto-shell [data-crash-auto-infinite]{color:#58c8ff}
+.crash-rocket{width:clamp(102px,14vw,174px)}
+.crash-canvas[data-phase="betting"] .crash-rocket{opacity:.66}
+.crash-rocket .rocket-shadow{fill:#030507;opacity:.62;transform:translate(2px,3px)}
+.crash-rocket .rocket-body{fill:url(#rocket-metal);stroke:#74808d;stroke-width:1.35;stroke-linejoin:round}
+.crash-rocket .rocket-lower{fill:url(#rocket-lower-metal);stroke:#48525d;stroke-width:1}
+.crash-rocket .rocket-nose{fill:#168bff;stroke:#72d2ff;stroke-width:1.35}
+.crash-rocket .rocket-canopy{fill:url(#rocket-glass);stroke:#8edcff;stroke-width:1.35}
+.crash-rocket .rocket-canopy-shine{fill:#dff6ff;opacity:.38}
+.crash-rocket .rocket-fin{fill:#222832;stroke:#697685;stroke-width:1.2;stroke-linejoin:round}
+.crash-rocket .rocket-fin-top{fill:#343c47}
+.crash-rocket .rocket-check{fill:url(#crash-checkers);stroke:#697685;stroke-width:1}
+.crash-rocket .rocket-stripe{fill:none;stroke:#168bff;stroke-width:3;stroke-linecap:round}
+.crash-rocket .rocket-intake{fill:#090d12;stroke:#58c8ff;stroke-width:1}
+.crash-rocket .rocket-rivet{fill:#d9e1e9}
+.crash-footer .game-tool-button,
+.crash-footer .game-tool-button:hover,
+.crash-footer .game-tool-button:focus,
+.crash-footer .game-tool-button:focus-visible{border:0;background:transparent;box-shadow:none;outline:0}
+.crash-footer .game-tool-button img{width:20px;height:20px}
+.crash-footer .game-tool-panel{display:block}
+.crash-footer .game-tool-panel[hidden]{display:none}
+.crash-footer .game-tool-panel header button{width:28px;height:28px;padding:0;border:0;background:transparent;box-shadow:none;outline:0}
+.crash-footer .game-setting-row,
+.crash-footer .game-setting-row:hover,
+.crash-footer .game-setting-row:focus,
+.crash-footer .game-setting-row:focus-visible{width:100%;border:0;border-radius:0;background:transparent;box-shadow:none;outline:0}
+.crash-footer .game-setting-row+.game-setting-row{border-top:1px solid #2c333d}
+.crash-footer .fairness-label,
+.crash-footer .fairness-label:hover,
+.crash-footer .fairness-label:focus,
+.crash-footer .fairness-label:focus-visible{border:0;background:transparent;box-shadow:none;outline:0;color:#8299a8;text-decoration:underline}

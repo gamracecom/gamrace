@@ -27,7 +27,9 @@ test("Crash has a live flight surface, four independent Dual slips and full anim
 });
 
 test("Crash is a shared server-authoritative round with immediate wallet debits", () => {
-  assert.match(worker, /const CRASH_CYCLE_MS = 26_000/);
+  assert.match(worker, /const CRASH_POST_CRASH_MS = 3_000/);
+  assert.match(worker, /settleCrashAutomaticWagers/);
+  assert.match(worker, /crashesAtMs: phase === "crashed"/);
   assert.match(worker, /secureRandomInt\(1_000_000\) \+ 1/);
   assert.match(worker, /available_units = available_units - \?/);
   assert.match(worker, /crash_wager_/);
@@ -36,6 +38,8 @@ test("Crash is a shared server-authoritative round with immediate wallet debits"
   assert.doesNotMatch(script, /Math\.random/);
   assert.match(migration, /UNIQUE\(round_id, uid, currency, slot\)/);
   assert.match(migration, /auto_cashout_micros/);
+  assert.match(script, /\/ 80000/);
+  assert.match(html, /data-crash-auto-infinite/);
 });
 
 test("Crash uses the shared tools, live RTP and winning history", () => {
