@@ -4,6 +4,9 @@ import test from "node:test";
 import {
   createIpnSignature,
   createRawHmacSignature,
+  crashDurationMs,
+  crashMultiplierMicros,
+  crashPointMicros,
   dicePayout,
   assetUnitsToString,
   maskAddress,
@@ -97,6 +100,17 @@ test("server game math settles exact wallet units", () => {
   const minesMultiplier = minesMultiplierMicros(3, 1);
   assert.equal(minesMultiplier, 1_125_000);
   assert.equal(payoutFromMultiplier(100_000_000, minesMultiplier), 112_500_000);
+});
+
+test("Crash points and time curves are bounded and inverse", () => {
+  assert.equal(crashPointMicros(1_000_000, 990_000), 1_000_000);
+  assert.equal(crashPointMicros(500_000, 990_000), 1_980_000);
+  assert.equal(crashPointMicros(1, 990_000), 1_000_000_000);
+  assert.equal(crashMultiplierMicros(0), 1_000_000);
+  assert.equal(crashMultiplierMicros(15_000), 1_000_000_000);
+  const point = 12_340_000;
+  assert.ok(Math.abs(crashMultiplierMicros(crashDurationMs(point)) - point) < 20_000);
+  assert.throws(() => crashPointMicros(0));
 });
 
 test("Plinko paytables are symmetric and preserve a 99% expected return", () => {

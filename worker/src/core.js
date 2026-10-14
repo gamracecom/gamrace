@@ -363,6 +363,31 @@ export function coinflipMultiplierMicros(streakValue, houseFactorMicrosValue = 9
   return Number(multiplierMicros > 1_000_000_000_000n ? 1_000_000_000_000n : multiplierMicros);
 }
 
+const CRASH_MAX_MULTIPLIER_MICROS = 1_000_000_000;
+const CRASH_FLIGHT_MS = 15_000;
+
+export function crashPointMicros(drawValue, houseFactorMicrosValue = 990_000) {
+  const draw = Number(drawValue);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(draw) || draw < 1 || draw > 1_000_000) throw new Error("Invalid Crash draw");
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  return Math.min(CRASH_MAX_MULTIPLIER_MICROS, Math.max(1_000_000, Math.floor(houseFactorMicros * 1_000_000 / draw)));
+}
+
+export function crashDurationMs(multiplierMicrosValue) {
+  const multiplierMicros = Number(multiplierMicrosValue);
+  if (!Number.isSafeInteger(multiplierMicros) || multiplierMicros < 1_000_000 || multiplierMicros > CRASH_MAX_MULTIPLIER_MICROS) throw new Error("Invalid Crash multiplier");
+  return Math.max(0, Math.min(CRASH_FLIGHT_MS, Math.round(Math.log(multiplierMicros / 1_000_000) / Math.log(1000) * CRASH_FLIGHT_MS)));
+}
+
+export function crashMultiplierMicros(elapsedMsValue) {
+  const elapsedMs = Number(elapsedMsValue);
+  if (!Number.isFinite(elapsedMs)) throw new Error("Invalid Crash elapsed time");
+  if (elapsedMs >= CRASH_FLIGHT_MS) return CRASH_MAX_MULTIPLIER_MICROS;
+  const progress = Math.max(0, Math.min(1, elapsedMs / CRASH_FLIGHT_MS));
+  return Math.min(CRASH_MAX_MULTIPLIER_MICROS, Math.max(1_000_000, Math.floor(Math.exp(Math.log(1000) * progress) * 1_000_000)));
+}
+
 export function payoutFromMultiplier(wagerUnits, multiplierMicros) {
   const wager = Number(wagerUnits);
   const multiplier = Number(multiplierMicros);

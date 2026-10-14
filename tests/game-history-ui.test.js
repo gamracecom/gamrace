@@ -10,7 +10,7 @@ const [html, script, styles, worker] = await Promise.all([
 ]);
 
 test("every game gets a compact collapsed live-results card", () => {
-  assert.equal((html.match(/class="mines-history[^\"]*" hidden/g) || []).length, 8);
+  assert.equal((html.match(/class="mines-history[^\"]*" hidden/g) || []).length, 9);
   assert.match(script, /game-results-summary/);
   assert.match(script, /section\.removeAttribute\("hidden"\)/);
   assert.match(script, /content\.hidden = !open/);

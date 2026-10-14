@@ -1,6 +1,9 @@
 import {
   assetUnitsToString,
   coinflipMultiplierMicros,
+  crashDurationMs,
+  crashMultiplierMicros,
+  crashPointMicros,
   createRawHmacSignature,
   dicePayout,
   hiloChoice,
@@ -39,6 +42,7 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "wheel", name: "Wheel", editable: true },
   { id: "hi-lo", name: "Hi-Lo", editable: true },
   { id: "coinflip", name: "Coinflip", editable: true },
+  { id: "crash", name: "Crash", editable: true },
   { id: "plinko", name: "Plinko", editable: true },
   { id: "keno", name: "Keno", editable: true },
   { id: "roulette", name: "Roulette", editable: false, fixedHouseEdgeBasisPoints: 1765, reason: "Determined by the live 17-tile distribution" },
@@ -1462,6 +1466,239 @@ async function handleCoinflipCashout(request, env, user, roundIdValue) {
   return json(request, env, 200, { round: coinflipRoundResponse(row), wallet: await walletResponse(env, user.sub) });
 }
 
+const CRASH_BETTING_MS = 8_000;
+const CRASH_FLIGHT_MS = 15_000;
+const CRASH_CYCLE_MS = 26_000;
+
+function crashRoundId(startsAt) {
+  return `crash_${startsAt}`;
+}
+
+function crashPhase(row, timestamp = now()) {
+  if (timestamp < Number(row.launches_at)) return "betting";
+  if (timestamp < Number(row.crashes_at)) return "flying";
+  return "crashed";
+}
+
+function crashCurrentMultiplier(row, timestamp = now()) {
+  if (timestamp < Number(row.launches_at)) return 1_000_000;
+  return Math.min(Number(row.crash_multiplier_micros), crashMultiplierMicros(timestamp - Number(row.launches_at)));
+}
+
+async function ensureCrashRound(env, timestamp = now()) {
+  const startsAt = Math.floor(timestamp / CRASH_CYCLE_MS) * CRASH_CYCLE_MS;
+  let row = await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
+  if (row) return row;
+  const houseFactorMicros = await gameHouseFactorMicros(env, "crash");
+  const crashMultiplierMicrosValue = crashPointMicros(secureRandomInt(1_000_000) + 1, houseFactorMicros);
+  const launchesAt = startsAt + CRASH_BETTING_MS;
+  const crashesAt = launchesAt + crashDurationMs(crashMultiplierMicrosValue);
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO crash_live_rounds(
+      id, starts_at, launches_at, crashes_at, ends_at, crash_multiplier_micros,
+      house_factor_micros, status, created_at
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, 'open', ?)
+  `).bind(
+    crashRoundId(startsAt), startsAt, launchesAt, crashesAt, startsAt + CRASH_CYCLE_MS,
+    crashMultiplierMicrosValue, houseFactorMicros, timestamp,
+  ).run();
+  row = await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
+  if (!row) throw httpError(503, "The Crash round could not be opened");
+  return row;
+}
+
+async function settleCrashWager(env, wager, multiplierMicros, timestamp = now()) {
+  if (!wager || wager.status !== "open") return wager;
+  const payoutUnits = payoutFromMultiplier(Number(wager.wager_units), Number(multiplierMicros));
+  const token = crypto.randomUUID();
+  const results = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE crash_wagers SET status = 'cashed_out', payout_units = ?, multiplier_micros = ?,
+        settlement_token = ?, settled_at = ?
+      WHERE id = ? AND status = 'open'
+    `).bind(payoutUnits, multiplierMicros, token, timestamp, wager.id),
+    env.DB.prepare(`
+      UPDATE crypto_balances SET available_units = available_units + ?, updated_at = ?
+      WHERE uid = ? AND currency = ? AND EXISTS(
+        SELECT 1 FROM crash_wagers WHERE id = ? AND settlement_token = ? AND status = 'cashed_out'
+      )
+    `).bind(payoutUnits, timestamp, wager.uid, wager.currency, wager.id, token),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'crash_payout_' || id, uid, currency, 'game_payout', payout_units, round_id, ?
+      FROM crash_wagers WHERE id = ? AND settlement_token = ? AND status = 'cashed_out'
+    `).bind(timestamp, wager.id, token),
+  ]);
+  if (Number(results[0]?.meta?.changes || 0) !== 1) return env.DB.prepare("SELECT * FROM crash_wagers WHERE id = ?").bind(wager.id).first();
+  return env.DB.prepare("SELECT * FROM crash_wagers WHERE id = ?").bind(wager.id).first();
+}
+
+async function settleCrashRoundIfDue(env, row, timestamp = now()) {
+  if (!row || timestamp < Number(row.crashes_at) || row.status === "settled") return row;
+  const automatic = await env.DB.prepare(`
+    SELECT * FROM crash_wagers
+    WHERE round_id = ? AND status = 'open' AND auto_cashout_micros IS NOT NULL
+      AND auto_cashout_micros <= ?
+    ORDER BY created_at ASC LIMIT 200
+  `).bind(row.id, Number(row.crash_multiplier_micros)).all();
+  for (const wager of automatic.results || []) await settleCrashWager(env, wager, Number(wager.auto_cashout_micros), timestamp);
+  const token = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE crash_live_rounds SET status = 'settling', settlement_token = ?, settled_at = ?
+      WHERE id = ? AND status = 'open'
+    `).bind(token, timestamp, row.id),
+    env.DB.prepare(`
+      UPDATE crash_wagers SET status = 'lost', payout_units = 0, multiplier_micros = 0, settled_at = ?
+      WHERE round_id = ? AND status = 'open'
+    `).bind(timestamp, row.id),
+    env.DB.prepare(`
+      UPDATE crash_live_rounds SET status = 'settled'
+      WHERE id = ? AND status IN ('open', 'settling')
+    `).bind(row.id),
+  ]);
+  return env.DB.prepare("SELECT * FROM crash_live_rounds WHERE id = ?").bind(row.id).first();
+}
+
+function crashWagerResponse(row) {
+  return {
+    id: row.id,
+    slot: Number(row.slot),
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units || 0), false),
+    autoCashout: row.auto_cashout_micros == null ? null : Number(row.auto_cashout_micros) / 1_000_000,
+    multiplier: Number(row.multiplier_micros || 0) / 1_000_000,
+    status: row.status,
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function crashRecent(env) {
+  const result = await env.DB.prepare(`
+    SELECT crash_multiplier_micros FROM crash_live_rounds
+    WHERE status = 'settled' ORDER BY starts_at DESC LIMIT 10
+  `).all();
+  return (result.results || []).map((entry) => Number(entry.crash_multiplier_micros) / 1_000_000);
+}
+
+async function crashRoundResponse(env, row, user, currency, timestamp = now()) {
+  if (!row) return null;
+  const phase = crashPhase(row, timestamp);
+  const wagerResult = currency ? await env.DB.prepare(`
+    SELECT * FROM crash_wagers WHERE round_id = ? AND uid = ? AND currency = ? ORDER BY slot ASC
+  `).bind(row.id, user.sub, currency).all() : { results: [] };
+  const activity = await env.DB.prepare(`
+    SELECT COUNT(DISTINCT uid) AS players, COALESCE(SUM(wager_units), 0) AS wager_units
+    FROM crash_wagers WHERE round_id = ?
+  `).bind(row.id).first();
+  return {
+    id: row.id,
+    game: "crash",
+    phase,
+    startsAtMs: Number(row.starts_at),
+    launchesAtMs: Number(row.launches_at),
+    crashesAtMs: Number(row.crashes_at),
+    endsAtMs: Number(row.ends_at),
+    currentMultiplier: crashCurrentMultiplier(row, timestamp) / 1_000_000,
+    crashMultiplier: phase === "crashed" ? Number(row.crash_multiplier_micros) / 1_000_000 : null,
+    players: Number(activity?.players || 0),
+    totalWager: assetUnitsToString(Number(activity?.wager_units || 0), false),
+    wagers: (wagerResult.results || []).map(crashWagerResponse),
+  };
+}
+
+async function handleCrashLive(request, env, user) {
+  const timestamp = now();
+  const currencyValue = new URL(request.url).searchParams.get("currency");
+  const currency = currencyValue ? normalizeCurrency(currencyValue) : "";
+  let round = await ensureCrashRound(env, timestamp);
+  round = await settleCrashRoundIfDue(env, round, timestamp);
+  return json(request, env, 200, {
+    serverNow: timestamp,
+    round: await crashRoundResponse(env, round, user, currency, timestamp),
+    recent: await crashRecent(env),
+    wallet: await walletResponse(env, user.sub),
+  });
+}
+
+async function handleCrashWager(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const slot = Number(body.slot);
+  if (!Number.isInteger(slot) || slot < 0 || slot > 3) throw httpError(400, "Choose a valid Crash bet slot");
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const existing = await env.DB.prepare("SELECT * FROM crash_wagers WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  const timestamp = now();
+  if (existing) {
+    const storedRound = await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE id = ?").bind(existing.round_id).first();
+    return json(request, env, 200, { serverNow: timestamp, round: await crashRoundResponse(env, storedRound, user, asset.code, timestamp), wallet: await walletResponse(env, user.sub) });
+  }
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  if (wagerUnits > Math.floor(Number.MAX_SAFE_INTEGER / 1000)) throw httpError(400, "That Crash wager is too large for the 1,000× maximum payout");
+  let autoCashoutMicros = null;
+  if (body.autoCashout !== null && body.autoCashout !== undefined && String(body.autoCashout).trim() !== "") {
+    const value = Number(body.autoCashout);
+    autoCashoutMicros = Math.round(value * 1_000_000);
+    if (!Number.isInteger(autoCashoutMicros) || autoCashoutMicros < 1_010_000 || autoCashoutMicros > 1_000_000_000) throw httpError(400, "Auto cash out must be between 1.01× and 1,000×");
+  }
+  const round = await ensureCrashRound(env, timestamp);
+  if (timestamp >= Number(round.launches_at) - 200) throw httpError(409, "Betting has closed for this flight");
+  const id = crypto.randomUUID();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO crash_wagers(
+          id, request_id, round_id, uid, currency, slot, wager_units, auto_cashout_micros, status, created_at
+        )
+        SELECT ?, ?, flight.id, ?, ?, ?, ?, ?, 'open', ?
+        FROM crash_live_rounds AS flight
+        JOIN crypto_balances AS balance ON balance.uid = ? AND balance.currency = ?
+        WHERE flight.id = ? AND flight.status = 'open' AND flight.launches_at > ?
+          AND balance.available_units >= ?
+      `).bind(id, requestId, user.sub, asset.code, slot, wagerUnits, autoCashoutMicros, timestamp, user.sub, asset.code, round.id, timestamp, wagerUnits),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM crash_wagers WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'crash_wager_' || id, uid, currency, 'game_wager', -wager_units, round_id, created_at
+        FROM crash_wagers WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "That slot is already placed, betting has closed, or your available balance is too low");
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM crash_wagers WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (!duplicate) throw error;
+  }
+  return json(request, env, 201, {
+    serverNow: timestamp,
+    round: await crashRoundResponse(env, round, user, asset.code, timestamp),
+    wallet: await walletResponse(env, user.sub),
+  });
+}
+
+async function handleCrashCashout(request, env, user, wagerIdValue) {
+  const wagerId = String(wagerIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{12,80}$/.test(wagerId)) throw httpError(400, "Invalid Crash wager");
+  let wager = await env.DB.prepare("SELECT * FROM crash_wagers WHERE id = ? AND uid = ?").bind(wagerId, user.sub).first();
+  if (!wager) throw httpError(404, "That Crash wager was not found");
+  if (wager.status === "cashed_out") return json(request, env, 200, { wager: crashWagerResponse(wager), wallet: await walletResponse(env, user.sub) });
+  if (wager.status !== "open") throw httpError(409, "That rocket has already crashed");
+  const round = await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE id = ?").bind(wager.round_id).first();
+  const timestamp = now();
+  if (!round || crashPhase(round, timestamp) !== "flying") throw httpError(409, "Cash out is only available while the rocket is flying");
+  const multiplierMicros = crashCurrentMultiplier(round, timestamp);
+  wager = await settleCrashWager(env, wager, multiplierMicros, timestamp);
+  return json(request, env, 200, {
+    serverNow: timestamp,
+    wager: crashWagerResponse(wager),
+    round: await crashRoundResponse(env, round, user, wager.currency, timestamp),
+    wallet: await walletResponse(env, user.sub),
+  });
+}
+
 async function handleGameHistory(request, env, user) {
   const url = new URL(request.url);
   const game = String(url.searchParams.get("game") || "").toLowerCase();
@@ -1476,6 +1713,7 @@ async function handleGameHistory(request, env, user) {
     wheel: { table: "wheel_bets", where: "b.status = 'settled'" },
     "hi-lo": { table: "hilo_rounds", where: "b.status = 'cashed_out'" },
     coinflip: { table: "coinflip_rounds", where: "b.status = 'cashed_out'" },
+    crash: { table: "crash_wagers", where: "b.status = 'cashed_out'" },
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
@@ -3063,6 +3301,10 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);
+  if (request.method === "GET" && path === "/games/crash/live") return handleCrashLive(request, env, user);
+  if (request.method === "POST" && path === "/games/crash/wagers") return handleCrashWager(request, env, user);
+  const crashCashoutMatch = path.match(/^\/games\/crash\/wagers\/([A-Za-z0-9-]+)\/cashout$/);
+  if (request.method === "POST" && crashCashoutMatch) return handleCrashCashout(request, env, user, crashCashoutMatch[1]);
   if (request.method === "GET" && path === "/games/hi-lo/rounds/active") return handleGetActiveHiloRound(request, env, user);
   if (request.method === "POST" && path === "/games/hi-lo/rounds") return handleStartHiloRound(request, env, user);
   const hiloGuessMatch = path.match(/^\/games\/hi-lo\/rounds\/([A-Za-z0-9-]+)\/guess$/);
