@@ -2087,7 +2087,7 @@ body,
 .crash-auto-shell [data-crash-auto-infinite]:hover{color:#58c8ff}
 .crash-slip.auto-infinite .crash-auto-shell input::placeholder{color:#fff;opacity:1;font-weight:900}
 .crash-slip.auto-infinite .crash-auto-shell [data-crash-auto-infinite]{color:#58c8ff}
-.crash-rocket{width:clamp(102px,14vw,174px)}
+.crash-rocket{width:clamp(102px,14vw,174px);transform:translate(-18%,-50%) rotate(-19deg)}
 .crash-canvas[data-phase="betting"] .crash-rocket{opacity:.66}
 .crash-rocket .rocket-shadow{fill:#030507;opacity:.62;transform:translate(2px,3px)}
 .crash-rocket .rocket-body{fill:url(#rocket-metal);stroke:#74808d;stroke-width:1.35;stroke-linejoin:round}
@@ -2118,3 +2118,5 @@ body,
 .crash-footer .fairness-label:hover,
 .crash-footer .fairness-label:focus,
 .crash-footer .fairness-label:focus-visible{border:0;background:transparent;box-shadow:none;outline:0;color:#8299a8;text-decoration:underline}
+@keyframes crash-swoosh{0%{transform:translate(-95%,-15%) rotate(-19deg);opacity:0}100%{transform:translate(-18%,-50%) rotate(-19deg);opacity:1}}
+@media(max-width:780px){.crash-rocket{width:112px}}
