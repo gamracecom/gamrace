@@ -46,3 +46,10 @@ test("Plinko reserves rapid wagers so queued balls cannot overspend the wallet",
   assert.match(script, /amount > spendableBalance\(\)/);
   assert.match(script, /while \(historyBody && historyBody\.rows\.length < 5\)/);
 });
+
+test("Plinko displays and settles against the live owner house edge", () => {
+  assert.match(script, /games\/settings/);
+  assert.match(script, /houseFactorMicros/);
+  assert.match(worker, /plinkoPayout\(wagerUnits, rows, risk, bucket, houseFactorMicros\)/);
+  assert.match(worker, /id: "plinko", name: "Plinko", editable: true/);
+});

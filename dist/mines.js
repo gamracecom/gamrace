@@ -18,7 +18,7 @@
   blankState.hidden = true;
 
   const TILE_COUNT = 25;
-  const HOUSE_FACTOR = 0.99;
+  let houseFactor = 0.99;
   const board = document.querySelector("#mines-board");
   const actionButton = document.querySelector("#mines-action");
   const autoActionButton = document.querySelector("#auto-action");
@@ -122,7 +122,18 @@
     for (let pick = 0; pick < picks; pick += 1) {
       survivalProbability *= (TILE_COUNT - mines - pick) / (TILE_COUNT - pick);
     }
-    return Math.max(1, HOUSE_FACTOR / survivalProbability);
+    return Math.max(1, houseFactor / survivalProbability);
+  }
+
+  async function loadLiveHouseEdge() {
+    try {
+      const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
+      const payload = response.ok ? await response.json() : null;
+      const factor = Number(payload?.games?.mines?.houseFactorMicros);
+      if (!Number.isInteger(factor) || factor < 900_000 || factor > 1_000_000) return;
+      houseFactor = factor / 1_000_000;
+      updateCashoutButton();
+    } catch { /* Keep the safe default until live configuration is reachable. */ }
   }
 
   function renderBalance() {
@@ -760,6 +771,7 @@
 
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
+  loadLiveHouseEdge();
 
   actionButton.addEventListener("click", async () => {
     if (activeRound && !activeRound.finished) {

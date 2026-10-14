@@ -39,8 +39,8 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "wheel", name: "Wheel", editable: true },
   { id: "hi-lo", name: "Hi-Lo", editable: true },
   { id: "coinflip", name: "Coinflip", editable: true },
-  { id: "plinko", name: "Plinko", editable: false, reason: "Uses a fixed, audited paytable" },
-  { id: "keno", name: "Keno", editable: false, reason: "Uses fixed risk paytables" },
+  { id: "plinko", name: "Plinko", editable: true },
+  { id: "keno", name: "Keno", editable: true },
   { id: "roulette", name: "Roulette", editable: false, reason: "Determined by the live tile distribution" },
 ]);
 
@@ -51,6 +51,18 @@ async function gameHouseEdgeBasisPoints(env, gameId) {
 
 async function gameHouseFactorMicros(env, gameId) {
   return 1_000_000 - await gameHouseEdgeBasisPoints(env, gameId) * 100;
+}
+
+async function handleGameSettings(request, env) {
+  const games = await readGameEdges(env);
+  return json(request, env, 200, {
+    games: Object.fromEntries(games.map((game) => [game.id, {
+      houseEdgeBasisPoints: game.houseEdgeBasisPoints,
+      houseEdgePercent: game.houseEdgePercent,
+      houseFactorMicros: 1_000_000 - game.houseEdgeBasisPoints * 100,
+      rtpPercent: game.rtpPercent,
+    }])),
+  });
 }
 
 function httpError(status, message, code = "REQUEST_FAILED") {
@@ -855,7 +867,8 @@ async function handlePlinkoBet(request, env, user) {
   const path = Array.from({ length: rows }, () => secureRandomInt(2));
   const bucket = path.reduce((total, step) => total + step, 0);
   let settlement;
-  try { settlement = plinkoPayout(wagerUnits, rows, risk, bucket); }
+  const houseFactorMicros = await gameHouseFactorMicros(env, "plinko");
+  try { settlement = plinkoPayout(wagerUnits, rows, risk, bucket, houseFactorMicros); }
   catch (error) { throw httpError(400, error.message); }
   const timestamp = now();
   const id = crypto.randomUUID();
@@ -1081,7 +1094,8 @@ async function handleStartKenoBet(request, env, user) {
   const hits = drawnNumbers.reduce((total, number) => total + (selected.has(number) ? 1 : 0), 0);
   const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
   let settlement;
-  try { settlement = kenoPayout(wagerUnits, selectedNumbers.length, hits, risk); }
+  const houseFactorMicros = await gameHouseFactorMicros(env, "keno");
+  try { settlement = kenoPayout(wagerUnits, selectedNumbers.length, hits, risk, houseFactorMicros); }
   catch (error) { throw httpError(400, error.message); }
   const timestamp = now();
   const id = crypto.randomUUID();
@@ -3012,6 +3026,7 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
   if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env);
+  if (request.method === "GET" && path === "/games/settings") return handleGameSettings(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
 

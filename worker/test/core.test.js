@@ -120,6 +120,18 @@ test("Plinko paytables are symmetric and preserve a 99% expected return", () => 
   assert.ok(settlement.payoutUnits > 100_000_000);
 });
 
+test("Plinko paytables follow the configured live house edge", () => {
+  const multipliers = plinkoMultipliers(12, "medium", 950_000);
+  const choose = (n, k) => {
+    let result = 1;
+    for (let index = 1; index <= k; index += 1) result = result * (n - k + index) / index;
+    return result;
+  };
+  const expectedReturn = multipliers.reduce((total, multiplier, bucket) => total + choose(12, bucket) / 2 ** 12 * multiplier, 0) / 1_000_000;
+  assert.ok(Math.abs(expectedReturn - 0.95) < 0.00001);
+  assert.ok(plinkoPayout(100_000_000, 12, "medium", 0, 950_000).multiplierMicros < plinkoPayout(100_000_000, 12, "medium", 0).multiplierMicros);
+});
+
 test("Wheel paytables preserve 99% RTP at every risk and segment count", () => {
   for (const risk of ["low", "medium", "high"]) {
     for (const segments of [10, 20, 30, 40, 50]) {

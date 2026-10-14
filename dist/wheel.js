@@ -51,6 +51,7 @@
   let autoRunning = false;
   let autoStopRequested = false;
   let autoInfinite = false;
+  let houseFactor = 0.99;
   const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0, cumulative: [] };
 
   try {
@@ -63,9 +64,22 @@
   } catch { /* use safe defaults */ }
 
   function multipliersFor(segments = segmentCount, level = risk) {
-    if (level === "low") return Array.from({ length: segments }, (_, index) => LOW_PATTERN[index % LOW_PATTERN.length]);
-    if (level === "medium") return Array.from({ length: segments }, (_, index) => MEDIUM_PATTERN[index % MEDIUM_PATTERN.length]);
-    return Array.from({ length: segments }, (_, index) => index === segments - 1 ? segments * 0.99 : 0);
+    let base;
+    if (level === "low") base = Array.from({ length: segments }, (_, index) => LOW_PATTERN[index % LOW_PATTERN.length]);
+    else if (level === "medium") base = Array.from({ length: segments }, (_, index) => MEDIUM_PATTERN[index % MEDIUM_PATTERN.length]);
+    else base = Array.from({ length: segments }, (_, index) => index === segments - 1 ? segments * 0.99 : 0);
+    return base.map((multiplier) => Math.floor(multiplier * (houseFactor / 0.99) * 1_000_000) / 1_000_000);
+  }
+
+  async function loadLiveHouseEdge() {
+    try {
+      const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
+      const payload = response.ok ? await response.json() : null;
+      const factor = Number(payload?.games?.wheel?.houseFactorMicros);
+      if (!Number.isInteger(factor) || factor < 900_000 || factor > 1_000_000) return;
+      houseFactor = factor / 1_000_000;
+      renderWheel();
+    } catch { /* Keep the safe default until live configuration is reachable. */ }
   }
 
   function formatMultiplier(value) {
@@ -488,4 +502,5 @@
   });
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
+  loadLiveHouseEdge();
 })();

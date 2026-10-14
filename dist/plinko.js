@@ -39,6 +39,7 @@
   let stopAutoplayRequested = false;
   let animationFrame = 0;
   let nextBallId = 0;
+  let houseFactorMicros = 990_000;
   const activeBalls = new Map();
 
   for (let rows = 8; rows <= 16; rows += 1) {
@@ -108,7 +109,20 @@
       return floor + (edge - floor) * distance ** curve;
     });
     const expected = raw.reduce((total, multiplier, bucket) => total + choose(rows, bucket) / 2 ** rows * multiplier, 0);
-    return raw.map((multiplier) => Math.floor(multiplier * (0.99 / expected) * 1_000_000) / 1_000_000);
+    const targetRtp = houseFactorMicros / 1_000_000;
+    return raw.map((multiplier) => Math.floor(multiplier * (targetRtp / expected) * 1_000_000) / 1_000_000);
+  }
+
+  async function loadLiveHouseEdge() {
+    try {
+      const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const nextFactor = Number(payload?.games?.plinko?.houseFactorMicros);
+      if (!Number.isInteger(nextFactor) || nextFactor < 900_000 || nextFactor > 1_000_000) return;
+      houseFactorMicros = nextFactor;
+      renderPayouts();
+    } catch { /* Keep the safe default until the live configuration is reachable. */ }
   }
 
   function multiplierText(value) {
@@ -460,5 +474,6 @@
   renderPayouts();
   drawBoard();
   updateAvailability();
+  loadLiveHouseEdge();
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
 })();

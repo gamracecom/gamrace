@@ -19,6 +19,10 @@ test("Coinflip provides manual, auto, cashout and both supplied racing faces", (
   assert.match(script, /applyGameResult/);
   assert.match(styles, /@keyframes coinflip-heads/);
   assert.match(styles, /@keyframes coinflip-tails/);
+  assert.doesNotMatch(html, /id="coinflip-status"/);
+  assert.doesNotMatch(html, /id="coinflip-multiplier"/);
+  assert.doesNotMatch(html, /<span>HEADS<\/span>|<span>TAILS<\/span>/);
+  assert.match(styles, /-webkit-backface-visibility:hidden/);
 });
 
 test("Coinflip rounds are server authoritative, refresh safe and wager first", () => {

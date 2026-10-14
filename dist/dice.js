@@ -12,7 +12,7 @@
   diceGame.hidden = false;
   if (blankState) blankState.hidden = true;
 
-  const HOUSE_FACTOR = 0.99;
+  let houseFactor = 0.99;
   const FAVORITES_KEY = "gamrace-favourites-v1";
   const SETTINGS_KEY = "gamrace-dice-settings-v1";
   const slider = diceGame.querySelector("#dice-roll-target");
@@ -95,7 +95,18 @@
   }
 
   function multiplierValue() {
-    return HOUSE_FACTOR * 100 / chanceValue();
+    return houseFactor * 100 / chanceValue();
+  }
+
+  async function loadLiveHouseEdge() {
+    try {
+      const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
+      const payload = response.ok ? await response.json() : null;
+      const factor = Number(payload?.games?.dice?.houseFactorMicros);
+      if (!Number.isInteger(factor) || factor < 900_000 || factor > 1_000_000) return;
+      houseFactor = factor / 1_000_000;
+      updateSliderVisuals();
+    } catch { /* Keep the safe default until live configuration is reachable. */ }
   }
 
   function updateSliderVisuals() {
@@ -436,7 +447,7 @@
     updateSliderVisuals();
   });
   chanceInput.addEventListener("change", () => setTargetFromChance(chanceInput.value));
-  multiplierInput.addEventListener("change", () => setTargetFromChance(HOUSE_FACTOR * 100 / clamp(multiplierInput.value, 1.0102, 99)));
+  multiplierInput.addEventListener("change", () => setTargetFromChance(houseFactor * 100 / clamp(multiplierInput.value, 1.0102, 99)));
   directionToggle.addEventListener("click", () => {
     const chance = chanceValue();
     direction = direction === "over" ? "under" : "over";
@@ -494,4 +505,5 @@
   updateSliderVisuals();
   updateWagerAvailability();
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
+  loadLiveHouseEdge();
 })();

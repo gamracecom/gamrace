@@ -15,8 +15,6 @@
   const tailsButton = game.querySelector("#coinflip-tails");
   const cashoutButton = game.querySelector("#coinflip-cashout");
   const coin = game.querySelector("#coinflip-coin");
-  const statusText = game.querySelector("#coinflip-status");
-  const multiplierText = game.querySelector("#coinflip-multiplier");
   const message = game.querySelector("#coinflip-message");
   const resultStrip = game.querySelector("[data-coinflip-result-strip]");
   const modeButtons = [...game.querySelectorAll("[data-coinflip-mode]")];
@@ -30,6 +28,7 @@
   const toolPanels = [...game.querySelectorAll("[data-coinflip-tool-panel]")];
   let selectedCurrency = "", selectedSymbol = "COIN", displayFiat = true, availableBalance = 0, usdRate = 0;
   let currentRound = null, mode = "manual", busy = false, autoRunning = false, stopAuto = false, turbo = false, restored = false, alternatingSide = "heads";
+  let houseFactor = 0.99;
   const displayWagers = new Map();
   const recordedRounds = new Set();
   const sessionStats = { profit: 0, wagered: 0, wins: 0, losses: 0 };
@@ -57,18 +56,21 @@
   function renderRound(round = currentRound) {
     currentRound = round;
     const active = round?.status === "active";
-    multiplierText.textContent = fmtX(round?.multiplier || 1);
-    game.querySelectorAll("[data-coinflip-next]").forEach((node) => { node.textContent = fmtX(round?.nextMultiplier || 1.98); });
-    if (!round) statusText.textContent = "Start a round, then choose a side";
-    else if (active && !round.streak) statusText.textContent = "Choose Heads or Tails";
-    else if (active && round.canFlip === false) statusText.textContent = "Maximum streak reached · Cash out";
-    else if (active) statusText.textContent = `${round.streak} correct ${round.streak === 1 ? "flip" : "flips"} · Continue or cash out`;
-    else if (round.status === "cashed_out") statusText.textContent = `Cashed out at ${fmtX(round.multiplier)}`;
-    else statusText.textContent = `${String(round.lastResult || "").toUpperCase()} ended the round`;
+    game.querySelectorAll("[data-coinflip-next]").forEach((node) => { node.textContent = fmtX(round?.nextMultiplier || houseFactor * 2); });
     const wager = displayWagers.get(round?.id);
     if (active && round.streak > 0) cashoutButton.textContent = `Cash Out · ${displayFiat && Number.isFinite(wager) ? fmtAmount(wager * round.multiplier) : `${round.payout} ${selectedSymbol}`}`;
     else cashoutButton.textContent = "Cash Out";
     updateAvailability();
+  }
+  async function loadLiveHouseEdge() {
+    try {
+      const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
+      const payload = response.ok ? await response.json() : null;
+      const factor = Number(payload?.games?.coinflip?.houseFactorMicros);
+      if (!Number.isInteger(factor) || factor < 900_000 || factor > 1_000_000) return;
+      houseFactor = factor / 1_000_000;
+      renderRound();
+    } catch { /* Keep the safe default until live configuration is reachable. */ }
   }
 
   async function animateCoin(result) {
@@ -166,4 +168,5 @@
   turboButton.setAttribute("aria-checked", String(turbo)); renderFavorite(); renderRound();
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWallet(event.detail));
   if (window.gamraceWalletSelection) applyWallet(window.gamraceWalletSelection);
+  loadLiveHouseEdge();
 })();

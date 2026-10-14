@@ -163,11 +163,13 @@ function binomialCoefficient(rows, bucket) {
   return result;
 }
 
-export function plinkoMultipliers(rowsValue, riskValue) {
+export function plinkoMultipliers(rowsValue, riskValue, houseFactorMicrosValue = 990_000) {
   const rows = Number(rowsValue);
   const risk = String(riskValue || "").toLowerCase();
   if (!Number.isInteger(rows) || rows < 8 || rows > 16) throw new Error("Invalid Plinko row count");
   if (!["low", "medium", "high"].includes(risk)) throw new Error("Invalid Plinko risk level");
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
 
   let floor;
   let edge;
@@ -193,17 +195,17 @@ export function plinkoMultipliers(rowsValue, riskValue) {
   const expected = raw.reduce((total, multiplier, bucket) => (
     total + binomialCoefficient(rows, bucket) / 2 ** rows * multiplier
   ), 0);
-  const scale = 0.99 / expected;
+  const scale = (houseFactorMicros / 1_000_000) / expected;
   return raw.map((multiplier) => Math.max(1, Math.floor(multiplier * scale * 1_000_000)));
 }
 
-export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue) {
+export function plinkoPayout(wagerUnits, rowsValue, riskValue, bucketValue, houseFactorMicrosValue = 990_000) {
   const wager = Number(wagerUnits);
   const rows = Number(rowsValue);
   const bucket = Number(bucketValue);
   if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Plinko wager");
   if (!Number.isInteger(bucket) || bucket < 0 || bucket > rows) throw new Error("Invalid Plinko bucket");
-  const multiplierMicros = plinkoMultipliers(rows, riskValue)[bucket];
+  const multiplierMicros = plinkoMultipliers(rows, riskValue, houseFactorMicrosValue)[bucket];
   const payoutUnits = payoutFromMultiplier(wager, multiplierMicros);
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }
@@ -288,20 +290,23 @@ export const KENO_PAYTABLE_MICROS = Object.freeze(Object.fromEntries(
   Object.entries(KENO_RISK_MODELS).map(([risk, model]) => [risk, buildKenoPaytable(model)]),
 ));
 
-export function kenoMultiplierMicros(selectedCountValue, hitsValue, riskValue = "medium") {
+export function kenoMultiplierMicros(selectedCountValue, hitsValue, riskValue = "medium", houseFactorMicrosValue = 990_000) {
   const selectedCount = Number(selectedCountValue);
   const hits = Number(hitsValue);
   const risk = String(riskValue || "").toLowerCase();
   if (!Number.isInteger(selectedCount) || selectedCount < 1 || selectedCount > 10) throw new Error("Choose between 1 and 10 Keno numbers");
   if (!Number.isInteger(hits) || hits < 0 || hits > selectedCount) throw new Error("Invalid Keno hit count");
   if (!Object.hasOwn(KENO_PAYTABLE_MICROS, risk)) throw new Error("Choose a valid Keno risk level");
-  return KENO_PAYTABLE_MICROS[risk][selectedCount][hits] || 0;
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  const baseMultiplierMicros = KENO_PAYTABLE_MICROS[risk][selectedCount][hits] || 0;
+  return Math.min(KENO_MAX_MULTIPLIER_MICROS, Math.floor(baseMultiplierMicros * houseFactorMicros / 990_000));
 }
 
-export function kenoPayout(wagerUnits, selectedCountValue, hitsValue, riskValue = "medium") {
+export function kenoPayout(wagerUnits, selectedCountValue, hitsValue, riskValue = "medium", houseFactorMicrosValue = 990_000) {
   const wager = Number(wagerUnits);
   if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Keno wager");
-  const multiplierMicros = kenoMultiplierMicros(selectedCountValue, hitsValue, riskValue);
+  const multiplierMicros = kenoMultiplierMicros(selectedCountValue, hitsValue, riskValue, houseFactorMicrosValue);
   const payoutUnits = payoutFromMultiplier(wager, multiplierMicros);
   return { multiplierMicros, payoutUnits, outcome: payoutUnits >= wager ? "win" : "loss" };
 }

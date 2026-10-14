@@ -37,3 +37,11 @@ test("Keno payouts use the selected-count table and exact integer accounting", (
   assert.throws(() => kenoMultiplierMicros(11, 1), /between 1 and 10/);
   assert.throws(() => kenoMultiplierMicros(5, 2, "impossible"), /valid Keno risk/);
 });
+
+test("Keno payouts follow the configured live house edge", () => {
+  const defaultMultiplier = kenoMultiplierMicros(5, 5, "medium");
+  const configuredMultiplier = kenoMultiplierMicros(5, 5, "medium", 950_000);
+  assert.equal(configuredMultiplier, Math.floor(defaultMultiplier * 950_000 / 990_000));
+  assert.ok(configuredMultiplier < defaultMultiplier);
+  assert.equal(kenoPayout(100_000_000, 5, 5, "medium", 950_000).multiplierMicros, configuredMultiplier);
+});

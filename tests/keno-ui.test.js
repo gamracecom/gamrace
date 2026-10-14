@@ -50,3 +50,10 @@ test("Keno has distinctive responsive tiles and live leaderboard history", () =>
   assert.match(history, /setInterval\(refresh, 4000\)/);
   assert.match(worker, /LEFT JOIN player_profiles/);
 });
+
+test("Keno displays and settles against the live owner house edge", () => {
+  assert.match(script, /games\/settings/);
+  assert.match(script, /houseFactorMicros/);
+  assert.match(worker, /kenoPayout\(wagerUnits, selectedNumbers\.length, hits, risk, houseFactorMicros\)/);
+  assert.match(worker, /id: "keno", name: "Keno", editable: true/);
+});

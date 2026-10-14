@@ -57,6 +57,7 @@
   }
 
   const PAYTABLES = Object.freeze(Object.fromEntries(Object.entries(RISK_MODELS).map(([name, model]) => [name, buildPaytable(model)])));
+  let houseFactorMicros = 990_000;
   const SETTINGS_KEY = "gamrace-game-settings-v1";
   const board = game.querySelector("#keno-board");
   const betInput = game.querySelector("#keno-bet-amount");
@@ -125,6 +126,22 @@
     return `${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 3 })}×`;
   }
 
+  function liveMultiplier(value) {
+    return Math.min(1000, Math.floor(Number(value || 0) * 1_000_000 * houseFactorMicros / 990_000) / 1_000_000);
+  }
+
+  async function loadLiveHouseEdge() {
+    try {
+      const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const nextFactor = Number(payload?.games?.keno?.houseFactorMicros);
+      if (!Number.isInteger(nextFactor) || nextFactor < 900_000 || nextFactor > 1_000_000) return;
+      houseFactorMicros = nextFactor;
+      renderPaytable();
+    } catch { /* Keep the safe default until the live configuration is reachable. */ }
+  }
+
   function formatAmount(value) {
     const amount = Number(value) || 0;
     if (displayFiat) return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -146,7 +163,7 @@
       const label = document.createElement("span");
       label.textContent = `${hits} hit${hits === 1 ? "" : "s"}`;
       const multiplier = document.createElement("strong");
-      multiplier.textContent = table[hits] ? formatMultiplier(table[hits]) : "0×";
+      multiplier.textContent = table[hits] ? formatMultiplier(liveMultiplier(table[hits])) : "0×";
       cell.append(label, multiplier);
       return cell;
     }));
@@ -496,5 +513,6 @@
   game.querySelectorAll("[data-keno-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(button.dataset.kenoBetAction)));
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
   renderSelection();
+  loadLiveHouseEdge();
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
 })();
