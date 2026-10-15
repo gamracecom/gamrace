@@ -352,6 +352,28 @@ export function minesMultiplierMicros(mineCount, revealedCount, houseFactorMicro
   return Math.max(1_000_000, Math.floor(houseFactorMicros / survivalProbability));
 }
 
+export function towersMultiplierMicros(columnsValue, trapsValue, clearedRowsValue, houseFactorMicrosValue = 990_000) {
+  const columns = Number(columnsValue);
+  const traps = Number(trapsValue);
+  const clearedRows = Number(clearedRowsValue);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(columns) || columns < 2 || columns > 4) throw new Error("Invalid Towers columns");
+  if (!Number.isInteger(traps) || traps < 1 || traps >= columns) throw new Error("Invalid Towers traps");
+  if (!Number.isInteger(clearedRows) || clearedRows < 0 || clearedRows > 8) throw new Error("Invalid Towers level");
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  if (clearedRows === 0) return 1_000_000;
+  const safe = BigInt(columns - traps);
+  const total = BigInt(columns);
+  let numerator = BigInt(houseFactorMicros);
+  let denominator = 1n;
+  for (let row = 0; row < clearedRows; row += 1) {
+    numerator *= total;
+    denominator *= safe;
+  }
+  const result = numerator / denominator;
+  return Number(result > 1_000_000_000_000n ? 1_000_000_000_000n : result);
+}
+
 export function coinflipMultiplierMicros(streakValue, houseFactorMicrosValue = 990_000) {
   const streak = Number(streakValue);
   const houseFactorMicros = Number(houseFactorMicrosValue);

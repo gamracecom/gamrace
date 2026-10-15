@@ -720,6 +720,30 @@
             </div>
             <section class="mines-history blackjack-history" hidden aria-labelledby="blackjack-history-heading"><div class="history-toolbar"><div class="history-tabs" role="tablist"><button class="history-tab active" id="blackjack-history-heading" data-blackjack-history-view="top">Top Wins</button><button class="history-tab" data-blackjack-history-view="lucky">Lucky Wins</button></div><label class="history-period"><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Blackjack results"><tr class="history-skeleton"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div></section>
           </section>
+          <section class="towers-game" id="towers-game" hidden aria-label="Towers">
+            <div class="towers-stage">
+              <section class="towers-controls" aria-label="Towers controls">
+                <label class="towers-field"><span><strong>Bet Amount</strong><small data-towers-balance>0.00000000 COIN</small></span><span class="towers-input-shell"><span data-towers-currency>$</span><input id="towers-bet-amount" type="number" min="0.01" step="0.01" value="0.00" inputmode="decimal" /><button type="button" data-towers-bet-action="half">½</button><button type="button" data-towers-bet-action="double">2×</button></span></label>
+                <fieldset class="towers-difficulty"><legend>Difficulty</legend><div><button class="easy" type="button" data-towers-difficulty="easy">Easy</button><button class="medium active" type="button" data-towers-difficulty="medium">Medium</button><button class="hard" type="button" data-towers-difficulty="hard">Hard</button><button class="extreme" type="button" data-towers-difficulty="extreme">Extreme</button></div></fieldset>
+                <div class="towers-current"><span>Multiplier</span><strong id="towers-multiplier">1.00×</strong></div>
+                <button class="towers-primary" id="towers-action" type="button" disabled>Start</button>
+                <p class="towers-message" id="towers-message" role="status" aria-live="polite" hidden></p>
+              </section>
+              <section class="towers-board-wrap" aria-label="Towers board"><div class="towers-board" id="towers-board"></div></section>
+              <footer class="towers-footer">
+                <div class="game-tools" data-shared-game-tools="towers" aria-label="Game tools">
+                  <button class="game-tool-button" type="button" data-shared-game-tool="settings" aria-label="Towers settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-shared-game-favorite="towers" aria-label="Add Towers to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-shared-game-tool="stats" aria-label="Towers session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-shared-game-tool="info" aria-label="Towers information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
+                  <section class="game-tool-panel settings-panel" data-shared-game-tool-panel="settings" hidden><header><div><strong>Game settings</strong><span>Towers settings</span></div><button type="button" data-close-shared-tool aria-label="Close settings">×</button></header><button class="game-setting-row" type="button" role="switch" aria-checked="false" data-shared-game-setting="turbo"><span><strong>Turbo mode</strong><small>Use faster tile reveals</small></span><i aria-hidden="true"></i></button><button class="game-setting-row" type="button" role="switch" aria-checked="false" data-shared-game-setting="mute"><span><strong>Mute</strong><small>Turn off game sounds</small></span><i aria-hidden="true"></i></button></section>
+                  <section class="game-tool-panel stats-panel" data-shared-game-tool-panel="stats" hidden><header><div><strong>Session statistics</strong><span>Resets when this page closes</span></div><button type="button" data-close-shared-tool aria-label="Close statistics">×</button></header><div class="game-stats-grid"><article><span>Profit</span><strong data-shared-stat="profit">0.00</strong></article><article><span>Wins</span><strong data-shared-stat="wins">0</strong></article><article><span>Wagered</span><strong data-shared-stat="wagered">0.00</strong></article><article><span>Losses</span><strong data-shared-stat="losses">0</strong></article></div></section>
+                  <section class="game-tool-panel info-panel" data-shared-game-tool-panel="info" hidden><header><div><strong>Towers</strong><span>Game information</span></div><button type="button" data-close-shared-tool aria-label="Close game information">×</button></header><p>Choose one safe tile on each row. Cash out after a safe pick or keep climbing for a higher multiplier.</p><dl><div><dt>Rows</dt><dd>8</dd></div><div><dt>Risk levels</dt><dd>4</dd></div><div><dt>Return to player</dt><dd data-game-rtp="towers">99%</dd></div></dl></section>
+                </div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button>
+              </footer>
+            </div>
+            <section class="mines-history towers-history" hidden aria-labelledby="towers-history-heading"><div class="history-toolbar"><div class="history-tabs" role="tablist"><button class="history-tab active" id="towers-history-heading" data-towers-history-view="top">Top Wins</button><button class="history-tab" data-towers-history-view="lucky">Lucky Wins</button></div><label class="history-period"><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Towers results"><tr class="history-skeleton"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div></section>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -745,7 +769,8 @@
     <script src="coinflip.js?v=coinflip-tools-1" defer></script>
     <script src="crash.js?v=crash-live-3" defer></script>
     <script src="blackjack.js?v=blackjack-2" defer></script>
-    <script src="game-history.js?v=blackjack-1" defer></script>
+    <script src="towers.js?v=towers-1" defer></script>
+    <script src="game-history.js?v=towers-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
