@@ -115,12 +115,12 @@
   }
 
   function segmentPalette(multiplier, index) {
-    if (risk === "high") return multiplier > 0 ? ["#f5b942", "#bf7d16"] : index % 2 ? ["#20252d", "#171b21"] : ["#292f38", "#1d2229"];
-    if (multiplier === 0) return index % 2 ? ["#262b33", "#1b1f25"] : ["#313741", "#22272e"];
-    if (multiplier < 1) return ["#4e3037", "#342126"];
+    if (risk === "high") return multiplier > 0 ? ["#ffc247", "#e87d16"] : index % 2 ? ["#252c35", "#14181e"] : ["#323a46", "#1b2028"];
+    if (multiplier === 0) return index % 2 ? ["#28313b", "#171c23"] : ["#35404d", "#202731"];
+    if (multiplier < 1) return index % 2 ? ["#ff5470", "#c72d4b"] : ["#ff7458", "#c6472d"];
     const palettes = risk === "medium"
-      ? [["#2f80ff", "#1858bd"], ["#15c7d9", "#087e91"], ["#8b5cf6", "#5834ad"]]
-      : [["#249cff", "#176eb2"], ["#25c5d8", "#117d8d"], ["#5972e8", "#34469e"]];
+      ? [["#168bff", "#075db8"], ["#15c7d9", "#078999"], ["#8b5cf6", "#5c36bd"], ["#32d583", "#168a54"]]
+      : [["#249cff", "#0d66bc"], ["#20d4e6", "#078d9d"], ["#7c6cff", "#4d3cc5"], ["#38d996", "#15845a"]];
     return palettes[index % palettes.length];
   }
 
@@ -303,6 +303,7 @@
     else sessionStats.losses += 1;
     sessionStats.cumulative.push(sessionStats.profit);
     renderSessionStats();
+    window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "wheel", wager: amount, payout } }));
   }
 
   async function play(existingBet = null) {

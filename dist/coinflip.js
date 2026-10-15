@@ -136,6 +136,7 @@
     sessionStats.wagered += wager; sessionStats.profit += payout - wager;
     if (round.status === "cashed_out") sessionStats.wins += 1; else sessionStats.losses += 1;
     Object.entries(sessionStats).forEach(([key, value]) => { const field = game.querySelector(`[data-coinflip-stat="${key}"]`); if (field) field.textContent = ["wins", "losses"].includes(key) ? String(value) : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }); });
+    window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "coinflip", wager, payout } }));
     window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
   }
   async function manualStart() { if (busy || currentRound?.status === "active") return; busy = true; setMessage(); updateAvailability(); try { await startRound(); } catch (error) { setMessage(error.message); } finally { busy = false; renderRound(); } }

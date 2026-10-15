@@ -136,8 +136,8 @@
 
   function slotColor(index, rows) {
     const distance = Math.abs(index - rows / 2) / (rows / 2);
-    const hue = 286 - distance * 252;
-    return `hsl(${hue} 88% ${47 + distance * 7}%)`;
+    const hue = 52 - distance * 52;
+    return `hsl(${hue} 96% ${53 - distance * 2}%)`;
   }
 
   function renderPayouts() {
@@ -168,29 +168,25 @@
   }
 
   function boardGeometry(rows) {
-    const side = 24;
-    const top = 92;
-    const pegBottom = canvas.height - 116;
+    const side = 62;
+    const top = 112;
+    const pegBottom = canvas.height - 88;
     const slotGap = (canvas.width - side * 2) / (rows + 1);
     return {
       center: canvas.width / 2,
-      launcherY: 34,
+      launcherY: 42,
       top,
       pegBottom,
-      cupY: canvas.height - 28,
+      cupY: canvas.height - 27,
       rowGap: rows > 1 ? (pegBottom - top) / (rows - 1) : 0,
       slotGap,
     };
   }
 
-  function drawPeg(x, y, colour, radius) {
+  function drawPeg(x, y, radius) {
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fillStyle = colour;
-    context.fill();
-    context.beginPath();
-    context.arc(x - radius * .25, y - radius * .28, radius * .32, 0, Math.PI * 2);
-    context.fillStyle = "rgba(255,255,255,.58)";
+    context.fillStyle = "#f7f8fb";
     context.fill();
   }
 
@@ -221,13 +217,13 @@
     context.clearRect(0, 0, canvas.width, canvas.height);
     const launcherGap = Math.min(58, geometry.slotGap * .7);
     [-1, 0, 1].forEach((offset) => {
-      drawPeg(geometry.center + offset * launcherGap, geometry.launcherY, offset === 0 ? "#2f80ff" : "#758291", 5.4);
+      drawPeg(geometry.center + offset * launcherGap, geometry.launcherY, 6.5);
     });
     for (let row = 0; row < rows; row += 1) {
       const y = geometry.top + row * geometry.rowGap;
       for (let peg = 0; peg <= row; peg += 1) {
         const x = geometry.center + (peg - row / 2) * geometry.slotGap;
-        drawPeg(x, y, row % 2 ? "#8a96a3" : "#a8b2bd", rows > 13 ? 4.1 : 4.8);
+        drawPeg(x, y, rows > 13 ? 4.9 : 5.6);
       }
     }
     balls.forEach(drawBall);

@@ -16,3 +16,10 @@ test("every implemented game displays its live return-to-player value", () => {
   assert.match(tools, /setInterval\(refreshRtp, 15_000\)/);
   assert.match(worker, /rtpPercent: 100 - houseEdgeBasisPoints \/ 100/);
 });
+
+test("statistics can track one game or all games and the panel is draggable", () => {
+  assert.match(tools, /All games/);
+  assert.match(tools, /data-session-stats-filter/);
+  assert.match(tools, /setPointerCapture/);
+  assert.match(tools, /gamrace-session-stats-v2/);
+});

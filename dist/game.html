@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=game-tools-1&amp;blackjack=2&amp;plinko=2&amp;towers=1" />
+    <link rel="stylesheet" href="styles.css?v=game-tools-2&amp;blackjack=2&amp;plinko=3&amp;towers=2" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -199,13 +199,23 @@
                     <span><strong>Bet Amount</strong><small>Per roll</small></span>
                     <span class="dice-input-shell dice-bet-shell"><span class="dice-currency-mark" data-dice-currency>$</span><input id="dice-auto-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Automatic Dice bet amount" /><button type="button" data-dice-auto-bet-action="half">½</button><button type="button" data-dice-auto-bet-action="double">2×</button></span>
                   </label>
-                  <label class="dice-field">
-                    <span><strong>Number of Bets</strong><small>1–100</small></span>
-                    <span class="dice-input-shell"><input id="dice-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Dice bets" /></span>
+                  <label class="dice-field dice-auto-count-field">
+                    <span><strong>Number of Bets</strong><small>1–100 or unlimited</small></span>
+                    <span class="dice-input-shell"><input id="dice-auto-round-count" type="number" min="1" max="100" step="1" value="10" aria-label="Number of automatic Dice bets" /><button id="dice-auto-infinite" type="button" aria-pressed="false" aria-label="Run unlimited Dice bets">∞</button></span>
                   </label>
                   <div class="dice-auto-rules">
-                    <label><span>On Win</span><span><input id="dice-auto-win" type="number" min="0" max="1000" step="1" value="0" inputmode="decimal" aria-label="Increase bet on win percentage" /><b>%</b></span></label>
-                    <label><span>On Loss</span><span><input id="dice-auto-loss" type="number" min="0" max="1000" step="1" value="0" inputmode="decimal" aria-label="Increase bet on loss percentage" /><b>%</b></span></label>
+                    <section class="dice-auto-rule" data-dice-auto-rule="win">
+                      <strong>On Win</strong>
+                      <div><button class="active" type="button" data-dice-auto-rule-action="reset" data-dice-auto-rule-result="win">Reset</button><label><span>Increase By</span><input id="dice-auto-win" type="number" min="0" max="1000" step="1" value="0" inputmode="decimal" aria-label="Increase bet on win percentage" /><b>%</b></label></div>
+                    </section>
+                    <section class="dice-auto-rule" data-dice-auto-rule="loss">
+                      <strong>On Loss</strong>
+                      <div><button class="active" type="button" data-dice-auto-rule-action="reset" data-dice-auto-rule-result="loss">Reset</button><label><span>Increase By</span><input id="dice-auto-loss" type="number" min="0" max="1000" step="1" value="0" inputmode="decimal" aria-label="Increase bet on loss percentage" /><b>%</b></label></div>
+                    </section>
+                  </div>
+                  <div class="dice-auto-stops">
+                    <label><strong>Stop On Profit</strong><span class="dice-input-shell"><span data-dice-currency>$</span><input id="dice-auto-stop-profit" type="number" min="0" step="0.01" value="0.00" inputmode="decimal" aria-label="Stop autoplay at profit" /></span></label>
+                    <label><strong>Stop On Loss</strong><span class="dice-input-shell"><span data-dice-currency>$</span><input id="dice-auto-stop-loss" type="number" min="0" step="0.01" value="0.00" inputmode="decimal" aria-label="Stop autoplay at loss" /></span></label>
                   </div>
                   <button class="dice-primary-button" id="dice-auto-action" type="button" disabled>Start Autoplay</button>
                 </div>
@@ -327,7 +337,7 @@
               </section>
               <section class="plinko-board-panel" aria-label="Plinko board">
                 <div class="plinko-board-shell">
-                  <canvas id="plinko-canvas" width="1100" height="590" aria-label="Plinko ball board"></canvas>
+                  <canvas id="plinko-canvas" width="1100" height="650" aria-label="Plinko ball board"></canvas>
                   <div class="plinko-payouts" id="plinko-payouts" aria-label="Plinko multipliers"></div>
                 </div>
                 <div class="plinko-result" id="plinko-result" hidden aria-live="assertive"><strong id="plinko-result-multiplier">1.00×</strong><span id="plinko-result-payout">$0.00</span></div>
@@ -567,7 +577,7 @@
                   <span class="hilo-suit-mark mark-spade" aria-hidden="true">♠</span><span class="hilo-suit-mark mark-diamond" aria-hidden="true">♦</span>
                   <article class="hilo-card is-empty" id="hilo-current-card" aria-live="polite"><span class="hilo-card-corner"><strong>?</strong><i>♠</i></span><strong class="hilo-card-suit">♠</strong><span class="hilo-card-corner bottom"><strong>?</strong><i>♠</i></span></article>
                 </div>
-                <div class="hilo-round-meta"><span id="hilo-round-label">Start a round to reveal your first card</span><strong id="hilo-round-multiplier">1.00×</strong></div>
+                <div class="hilo-round-meta" hidden><span id="hilo-round-label"></span><strong id="hilo-round-multiplier"></strong></div>
                 <div class="hilo-choice-grid">
                   <button class="hilo-choice higher" id="hilo-higher" type="button" disabled><span><strong>Higher or Same</strong><small data-hilo-high-chance>—</small></span><b data-hilo-high-multiplier>—</b></button>
                   <button class="hilo-choice lower" id="hilo-lower" type="button" disabled><span><strong>Lower or Same</strong><small data-hilo-low-chance>—</small></span><b data-hilo-low-multiplier>—</b></button>
@@ -758,15 +768,15 @@
     </nav>
     <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="game-currency.js?v=crypto-icons-1" defer></script>
-    <script src="game-tools.js?v=shared-tools-1" defer></script>
-    <script src="mines.js?v=live-edge-1" defer></script>
-    <script src="dice.js?v=live-edge-1" defer></script>
-    <script src="plinko.js?v=three-launch-pins-1" defer></script>
+    <script src="game-tools.js?v=shared-tools-2" defer></script>
+    <script src="mines.js?v=session-stats-2" defer></script>
+    <script src="dice.js?v=autobet-controls-2" defer></script>
+    <script src="plinko.js?v=clean-board-2" defer></script>
     <script src="roulette.js?v=landed-tile-1" defer></script>
-    <script src="keno.js?v=live-edge-1" defer></script>
-    <script src="wheel.js?v=live-edge-1" defer></script>
-    <script src="hilo.js?v=hilo-fix-1" defer></script>
-    <script src="coinflip.js?v=coinflip-tools-1" defer></script>
+    <script src="keno.js?v=session-stats-2" defer></script>
+    <script src="wheel.js?v=bright-segments-2" defer></script>
+    <script src="hilo.js?v=clean-empty-state-2" defer></script>
+    <script src="coinflip.js?v=session-stats-2" defer></script>
     <script src="crash.js?v=crash-live-3" defer></script>
     <script src="blackjack.js?v=blackjack-2" defer></script>
     <script src="towers.js?v=towers-1" defer></script>

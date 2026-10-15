@@ -22,6 +22,7 @@
   const cardHistory = game.querySelector("#hilo-card-history");
   const roundLabel = game.querySelector("#hilo-round-label");
   const roundMultiplier = game.querySelector("#hilo-round-multiplier");
+  const roundMeta = game.querySelector(".hilo-round-meta");
   const message = game.querySelector("#hilo-message");
   const resultStrip = game.querySelector("[data-hilo-result-strip]");
   const modeButtons = [...game.querySelectorAll("[data-hilo-mode]")];
@@ -119,6 +120,7 @@
   function renderRound(round = currentRound, animate = false) {
     currentRound = round;
     const active = round?.status === "active";
+    roundMeta.hidden = !round;
     const card = round?.currentCard || null;
     renderCard(card, animate);
     renderCardHistory(round?.cards || []);
@@ -128,8 +130,8 @@
     game.querySelector("[data-hilo-low-chance]").textContent = low?.available === false ? "Unavailable on this card" : low ? `${Number(low.chance).toFixed(2)}% chance` : "—";
     game.querySelector("[data-hilo-high-multiplier]").textContent = high?.available === false ? "—" : high ? formatMultiplier(high.multiplier) : "—";
     game.querySelector("[data-hilo-low-multiplier]").textContent = low?.available === false ? "—" : low ? formatMultiplier(low.multiplier) : "—";
-    roundMultiplier.textContent = formatMultiplier(round?.multiplier || 1);
-    if (!round) roundLabel.textContent = "Start a round to reveal your first card";
+    roundMultiplier.textContent = round ? formatMultiplier(round.multiplier || 1) : "";
+    if (!round) roundLabel.textContent = "";
     else if (active && Number(round.guesses) === 0) roundLabel.textContent = "Will the next card be higher or lower?";
     else if (active) roundLabel.textContent = `${round.guesses} correct · Keep playing or cash out`;
     else if (round.status === "cashed_out") roundLabel.textContent = `Cashed out at ${formatMultiplier(round.multiplier)}`;
@@ -245,6 +247,7 @@
     sessionStats.cumulative.push(sessionStats.profit);
     renderSessionStats();
     addResult(round);
+    window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "hi-lo", wager, payout } }));
     window.dispatchEvent(new CustomEvent("gamrace:game-history-refresh"));
   }
 

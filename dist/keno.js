@@ -308,6 +308,7 @@
     else sessionStats.losses += 1;
     sessionStats.cumulative.push(sessionStats.profit);
     renderSessionStats();
+    window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "keno", wager: amount, payout } }));
   }
 
   async function play(existingBet = null) {

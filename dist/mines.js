@@ -635,6 +635,7 @@
     else sessionStats.losses += 1;
     sessionStats.cumulativeProfit.push(sessionStats.profit);
     renderSessionStats();
+    window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "mines", wager: activeRound.amount, payout } }));
   }
 
   function writeSettings() {

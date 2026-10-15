@@ -49,3 +49,14 @@ test("Dice matches the compact Mines stage dimensions and includes win tables", 
   assert.match(gameHtml, /data-dice-history-view="top">Top Wins/);
   assert.match(gameHtml, /data-dice-history-view="lucky">Lucky Wins/);
 });
+
+test("Dice auto mode supports reset, increase, infinite rounds, and stop limits", () => {
+  for (const id of ["dice-auto-infinite", "dice-auto-stop-profit", "dice-auto-stop-loss"]) {
+    assert.match(gameHtml, new RegExp(`id="${id}"`));
+  }
+  assert.match(gameHtml, /data-dice-auto-rule-result="win"/);
+  assert.match(gameHtml, /data-dice-auto-rule-result="loss"/);
+  assert.match(diceScript, /autoRuleActions/);
+  assert.match(diceScript, /runningProfit >= stopProfit/);
+  assert.match(diceScript, /runningProfit <= -stopLoss/);
+});

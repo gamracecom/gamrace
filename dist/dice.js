@@ -25,8 +25,11 @@
   const betInput = diceGame.querySelector("#dice-bet-amount");
   const autoBetInput = diceGame.querySelector("#dice-auto-bet-amount");
   const autoRoundInput = diceGame.querySelector("#dice-auto-round-count");
+  const autoInfiniteButton = diceGame.querySelector("#dice-auto-infinite");
   const autoWinInput = diceGame.querySelector("#dice-auto-win");
   const autoLossInput = diceGame.querySelector("#dice-auto-loss");
+  const autoStopProfitInput = diceGame.querySelector("#dice-auto-stop-profit");
+  const autoStopLossInput = diceGame.querySelector("#dice-auto-stop-loss");
   const actionButton = diceGame.querySelector("#dice-action");
   const autoActionButton = diceGame.querySelector("#dice-auto-action");
   const profitOutput = diceGame.querySelector("#dice-profit");
@@ -46,6 +49,8 @@
   let currentMode = "manual";
   let autoplayRunning = false;
   let stopAutoplayRequested = false;
+  let autoplayInfinite = false;
+  const autoRuleActions = { win: "reset", loss: "reset" };
   let selectedCurrency = "";
   let selectedSymbol = "COIN";
   let displayFiat = true;
@@ -136,6 +141,10 @@
     const minimum = minimumWager();
     actionButton.disabled = betPending || autoplayRunning || manualAmount < minimum || manualAmount > availableBalance;
     autoActionButton.disabled = betPending || (!autoplayRunning && (autoAmount < minimum || autoAmount > availableBalance));
+    autoRoundInput.disabled = autoplayRunning || autoplayInfinite;
+    autoInfiniteButton.disabled = autoplayRunning;
+    [autoWinInput, autoLossInput, autoStopProfitInput, autoStopLossInput].forEach((input) => { input.disabled = autoplayRunning; });
+    diceGame.querySelectorAll("[data-dice-auto-rule-action]").forEach((button) => { button.disabled = autoplayRunning; });
     balanceLabel.textContent = availableText();
     updateProfit();
 
@@ -220,6 +229,7 @@
     else sessionStats.losses += 1;
     sessionStats.cumulativeProfit.push(sessionStats.profit);
     renderSessionStats();
+    window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "dice", wager: amount, payout: Math.max(0, amount + profit) } }));
   }
 
   async function runRoll(amount) {
@@ -277,8 +287,12 @@
       autoActionButton.textContent = "Stopping…";
       return;
     }
-    const rounds = Math.round(clamp(autoRoundInput.value, 1, 100));
-    let amount = cleanAmount(autoBetInput);
+    const rounds = autoplayInfinite ? Number.POSITIVE_INFINITY : Math.round(clamp(autoRoundInput.value, 1, 100));
+    const baseAmount = cleanAmount(autoBetInput);
+    const stopProfit = cleanAmount(autoStopProfitInput);
+    const stopLoss = cleanAmount(autoStopLossInput);
+    let amount = baseAmount;
+    let runningProfit = 0;
     if (amount < minimumWager() || amount > availableBalance) return updateWagerAvailability();
 
     autoplayRunning = true;
@@ -290,10 +304,17 @@
     for (let index = 0; index < rounds && !stopAutoplayRequested; index += 1) {
       const result = await runRoll(amount);
       if (!result) break;
-      const change = result.won ? clamp(autoWinInput.value, 0, 1000) : clamp(autoLossInput.value, 0, 1000);
-      if (change > 0) amount = Math.round(amount * (1 + change / 100) * 100000000) / 100000000;
+      runningProfit += result.profit;
+      const resultType = result.won ? "win" : "loss";
+      const changeInput = result.won ? autoWinInput : autoLossInput;
+      if (autoRuleActions[resultType] === "reset") amount = baseAmount;
+      else {
+        const change = clamp(changeInput.value, 0, 1000);
+        amount = Math.round(amount * (1 + change / 100) * 100000000) / 100000000;
+      }
       autoBetInput.value = amount.toFixed(displayFiat ? 2 : 8);
       updateProfit();
+      if ((stopProfit > 0 && runningProfit >= stopProfit) || (stopLoss > 0 && runningProfit <= -stopLoss)) break;
       if (amount > availableBalance) break;
       if (index < rounds - 1) await delay(settings.turbo ? 90 : 520);
     }
@@ -326,7 +347,7 @@
     const coinAmount = Number(detail.balance.available || 0);
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : coinAmount;
     const minimum = minimumWager();
-    [betInput, autoBetInput].forEach((input) => {
+    [betInput, autoBetInput, autoStopProfitInput, autoStopLossInput].forEach((input) => {
       input.min = minimum.toFixed(displayFiat ? 2 : 8);
       input.step = input.min;
     });
@@ -335,6 +356,8 @@
       wagerError = "";
       betInput.value = displayFiat ? "0.00" : "0.00000000";
       autoBetInput.value = displayFiat ? "0.00" : "0.00000000";
+      autoStopProfitInput.value = displayFiat ? "0.00" : "0.00000000";
+      autoStopLossInput.value = displayFiat ? "0.00" : "0.00000000";
       sessionStats.profit = 0;
       sessionStats.wagered = 0;
       sessionStats.wins = 0;
@@ -455,6 +478,32 @@
   });
   betInput.addEventListener("input", () => { wagerError = ""; updateWagerAvailability(); });
   autoBetInput.addEventListener("input", () => { wagerError = ""; updateWagerAvailability(); });
+  autoInfiniteButton.addEventListener("click", () => {
+    if (autoplayRunning) return;
+    autoplayInfinite = !autoplayInfinite;
+    autoInfiniteButton.classList.toggle("active", autoplayInfinite);
+    autoInfiniteButton.setAttribute("aria-pressed", String(autoplayInfinite));
+    autoRoundInput.disabled = autoplayInfinite;
+    autoRoundInput.placeholder = autoplayInfinite ? "Infinite" : "";
+  });
+  diceGame.querySelectorAll("[data-dice-auto-rule-action]").forEach((button) => button.addEventListener("click", () => {
+    if (autoplayRunning) return;
+    const resultType = button.dataset.diceAutoRuleResult;
+    autoRuleActions[resultType] = "reset";
+    diceGame.querySelector(`[data-dice-auto-rule="${resultType}"]`)?.classList.remove("increase-active");
+    button.classList.add("active");
+  }));
+  [[autoWinInput, "win"], [autoLossInput, "loss"]].forEach(([input, resultType]) => {
+    const activateIncrease = () => {
+      if (autoplayRunning) return;
+      autoRuleActions[resultType] = "increase";
+      const rule = diceGame.querySelector(`[data-dice-auto-rule="${resultType}"]`);
+      rule?.classList.add("increase-active");
+      rule?.querySelector("[data-dice-auto-rule-action]")?.classList.remove("active");
+    };
+    input.addEventListener("focus", activateIncrease);
+    input.addEventListener("input", activateIncrease);
+  });
   actionButton.addEventListener("click", runManualRoll);
   autoActionButton.addEventListener("click", runAutoplay);
   diceGame.querySelectorAll("[data-dice-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(betInput, button.dataset.diceBetAction)));

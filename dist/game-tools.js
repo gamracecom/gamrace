@@ -3,12 +3,17 @@
 
   const SETTINGS_KEY = "gamrace-game-settings-v1";
   const FAVORITES_KEY = "gamrace-favourites-v1";
+  const SESSION_STATS_KEY = "gamrace-session-stats-v2";
+  const GAME_LABELS = {
+    all: "All games", mines: "Mines", dice: "Dice", plinko: "Plinko", roulette: "Roulette",
+    keno: "Keno", wheel: "Wheel", "hi-lo": "Hi-Lo", coinflip: "Coinflip", crash: "Crash",
+    blackjack: "Blackjack", towers: "Towers",
+  };
   const roots = [...document.querySelectorAll("[data-shared-game-tools]")];
-  const sessionStats = new Map();
 
-  function readObject(key) {
+  function readObject(key, storage = localStorage) {
     try {
-      const value = JSON.parse(localStorage.getItem(key) || "{}");
+      const value = JSON.parse(storage.getItem(key) || "{}");
       return value && typeof value === "object" && !Array.isArray(value) ? value : {};
     } catch {
       return {};
@@ -18,6 +23,16 @@
   function readFavorites() {
     try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]")); }
     catch { return new Set(); }
+  }
+
+  function emptyStats() { return { profit: 0, wagered: 0, wins: 0, losses: 0 }; }
+  const sessionStats = readObject(SESSION_STATS_KEY, sessionStorage);
+  Object.keys(GAME_LABELS).filter((game) => game !== "all").forEach((game) => {
+    sessionStats[game] = { ...emptyStats(), ...(sessionStats[game] || {}) };
+  });
+
+  function saveStats() {
+    try { sessionStorage.setItem(SESSION_STATS_KEY, JSON.stringify(sessionStats)); } catch { /* Session tracking is an enhancement. */ }
   }
 
   function settingKey(game, name) {
@@ -38,16 +53,112 @@
     if (!button) return;
     const active = readFavorites().has(game);
     button.setAttribute("aria-pressed", String(active));
-    button.setAttribute("aria-label", `${active ? "Remove" : "Add"} ${game.charAt(0).toUpperCase() + game.slice(1)} ${active ? "from" : "to"} favourites`);
+    button.setAttribute("aria-label", `${active ? "Remove" : "Add"} ${GAME_LABELS[game] || game} ${active ? "from" : "to"} favourites`);
+  }
+
+  function statsFor(filter) {
+    if (filter !== "all") return sessionStats[filter] || emptyStats();
+    return Object.keys(GAME_LABELS).filter((game) => game !== "all").reduce((total, game) => {
+      const item = sessionStats[game] || emptyStats();
+      total.profit += Number(item.profit) || 0;
+      total.wagered += Number(item.wagered) || 0;
+      total.wins += Number(item.wins) || 0;
+      total.losses += Number(item.losses) || 0;
+      return total;
+    }, emptyStats());
+  }
+
+  function panelGame(panel) {
+    const sectionId = panel.closest('section[id$="-game"]')?.id?.replace(/-game$/, "") || "";
+    return sectionId === "hilo" ? "hi-lo" : sectionId;
+  }
+
+  function statField(panel, name) {
+    return panel.querySelector(`[data-shared-stat="${name}"], [data-dice-stat="${name}"], [data-stat="${name}"], [data-keno-stat="${name}"], [data-wheel-stat="${name}"], [data-hilo-stat="${name}"], [data-coinflip-stat="${name}"]`);
+  }
+
+  function renderStatsPanel(panel) {
+    const filter = panel.querySelector("[data-session-stats-filter]")?.value || panelGame(panel);
+    const stats = statsFor(filter);
+    Object.entries(stats).forEach(([name, value]) => {
+      const field = statField(panel, name);
+      if (!field) return;
+      field.textContent = name === "wins" || name === "losses"
+        ? String(Math.round(Number(value) || 0))
+        : Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+      if (name === "profit") {
+        field.classList.toggle("positive", value > 0);
+        field.classList.toggle("negative", value < 0);
+      }
+    });
+    const chart = panel.querySelector(".game-stats-chart");
+    if (chart) chart.hidden = filter !== panelGame(panel);
   }
 
   function renderStats(root) {
-    const game = root.dataset.sharedGameTools;
-    const stats = sessionStats.get(game) || { profit: 0, wagered: 0, wins: 0, losses: 0 };
-    Object.entries(stats).forEach(([name, value]) => {
-      const field = root.querySelector(`[data-shared-stat="${name}"]`);
-      if (field) field.textContent = name === "wins" || name === "losses" ? String(value) : Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+    const panel = root.querySelector('[data-shared-game-tool-panel="stats"]');
+    if (panel) renderStatsPanel(panel);
+  }
+
+  function installStatsPanel(panel) {
+    if (panel.dataset.statsEnhanced === "true") return;
+    panel.dataset.statsEnhanced = "true";
+    const game = panelGame(panel);
+    const controls = document.createElement("label");
+    controls.className = "game-stats-controls";
+    controls.innerHTML = '<span>Track</span><select data-session-stats-filter aria-label="Game to track in statistics"></select>';
+    const select = controls.querySelector("select");
+    Object.entries(GAME_LABELS).forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      option.selected = value === game;
+      select.append(option);
     });
+    panel.querySelector("header")?.insertAdjacentElement("afterend", controls);
+    select.addEventListener("change", () => renderStatsPanel(panel));
+
+    const header = panel.querySelector("header");
+    if (header) {
+      header.classList.add("game-stats-drag-handle");
+      header.title = "Drag statistics panel · double-click to reset";
+      let drag = null;
+      header.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || event.target.closest("button, select, input")) return;
+        const rect = panel.getBoundingClientRect();
+        drag = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+        panel.dataset.dragged = "true";
+        panel.style.left = `${rect.left}px`;
+        panel.style.top = `${rect.top}px`;
+        panel.style.right = "auto";
+        panel.style.bottom = "auto";
+        header.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+      header.addEventListener("pointermove", (event) => {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        const rect = panel.getBoundingClientRect();
+        const left = Math.max(8, Math.min(window.innerWidth - rect.width - 8, event.clientX - drag.offsetX));
+        const top = Math.max(8, Math.min(window.innerHeight - rect.height - 8, event.clientY - drag.offsetY));
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+      });
+      const stopDrag = (event) => {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        if (header.hasPointerCapture(event.pointerId)) header.releasePointerCapture(event.pointerId);
+        drag = null;
+      };
+      header.addEventListener("pointerup", stopDrag);
+      header.addEventListener("pointercancel", stopDrag);
+      header.addEventListener("dblclick", () => {
+        delete panel.dataset.dragged;
+        panel.style.removeProperty("left");
+        panel.style.removeProperty("top");
+        panel.style.removeProperty("right");
+        panel.style.removeProperty("bottom");
+      });
+    }
+    renderStatsPanel(panel);
   }
 
   roots.forEach((root) => {
@@ -84,23 +195,28 @@
       localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]));
       renderFavorite(root);
     });
-    sessionStats.set(game, { profit: 0, wagered: 0, wins: 0, losses: 0 });
     renderFavorite(root);
     renderStats(root);
   });
 
+  const statsPanels = [...document.querySelectorAll(".stats-panel")];
+  statsPanels.forEach(installStatsPanel);
+
   window.addEventListener("gamrace:session-result", (event) => {
     const game = String(event.detail?.game || "");
-    const root = roots.find((item) => item.dataset.sharedGameTools === game);
-    if (!root) return;
+    if (!sessionStats[game]) sessionStats[game] = emptyStats();
     const wager = Math.max(0, Number(event.detail?.wager) || 0);
     const payout = Math.max(0, Number(event.detail?.payout) || 0);
-    const stats = sessionStats.get(game);
+    const stats = sessionStats[game];
     stats.wagered += wager;
     stats.profit += payout - wager;
     if (payout > wager) stats.wins += 1; else stats.losses += 1;
-    renderStats(root);
+    saveStats();
+    statsPanels.forEach(renderStatsPanel);
   });
+
+  window.addEventListener("load", () => statsPanels.forEach(renderStatsPanel));
+  window.addEventListener("gamrace:wallet-balance-changed", () => window.setTimeout(() => statsPanels.forEach(renderStatsPanel), 0));
 
   async function refreshRtp() {
     try {
