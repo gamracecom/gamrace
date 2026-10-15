@@ -204,8 +204,9 @@
     }));
   }
 
-  async function refresh() {
+  async function refresh({ force = false } = {}) {
     if (loading || document.hidden || !window.gamraceWallet?.request) return;
+    if (loadedOnce && card.content.hidden && !force) return;
     loading = true;
     showSkeleton();
     try {
@@ -230,9 +231,9 @@
     refresh();
   }));
   select?.addEventListener("change", refresh);
-  window.addEventListener("gamrace:wallet-balance-changed", refresh);
-  window.addEventListener("gamrace:game-history-refresh", refresh);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+  window.addEventListener("gamrace:wallet-balance-changed", () => refresh({ force: true }));
+  window.addEventListener("gamrace:game-history-refresh", () => refresh({ force: true }));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !card.content.hidden) refresh(); });
   window.setInterval(refresh, 4000);
-  window.setTimeout(refresh, 250);
+  window.setTimeout(() => refresh({ force: true }), 250);
 })();

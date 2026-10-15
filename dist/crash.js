@@ -309,7 +309,10 @@
     if (event.detail.name === "reducedMotion") reducedMotion = Boolean(event.detail.value);
   });
   if (window.gamraceWalletSelection) applyWallet(window.gamraceWalletSelection);
-  window.setInterval(refreshLive, 250);
+  // The flight animation is rendered locally from the server timestamps. One
+  // authoritative sync per second keeps every client aligned without turning
+  // animation frames into database reads.
+  window.setInterval(refreshLive, 1000);
   window.addEventListener("focus", refreshLive);
   renderFlight();
 })();

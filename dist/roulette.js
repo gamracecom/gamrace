@@ -315,7 +315,9 @@
 
   renderIdleTrack();
   updateAvailability();
-  syncTimer = window.setInterval(syncRound, 750);
+  // Movement between syncs is calculated from the shared server clock, so the
+  // track remains smooth while the backend only needs one read per second.
+  syncTimer = window.setInterval(syncRound, 1000);
   clockFrame = requestAnimationFrame(clockTick);
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
 })();

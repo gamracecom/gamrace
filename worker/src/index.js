@@ -38,6 +38,21 @@ let currencyCache;
 let currencyCacheExpiresAt = 0;
 let priceCache;
 let priceCacheExpiresAt = 0;
+let gameEdgesCache;
+let gameEdgesCacheExpiresAt = 0;
+const countryAccessCache = new Map();
+const sessionTouchCache = new Map();
+const gameHistoryCache = new Map();
+
+const COUNTRY_ACCESS_CACHE_MS = 5 * 60 * 1000;
+const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+const GAME_EDGES_CACHE_MS = 30 * 1000;
+const GAME_HISTORY_CACHE_MS = 15 * 1000;
+
+function rememberWithLimit(cache, key, value, maximumEntries = 10_000) {
+  if (cache.size >= maximumEntries && !cache.has(key)) cache.clear();
+  cache.set(key, value);
+}
 
 const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "mines", name: "Mines", editable: true },
@@ -54,8 +69,9 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
 ]);
 
 async function gameHouseEdgeBasisPoints(env, gameId) {
-  const row = await env.DB.prepare("SELECT house_edge_basis_points FROM game_settings WHERE game_id = ?").bind(gameId).first();
-  return Number.isInteger(Number(row?.house_edge_basis_points)) ? Number(row.house_edge_basis_points) : 100;
+  const games = await readGameEdges(env);
+  const game = games.find((entry) => entry.id === gameId);
+  return Number.isInteger(Number(game?.houseEdgeBasisPoints)) ? Number(game.houseEdgeBasisPoints) : 100;
 }
 
 async function gameHouseFactorMicros(env, gameId) {
@@ -223,8 +239,12 @@ function clientDetails(request) {
 async function countryAccess(env, countryCode) {
   const normalized = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "XX";
   if (normalized === "XX") return { allowed: true, countryCode: normalized };
+  const cached = countryAccessCache.get(normalized);
+  if (cached && cached.expiresAt > now()) return { allowed: cached.allowed, countryCode: normalized };
   const row = await env.DB.prepare("SELECT allowed FROM country_access WHERE country_code = ?").bind(normalized).first();
-  return { allowed: row ? Boolean(row.allowed) : true, countryCode: normalized };
+  const allowed = row ? Boolean(row.allowed) : true;
+  rememberWithLimit(countryAccessCache, normalized, { allowed, expiresAt: now() + COUNTRY_ACCESS_CACHE_MS }, 300);
+  return { allowed, countryCode: normalized };
 }
 
 async function requireAllowedRegion(request, env) {
@@ -237,6 +257,10 @@ async function requireAllowedRegion(request, env) {
 async function touchUserSession(request, env, user, geo = requestGeo(request)) {
   const sessionId = String(request.headers.get("X-Session-Id") || "").trim();
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(sessionId)) return;
+  const cacheKey = `${user.sub}:${sessionId}`;
+  const lastTouch = Number(sessionTouchCache.get(cacheKey) || 0);
+  if (now() - lastTouch < SESSION_TOUCH_INTERVAL_MS) return;
+  rememberWithLimit(sessionTouchCache, cacheKey, now());
   const details = clientDetails(request);
   const timestamp = now();
   await env.DB.prepare(`
@@ -451,13 +475,20 @@ async function ensureWalletPreference(env, uid) {
 }
 
 async function walletResponse(env, uid) {
-  const preference = await ensureWalletPreference(env, uid);
-  const selectedCurrency = getWalletAsset(preference?.selected_currency)?.code || DEFAULT_WALLET_ASSET;
   const result = await env.DB.prepare(`
-    SELECT currency, available_units, held_units, lifetime_deposited_units, lifetime_withdrawn_units
-    FROM crypto_balances WHERE uid = ?
+    SELECT preference.selected_currency, balance.currency, balance.available_units, balance.held_units,
+      balance.lifetime_deposited_units, balance.lifetime_withdrawn_units
+    FROM wallet_preferences AS preference
+    LEFT JOIN crypto_balances AS balance ON balance.uid = preference.uid
+    WHERE preference.uid = ?
   `).bind(uid).all();
-  const rows = new Map((result.results || []).map((row) => [row.currency, row]));
+  let resultRows = result.results || [];
+  if (!resultRows.length) {
+    await ensureWalletPreference(env, uid);
+    resultRows = [{ selected_currency: DEFAULT_WALLET_ASSET }];
+  }
+  const selectedCurrency = getWalletAsset(resultRows[0]?.selected_currency)?.code || DEFAULT_WALLET_ASSET;
+  const rows = new Map(resultRows.filter((row) => row.currency).map((row) => [row.currency, row]));
   const balances = WALLET_ASSETS.map((asset) => {
     const row = rows.get(asset.code) || {};
     return {
@@ -2033,11 +2064,15 @@ function crashWagerResponse(row) {
 }
 
 async function crashRecent(env) {
+  const cached = gameHistoryCache.get("crash:recent");
+  if (cached && cached.expiresAt > now()) return cached.value;
   const result = await env.DB.prepare(`
     SELECT crash_multiplier_micros FROM crash_live_rounds
     WHERE status = 'settled' ORDER BY starts_at DESC LIMIT 10
   `).all();
-  return (result.results || []).map((entry) => Number(entry.crash_multiplier_micros) / 1_000_000);
+  const value = (result.results || []).map((entry) => Number(entry.crash_multiplier_micros) / 1_000_000);
+  rememberWithLimit(gameHistoryCache, "crash:recent", { value, expiresAt: now() + 2_000 }, 100);
+  return value;
 }
 
 async function crashRoundResponse(env, row, user, currency, timestamp = now()) {
@@ -2046,10 +2081,6 @@ async function crashRoundResponse(env, row, user, currency, timestamp = now()) {
   const wagerResult = currency ? await env.DB.prepare(`
     SELECT * FROM crash_wagers WHERE round_id = ? AND uid = ? AND currency = ? ORDER BY slot ASC
   `).bind(row.id, user.sub, currency).all() : { results: [] };
-  const activity = await env.DB.prepare(`
-    SELECT COUNT(DISTINCT uid) AS players, COALESCE(SUM(wager_units), 0) AS wager_units
-    FROM crash_wagers WHERE round_id = ?
-  `).bind(row.id).first();
   return {
     id: row.id,
     game: "crash",
@@ -2060,8 +2091,6 @@ async function crashRoundResponse(env, row, user, currency, timestamp = now()) {
     endsAtMs: phase === "crashed" ? Number(row.ends_at) : null,
     currentMultiplier: crashCurrentMultiplier(row, timestamp) / 1_000_000,
     crashMultiplier: phase === "crashed" ? Number(row.crash_multiplier_micros) / 1_000_000 : null,
-    players: Number(activity?.players || 0),
-    totalWager: assetUnitsToString(Number(activity?.wager_units || 0), false),
     wagers: (wagerResult.results || []).map(crashWagerResponse),
   };
 }
@@ -2075,7 +2104,6 @@ async function handleCrashLive(request, env, user) {
     serverNow: timestamp,
     round: await crashRoundResponse(env, round, user, currency, timestamp),
     recent: await crashRecent(env),
-    wallet: await walletResponse(env, user.sub),
   });
 }
 
@@ -2178,19 +2206,26 @@ async function handleGameHistory(request, env, user) {
   if (!config) throw httpError(400, "Choose a valid game history");
   const cutoff = period === "30d" ? now() - 30 * 86_400_000 : period === "90d" ? now() - 90 * 86_400_000 : 0;
   const order = view === "lucky" ? "b.multiplier_micros DESC, b.payout_units DESC, b.created_at DESC" : "b.payout_units DESC, b.multiplier_micros DESC, b.created_at DESC";
-  const result = await env.DB.prepare(`
-    SELECT b.id, b.uid, COALESCE(NULLIF(p.username, ''), 'Player') AS username,
-      COALESCE(p.profile_public, 1) AS profile_public,
-      COALESCE(p.show_username, 1) AS show_username,
-      COALESCE(p.show_rank, 1) AS show_rank,
-      b.currency, b.wager_units, b.payout_units, b.multiplier_micros, b.created_at
-    FROM ${config.table} AS b
-    LEFT JOIN player_profiles AS p ON p.uid = b.uid
-    WHERE ${config.where} AND b.created_at >= ?
-      AND b.payout_units > b.wager_units AND b.multiplier_micros > 1000000
-    ORDER BY ${order} LIMIT 3
-  `).bind(cutoff).all();
-  const entries = (result.results || []).map((row, index) => {
+  const cacheKey = `history:${game}:${view}:${period}`;
+  const cached = gameHistoryCache.get(cacheKey);
+  let rows = cached?.expiresAt > now() ? cached.value : null;
+  if (!rows) {
+    const result = await env.DB.prepare(`
+      SELECT b.id, b.uid, COALESCE(NULLIF(p.username, ''), 'Player') AS username,
+        COALESCE(p.profile_public, 1) AS profile_public,
+        COALESCE(p.show_username, 1) AS show_username,
+        COALESCE(p.show_rank, 1) AS show_rank,
+        b.currency, b.wager_units, b.payout_units, b.multiplier_micros, b.created_at
+      FROM ${config.table} AS b
+      LEFT JOIN player_profiles AS p ON p.uid = b.uid
+      WHERE ${config.where} AND b.created_at >= ?
+        AND b.payout_units > b.wager_units AND b.multiplier_micros > 1000000
+      ORDER BY ${order} LIMIT 3
+    `).bind(cutoff).all();
+    rows = result.results || [];
+    rememberWithLimit(gameHistoryCache, cacheKey, { value: rows, expiresAt: now() + GAME_HISTORY_CACHE_MS }, 100);
+  }
+  const entries = rows.map((row, index) => {
     const isYou = row.uid === user.sub;
     const profileVisible = isYou || Boolean(row.profile_public);
     const usernameVisible = isYou || (profileVisible && Boolean(row.show_username));
@@ -2243,6 +2278,8 @@ const ROULETTE_CYCLE_MS = ROULETTE_BETTING_MS + ROULETTE_ANIMATION_MS;
 const ROULETTE_MAX_CATCHUP_ROUNDS = 10;
 
 async function rouletteRecent(env) {
+  const cached = gameHistoryCache.get("roulette:recent");
+  if (cached && cached.expiresAt > now()) return cached.value;
   const result = await env.DB.prepare(`
     SELECT result FROM roulette_live_rounds
     WHERE status = 'settled'
@@ -2251,7 +2288,9 @@ async function rouletteRecent(env) {
   const results = (result.results || []).map((row) => String(row.result || "")).filter((value) => ["blue", "cyan", "purple", "gold"].includes(value));
   const counts = { blue: 0, cyan: 0, purple: 0, gold: 0 };
   results.forEach((value) => { counts[value] += 1; });
-  return { counts, results: results.slice(0, 10), total: results.length };
+  const value = { counts, results: results.slice(0, 10), total: results.length };
+  rememberWithLimit(gameHistoryCache, "roulette:recent", { value, expiresAt: now() + 2_000 }, 100);
+  return value;
 }
 
 async function ensureSharedRouletteRound(env, timestamp = now()) {
@@ -3106,14 +3145,9 @@ async function existingDepositForCurrency(env, uid, payCurrency) {
 
 async function handleDepositAddresses(request, env, user) {
   const result = await env.DB.prepare(`
-    SELECT * FROM crypto_deposits AS deposit
-    WHERE deposit.uid = ? AND deposit.status = 'address_ready' AND deposit.pay_address <> ''
-      AND deposit.created_at = (
-        SELECT MAX(candidate.created_at) FROM crypto_deposits AS candidate
-        WHERE candidate.uid = deposit.uid AND candidate.pay_currency = deposit.pay_currency
-          AND candidate.status = 'address_ready'
-      )
-    ORDER BY deposit.created_at DESC
+    SELECT * FROM crypto_deposits
+    WHERE uid = ? AND status = 'address_ready' AND pay_address <> ''
+    ORDER BY created_at DESC
   `).bind(user.sub).all();
   return json(request, env, 200, { deposits: (result.results || []).map(depositResponse) });
 }
@@ -3479,9 +3513,10 @@ async function handleAdminLeaderboards(request, env, user) {
 }
 
 async function readGameEdges(env) {
+  if (gameEdgesCache && gameEdgesCacheExpiresAt > now()) return gameEdgesCache;
   const result = await env.DB.prepare("SELECT game_id, house_edge_basis_points, updated_at FROM game_settings").all();
   const settings = new Map((result.results || []).map((row) => [row.game_id, row]));
-  return GAME_EDGE_DEFINITIONS.map((definition) => {
+  gameEdgesCache = GAME_EDGE_DEFINITIONS.map((definition) => {
     const row = settings.get(definition.id);
     const houseEdgeBasisPoints = Number.isInteger(definition.fixedHouseEdgeBasisPoints)
       ? definition.fixedHouseEdgeBasisPoints
@@ -3494,6 +3529,8 @@ async function readGameEdges(env) {
       updatedAt: row?.updated_at ? new Date(Number(row.updated_at)).toISOString() : null,
     };
   });
+  gameEdgesCacheExpiresAt = now() + GAME_EDGES_CACHE_MS;
+  return gameEdgesCache;
 }
 
 async function handleAdminGameEdges(request, env, user) {
@@ -3519,6 +3556,8 @@ async function handleAdminSetGameEdge(request, env, user, gameIdValue) {
     ON CONFLICT(game_id) DO UPDATE SET house_edge_basis_points = excluded.house_edge_basis_points,
       updated_at = excluded.updated_at, updated_by = excluded.updated_by
   `).bind(gameId, houseEdgeBasisPoints, timestamp, user.sub).run();
+  gameEdgesCache = null;
+  gameEdgesCacheExpiresAt = 0;
   await writeAdminAudit(env, user, "game.house_edge.updated", gameId, JSON.stringify({ houseEdgeBasisPoints }));
   return json(request, env, 200, { game: (await readGameEdges(env)).find((game) => game.id === gameId) });
 }
@@ -3926,6 +3965,7 @@ async function handleAdminSetCountryAccess(request, env, user, countryCode) {
     VALUES(?, ?, ?, ?)
     ON CONFLICT(country_code) DO UPDATE SET allowed = excluded.allowed, updated_at = excluded.updated_at, updated_by = excluded.updated_by
   `).bind(normalized, body.allowed ? 1 : 0, timestamp, user.sub).run();
+  countryAccessCache.delete(normalized);
   await writeAdminAudit(env, user, body.allowed ? "country.allowed" : "country.blocked", normalized);
   return json(request, env, 200, { countryCode: normalized, allowed: body.allowed, updatedAt: new Date(timestamp).toISOString() });
 }
@@ -4041,8 +4081,14 @@ async function route(request, env) {
 function publicError(error) {
   const status = Number(error?.httpStatus || 500);
   if (error?.code === "ADMIN_NOT_CONFIGURED") return error.message;
+  if (isD1CapacityError(error)) return "Wallet services are temporarily unavailable because database capacity has been reached. No balance-changing action was completed. Please retry shortly.";
   if (status >= 500) return "The wallet service could not complete that request";
   return error?.message || "The wallet service could not complete that request";
+}
+
+function isD1CapacityError(error) {
+  const detail = `${error?.message || ""} ${error?.cause?.message || ""}`;
+  return error?.code === 7500 || /D1.*(?:daily|limit|quota)|rows? read limit|exceeded D1/i.test(detail);
 }
 
 export default {
@@ -4052,9 +4098,13 @@ export default {
       if (origin && !allowedOrigins(env).has(origin)) return json(request, env, 403, { error: "Origin is not allowed" });
       return await route(request, env);
     } catch (error) {
-      const status = Number(error?.httpStatus || 500);
+      const capacityLimited = isD1CapacityError(error);
+      const status = capacityLimited ? 503 : Number(error?.httpStatus || 500);
       if (status >= 500) console.error("Wallet request failed", { path: pathFrom(request), message: error?.message, code: error?.code });
-      return json(request, env, status, { error: publicError(error) });
+      return json(request, env, status, {
+        error: publicError(error),
+        ...(capacityLimited ? { code: "DATABASE_CAPACITY_REACHED", retryable: true } : {}),
+      });
     }
   },
   async scheduled(controller, env, ctx) {
