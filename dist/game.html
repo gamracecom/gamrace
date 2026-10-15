@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=game-tools-1&amp;blackjack=1&amp;plinko=2" />
+    <link rel="stylesheet" href="styles.css?v=game-tools-1&amp;blackjack=2&amp;plinko=2" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -671,12 +671,20 @@
           <section class="blackjack-game" id="blackjack-game" hidden aria-label="Blackjack">
             <div class="blackjack-stage">
               <section class="blackjack-controls" aria-label="Blackjack controls">
-                <div class="blackjack-mode-tabs"><button class="active" type="button">Manual</button></div>
+                <div class="blackjack-mode-tabs" role="tablist" aria-label="Blackjack wager options"><button class="active" type="button" role="tab" aria-selected="true" data-blackjack-view="manual">Manual</button><button type="button" role="tab" aria-selected="false" data-blackjack-view="side-bets">Side Bets</button></div>
                 <div class="blackjack-control-stack">
-                  <label class="blackjack-field">
-                    <span><strong>Bet Amount</strong><small data-blackjack-balance>0.00000000 COIN</small></span>
-                    <span class="blackjack-input-shell"><span data-blackjack-currency>$</span><input id="blackjack-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Blackjack bet amount" /><button type="button" data-blackjack-bet-action="half">½</button><button type="button" data-blackjack-bet-action="double">2×</button></span>
-                  </label>
+                  <div class="blackjack-control-panel" data-blackjack-panel="manual">
+                    <label class="blackjack-field">
+                      <span><strong>Bet Amount <em>per hand</em></strong><small data-blackjack-balance>0.00000000 COIN</small></span>
+                      <span class="blackjack-input-shell"><span data-blackjack-currency>$</span><input id="blackjack-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Blackjack bet amount per hand" /><button type="button" data-blackjack-bet-action="half">½</button><button type="button" data-blackjack-bet-action="double">2×</button></span>
+                    </label>
+                    <fieldset class="blackjack-hand-count"><legend>Hands</legend><div><button class="active" type="button" data-blackjack-hand-count="1" aria-pressed="true"><strong>1</strong><span>Hand</span></button><button type="button" data-blackjack-hand-count="2" aria-pressed="false"><strong>2</strong><span>Hands</span></button><button type="button" data-blackjack-hand-count="3" aria-pressed="false"><strong>3</strong><span>Hands</span></button></div></fieldset>
+                  </div>
+                  <div class="blackjack-control-panel blackjack-side-panel" data-blackjack-panel="side-bets" hidden>
+                    <label class="blackjack-side-bet perfect-pairs"><span><strong>Perfect Pairs</strong><small>Up to 25:1</small></span><span class="blackjack-input-shell"><span data-blackjack-currency>$</span><input id="blackjack-perfect-pairs" type="number" min="0" step="0.01" inputmode="decimal" value="0.00" aria-label="Perfect Pairs wager per hand" /></span><span class="blackjack-side-odds">Mixed 6:1 · Coloured 12:1 · Perfect 25:1</span></label>
+                    <label class="blackjack-side-bet twenty-one-three"><span><strong>21+3</strong><small>Up to 100:1</small></span><span class="blackjack-input-shell"><span data-blackjack-currency>$</span><input id="blackjack-twenty-one-three" type="number" min="0" step="0.01" inputmode="decimal" value="0.00" aria-label="21 plus 3 wager per hand" /></span><span class="blackjack-side-odds">Flush 5:1 · Straight 10:1 · Trips 30:1 · Straight flush 40:1 · Suited trips 100:1</span></label>
+                    <p>Side bets apply to every selected hand.</p>
+                  </div>
                   <button class="blackjack-primary" id="blackjack-deal" type="button" disabled>Deal</button>
                   <div class="blackjack-actions" aria-label="Blackjack actions" hidden>
                     <button type="button" data-blackjack-action="hit">Hit</button>
@@ -689,14 +697,13 @@
                 </div>
               </section>
               <section class="blackjack-table" aria-label="Blackjack table">
-                <header class="blackjack-table-header"><span><i></i>Six-deck shoe</span><strong id="blackjack-round-state">Place your bet</strong></header>
                 <div class="blackjack-seat dealer-seat">
                   <div class="blackjack-seat-label"><span>Dealer</span><strong id="blackjack-dealer-total">—</strong></div>
                   <div class="blackjack-card-row" id="blackjack-dealer-cards" aria-label="Dealer cards"></div>
                 </div>
                 <div class="blackjack-table-mark" aria-hidden="true"><strong>BLACKJACK</strong><span>PAYS 3 TO 2</span></div>
                 <div class="blackjack-player-hands" id="blackjack-player-hands" aria-label="Your Blackjack hands">
-                  <div class="blackjack-empty-seat"><span>♠</span><strong>Your cards appear here</strong></div>
+                  <div class="blackjack-empty-seat"><span>♠</span></div>
                 </div>
               </section>
               <footer class="blackjack-footer">
@@ -737,7 +744,7 @@
     <script src="hilo.js?v=hilo-fix-1" defer></script>
     <script src="coinflip.js?v=coinflip-tools-1" defer></script>
     <script src="crash.js?v=crash-live-3" defer></script>
-    <script src="blackjack.js?v=blackjack-1" defer></script>
+    <script src="blackjack.js?v=blackjack-2" defer></script>
     <script src="game-history.js?v=blackjack-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>

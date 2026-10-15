@@ -412,6 +412,46 @@ export function blackjackHandValue(cardsValue) {
   return { total, soft: aces > 0, blackjack: cards.length === 2 && total === 21, bust: total > 21 };
 }
 
+function blackjackSideCard(cardIdValue) {
+  const cardId = Number(cardIdValue);
+  if (!Number.isInteger(cardId) || cardId < 0 || cardId >= 312) throw new Error("Invalid Blackjack card");
+  const rank = cardId % 13;
+  const suit = Math.floor(cardId / 13) % 4;
+  return { rank, suit, colour: suit === 1 || suit === 2 ? "red" : "black" };
+}
+
+export function blackjackSideBetResults(playerCardsValue, dealerUpCardValue) {
+  const playerCards = Array.isArray(playerCardsValue) ? playerCardsValue : [];
+  if (playerCards.length !== 2) throw new Error("Side bets require two player cards");
+  const [first, second] = playerCards.map(blackjackSideCard);
+  const dealer = blackjackSideCard(dealerUpCardValue);
+
+  let perfectPairs = { result: "none", multiplierMicros: 0 };
+  if (first.rank === second.rank) {
+    if (first.suit === second.suit) perfectPairs = { result: "perfect-pair", multiplierMicros: 26_000_000 };
+    else if (first.colour === second.colour) perfectPairs = { result: "coloured-pair", multiplierMicros: 13_000_000 };
+    else perfectPairs = { result: "mixed-pair", multiplierMicros: 7_000_000 };
+  }
+
+  const cards = [first, second, dealer];
+  const ranks = cards.map((card) => card.rank).sort((left, right) => left - right);
+  const suited = cards.every((card) => card.suit === cards[0].suit);
+  const sameRank = ranks[0] === ranks[2];
+  const uniqueRanks = new Set(ranks).size === 3;
+  const straight = uniqueRanks && (
+    (ranks[2] - ranks[0] === 2 && ranks[1] - ranks[0] === 1)
+    || (ranks[0] === 0 && ranks[1] === 1 && ranks[2] === 2)
+    || (ranks[0] === 0 && ranks[1] === 11 && ranks[2] === 12)
+  );
+  let twentyOnePlusThree = { result: "none", multiplierMicros: 0 };
+  if (sameRank && suited) twentyOnePlusThree = { result: "suited-trips", multiplierMicros: 101_000_000 };
+  else if (straight && suited) twentyOnePlusThree = { result: "straight-flush", multiplierMicros: 41_000_000 };
+  else if (sameRank) twentyOnePlusThree = { result: "three-of-a-kind", multiplierMicros: 31_000_000 };
+  else if (straight) twentyOnePlusThree = { result: "straight", multiplierMicros: 11_000_000 };
+  else if (suited) twentyOnePlusThree = { result: "flush", multiplierMicros: 6_000_000 };
+  return { perfectPairs, twentyOnePlusThree };
+}
+
 export function normalizeAddress(value) {
   const address = String(value || "").trim();
   if (address.length < 10 || address.length > 256 || /\s/.test(address)) throw new Error("Enter a valid wallet address");

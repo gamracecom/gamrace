@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 import {
   blackjackHandValue,
+  blackjackSideBetResults,
   createIpnSignature,
   createRawHmacSignature,
   crashDurationMs,
@@ -37,6 +38,18 @@ test("Blackjack values aces, naturals, face cards and busts correctly", () => {
   assert.deepEqual(blackjackHandValue([0, 13, 8, 9]), { total: 21, soft: false, blackjack: false, bust: false });
   assert.deepEqual(blackjackHandValue([9, 10, 4]), { total: 25, soft: false, blackjack: false, bust: true });
   assert.deepEqual(blackjackHandValue([0, 13, 26, 39]), { total: 14, soft: true, blackjack: false, bust: false });
+});
+
+test("Blackjack side bets classify Perfect Pairs and 21+3 hands", () => {
+  assert.deepEqual(blackjackSideBetResults([5, 57], 32), {
+    perfectPairs: { result: "perfect-pair", multiplierMicros: 26_000_000 },
+    twentyOnePlusThree: { result: "none", multiplierMicros: 0 },
+  });
+  assert.equal(blackjackSideBetResults([1, 40], 53).perfectPairs.result, "coloured-pair");
+  assert.equal(blackjackSideBetResults([1, 14], 27).perfectPairs.result, "mixed-pair");
+  assert.deepEqual(blackjackSideBetResults([0, 11], 12).twentyOnePlusThree, { result: "straight-flush", multiplierMicros: 41_000_000 });
+  assert.deepEqual(blackjackSideBetResults([8, 21], 34).twentyOnePlusThree, { result: "three-of-a-kind", multiplierMicros: 31_000_000 });
+  assert.deepEqual(blackjackSideBetResults([2, 3], 4).twentyOnePlusThree, { result: "straight-flush", multiplierMicros: 41_000_000 });
 });
 
 test("IPN signing recursively sorts object keys", async () => {

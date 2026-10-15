@@ -16,11 +16,15 @@
   const actionPanel = game.querySelector(".blackjack-actions");
   const actionButtons = [...game.querySelectorAll("[data-blackjack-action]")];
   const balanceLabel = game.querySelector("[data-blackjack-balance]");
+  const perfectPairsInput = game.querySelector("#blackjack-perfect-pairs");
+  const twentyOnePlusThreeInput = game.querySelector("#blackjack-twenty-one-three");
+  const viewButtons = [...game.querySelectorAll("[data-blackjack-view]")];
+  const controlPanels = [...game.querySelectorAll("[data-blackjack-panel]")];
+  const handCountButtons = [...game.querySelectorAll("[data-blackjack-hand-count]")];
   const message = game.querySelector("#blackjack-message");
   const dealerCards = game.querySelector("#blackjack-dealer-cards");
   const dealerTotal = game.querySelector("#blackjack-dealer-total");
   const playerHands = game.querySelector("#blackjack-player-hands");
-  const roundState = game.querySelector("#blackjack-round-state");
 
   const SUITS = Object.freeze({ spades: "♠", hearts: "♥", diamonds: "♦", clubs: "♣" });
   let selectedCurrency = "";
@@ -29,6 +33,7 @@
   let availableBalance = 0;
   let round = null;
   let busy = false;
+  let handCount = 1;
   let renderedSignature = "";
   const recordedRounds = new Set();
 
@@ -41,9 +46,15 @@
     catch { return {}; }
   }
 
-  function cleanAmount() {
-    const value = Number.parseFloat(betInput.value);
+  function cleanInput(input) {
+    const value = Number.parseFloat(input?.value);
     return Number.isFinite(value) ? Math.max(0, Math.round(value * 100000000) / 100000000) : 0;
+  }
+
+  function cleanAmount() { return cleanInput(betInput); }
+
+  function requestedTotal() {
+    return handCount * (cleanAmount() + cleanInput(perfectPairsInput) + cleanInput(twentyOnePlusThreeInput));
   }
 
   function minimumWager() {
@@ -88,6 +99,20 @@
     return round?.hands?.length > 1 ? `Hand ${index + 1}` : "Your hand";
   }
 
+  function sideResultLabel(result) {
+    return String(result || "none").split("-").map((part) => part ? `${part[0].toUpperCase()}${part.slice(1)}` : "").join(" ");
+  }
+
+  function sideResults(index) {
+    if (!round?.sideBets) return "";
+    return [["Perfect Pairs", round.sideBets.perfectPairs], ["21+3", round.sideBets.twentyOnePlusThree]].map(([label, bet]) => {
+      if (!bet || Number(bet.wagerPerHand || 0) <= 0) return "";
+      const result = bet.results?.[index] || { result: "none", multiplier: 0 };
+      const won = Number(result.multiplier || 0) > 0;
+      return `<span class="${won ? "win" : "loss"}"><b>${label}</b>${won ? `${sideResultLabel(result.result)} · ${(result.multiplier - 1).toFixed(0)}:1` : "No win"}</span>`;
+    }).join("");
+  }
+
   function renderRound(nextRound) {
     round = nextRound || null;
     const signature = round ? `${round.id}:${round.updatedAt}:${round.status}` : "empty";
@@ -99,28 +124,27 @@
     if (!round) {
       dealerCards.replaceChildren();
       dealerTotal.textContent = "—";
-      playerHands.innerHTML = `<div class="blackjack-empty-seat"><span>♠</span><strong>Your cards appear here</strong></div>`;
-      roundState.textContent = "Place your bet";
+      playerHands.innerHTML = `<div class="blackjack-empty-seat"><span>♠</span></div>`;
       actionPanel.hidden = true;
       dealButton.textContent = "Deal";
       updateAvailability();
       return;
     }
 
+    if (Number.isInteger(Number(round.handCount))) selectHandCount(Number(round.handCount), false);
+
     dealerCards.replaceChildren(...round.dealer.cards.map(cardNode));
     dealerTotal.textContent = round.status === "settled" ? String(round.dealer.total) : `${round.dealer.total} + ?`;
     playerHands.replaceChildren(...round.hands.map((hand, index) => {
       const article = document.createElement("article");
       article.className = `blackjack-hand${index === round.activeHand && round.status === "active" ? " active" : ""} status-${hand.status}`;
-      article.innerHTML = `<header><span>${handLabel(hand, index)}</span><strong>${hand.total}</strong></header><div class="blackjack-card-row"></div>`;
+      article.innerHTML = `<header><span>${handLabel(hand, index)}</span><strong>${hand.total}</strong></header><div class="blackjack-card-row"></div><footer class="blackjack-side-results">${sideResults(Number.isInteger(Number(hand.seat)) ? Number(hand.seat) : index)}</footer>`;
       article.querySelector(".blackjack-card-row").replaceChildren(...hand.cards.map(cardNode));
       return article;
     }));
     game.classList.toggle("deal-animate", animate);
     if (animate) requestAnimationFrame(() => window.setTimeout(() => game.classList.remove("deal-animate"), 650));
 
-    const labels = { win: "You win", loss: "Dealer wins", push: "Push" };
-    roundState.textContent = round.status === "active" ? `Hand ${Math.min(round.activeHand + 1, round.hands.length)} · Your move` : labels[round.outcome] || "Round complete";
     actionPanel.hidden = round.status !== "active";
     dealButton.textContent = round.status === "settled" ? "Deal Again" : "Hand in progress";
     actionButtons.forEach((button) => {
@@ -148,10 +172,32 @@
   function updateAvailability() {
     const amount = cleanAmount();
     const active = round?.status === "active";
-    betInput.disabled = busy || active;
-    dealButton.disabled = busy || active || !selectedCurrency || amount < minimumWager() || amount > availableBalance;
+    const required = requestedTotal();
+    [betInput, perfectPairsInput, twentyOnePlusThreeInput].forEach((input) => { input.disabled = busy || active; });
+    handCountButtons.forEach((button) => { button.disabled = busy || active; });
+    dealButton.disabled = busy || active || !selectedCurrency || amount < minimumWager() || required > availableBalance;
     balanceLabel.textContent = formatAmount(availableBalance);
-    if (round?.status !== "settled" && !active && amount > availableBalance && amount > 0) setMessage(`Insufficient ${selectedSymbol} balance.`);
+    if (round?.status !== "settled" && !active && required > availableBalance && required > 0) setMessage(`Insufficient ${selectedSymbol} balance for all selected hands and side bets.`);
+  }
+
+  function switchView(view) {
+    viewButtons.forEach((button) => {
+      const selected = button.dataset.blackjackView === view;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-selected", String(selected));
+    });
+    controlPanels.forEach((panel) => { panel.hidden = panel.dataset.blackjackPanel !== view; });
+  }
+
+  function selectHandCount(value, update = true) {
+    if (![1, 2, 3].includes(value)) return;
+    handCount = value;
+    handCountButtons.forEach((button) => {
+      const selected = Number(button.dataset.blackjackHandCount) === value;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    if (update) updateAvailability();
   }
 
   function applyWalletSelection(detail) {
@@ -163,6 +209,10 @@
     availableBalance = displayFiat ? Number(detail.balance.usdCents || 0) / 100 : Number(detail.balance.available || 0);
     betInput.min = minimumWager().toFixed(displayFiat ? 2 : 8);
     betInput.step = betInput.min;
+    [perfectPairsInput, twentyOnePlusThreeInput].forEach((input) => {
+      input.min = "0";
+      input.step = minimumWager().toFixed(displayFiat ? 2 : 8);
+    });
     window.GamRaceBetCurrency?.render(game.querySelectorAll("[data-blackjack-currency]"), detail);
     if (changed) { round = null; renderedSignature = ""; }
     updateAvailability();
@@ -187,14 +237,21 @@
 
   async function deal() {
     const amount = cleanAmount();
-    if (busy || round?.status === "active" || amount < minimumWager() || amount > availableBalance) return;
+    if (busy || round?.status === "active" || amount < minimumWager() || requestedTotal() > availableBalance) return;
     busy = true;
     setMessage();
     updateAvailability();
     try {
       const response = await window.gamraceWallet.request("/games/blackjack/rounds", {
         method: "POST",
-        body: JSON.stringify({ requestId: requestId(), currency: selectedCurrency, wager: amount.toFixed(displayFiat ? 2 : 8), displayFiat }),
+        body: JSON.stringify({
+          requestId: requestId(), currency: selectedCurrency,
+          wager: amount.toFixed(displayFiat ? 2 : 8), displayFiat, handCount,
+          sideBets: {
+            perfectPairs: cleanInput(perfectPairsInput).toFixed(displayFiat ? 2 : 8),
+            twentyOnePlusThree: cleanInput(twentyOnePlusThreeInput).toFixed(displayFiat ? 2 : 8),
+          },
+        }),
       });
       window.gamraceWallet.applyGameResult(response);
       renderRound(response.round);
@@ -219,9 +276,11 @@
   }
 
   dealButton.addEventListener("click", deal);
+  viewButtons.forEach((button) => button.addEventListener("click", () => switchView(button.dataset.blackjackView)));
+  handCountButtons.forEach((button) => button.addEventListener("click", () => selectHandCount(Number(button.dataset.blackjackHandCount))));
   actionButtons.forEach((button) => button.addEventListener("click", () => play(button.dataset.blackjackAction)));
   game.querySelectorAll("[data-blackjack-bet-action]").forEach((button) => button.addEventListener("click", () => adjustBet(button.dataset.blackjackBetAction)));
-  betInput.addEventListener("input", updateAvailability);
+  [betInput, perfectPairsInput, twentyOnePlusThreeInput].forEach((input) => input.addEventListener("input", updateAvailability));
   window.addEventListener("gamrace:wallet-balance-changed", (event) => applyWalletSelection(event.detail));
   window.addEventListener("gamrace:game-setting-changed", (event) => {
     if (event.detail?.game === "blackjack" && event.detail?.name === "reducedMotion") game.classList.toggle("reduced-motion", Boolean(event.detail.value));
@@ -229,6 +288,8 @@
   window.addEventListener("focus", syncActive);
 
   game.classList.toggle("reduced-motion", Boolean(settings().blackjackReducedMotion));
+  switchView("manual");
+  selectHandCount(1, false);
   renderRound(null);
   if (window.gamraceWalletSelection) applyWalletSelection(window.gamraceWalletSelection);
 })();

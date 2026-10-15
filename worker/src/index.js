@@ -1,6 +1,7 @@
 import {
   assetUnitsToString,
   blackjackHandValue,
+  blackjackSideBetResults,
   coinflipMultiplierMicros,
   crashDurationMs,
   crashMultiplierMicros,
@@ -1381,8 +1382,50 @@ function blackjackAvailableActions(row, hands) {
   if (!hand || hand.status !== "playing") return [];
   const actions = ["hit", "stand"];
   if (hand.cards.length === 2 && !hand.doubled) actions.push("double");
-  if (!Number(row.split_hand) && hands.length === 1 && hand.cards.length === 2 && Number(hand.cards[0]) % 13 === Number(hand.cards[1]) % 13) actions.push("split");
+  if (!Number(row.split_hand) && hand.cards.length === 2 && Number(hand.cards[0]) % 13 === Number(hand.cards[1]) % 13) actions.push("split");
   return actions;
+}
+
+function blackjackSideState(row) {
+  try {
+    const value = JSON.parse(String(row?.side_bets_json || "{}"));
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch { throw httpError(500, "That Blackjack round has invalid side-bet data"); }
+}
+
+function blackjackSideResponse(row) {
+  const state = blackjackSideState(row);
+  return Object.fromEntries(["perfectPairs", "twentyOnePlusThree"].map((key) => {
+    const bet = state[key] || {};
+    return [key, {
+      wagerPerHand: assetUnitsToString(Number(bet.wagerPerHand || 0), false),
+      wager: assetUnitsToString(Number(bet.wagerUnits || 0), false),
+      payout: assetUnitsToString(Number(bet.payoutUnits || 0), false),
+      results: Array.isArray(bet.results) ? bet.results.map((result) => ({
+        result: String(result.result || "none"),
+        multiplier: Number(result.multiplierMicros || 0) / 1_000_000,
+        payout: assetUnitsToString(Number(result.payoutUnits || 0), false),
+      })) : [],
+    }];
+  }));
+}
+
+function blackjackSideStateForHands(hands, dealerUpCard, perfectPairsWager, twentyOnePlusThreeWager) {
+  const state = {};
+  for (const [key, wagerPerHand] of Object.entries({ perfectPairs: perfectPairsWager, twentyOnePlusThree: twentyOnePlusThreeWager })) {
+    const results = hands.map((hand) => {
+      const result = blackjackSideBetResults(hand.cards, dealerUpCard)[key];
+      const payoutUnits = wagerPerHand > 0 && result.multiplierMicros > 0 ? payoutFromMultiplier(wagerPerHand, result.multiplierMicros) : 0;
+      return { ...result, payoutUnits };
+    });
+    state[key] = {
+      wagerPerHand,
+      wagerUnits: wagerPerHand * hands.length,
+      payoutUnits: results.reduce((total, result) => total + result.payoutUnits, 0),
+      results,
+    };
+  }
+  return state;
 }
 
 function blackjackRoundResponse(row) {
@@ -1398,6 +1441,10 @@ function blackjackRoundResponse(row) {
     wager: assetUnitsToString(Number(row.wager_units), false),
     baseWager: assetUnitsToString(Number(row.base_wager_units), false),
     payout: assetUnitsToString(Number(row.payout_units || 0), false),
+    handCount: Number(row.hand_count || 1),
+    sideWager: assetUnitsToString(Number(row.side_wager_units || 0), false),
+    sidePayout: assetUnitsToString(Number(row.side_payout_units || 0), false),
+    sideBets: blackjackSideResponse(row),
     multiplier: Number(row.multiplier_micros || 0) / 1_000_000,
     status: row.status,
     outcome: row.outcome || null,
@@ -1407,6 +1454,7 @@ function blackjackRoundResponse(row) {
       const value = blackjackHandValue(hand.cards);
       return {
         index,
+        seat: Number.isInteger(Number(hand.seat)) ? Number(hand.seat) : index,
         cards: hand.cards.map(blackjackCard),
         total: value.total,
         soft: value.soft,
@@ -1428,22 +1476,23 @@ async function settleBlackjackRound(env, row, state, timestamp = now(), forced =
   if (!row || row.status !== "active") return row;
   const { shoe, dealer, hands } = state;
   let shoePosition = Number(row.shoe_position);
-  let payoutUnits = 0;
+  let payoutUnits = Number(row.side_payout_units || 0);
   let outcome = "loss";
 
-  const playerNatural = hands.length === 1 && blackjackHandValue(hands[0].cards).blackjack;
-  const dealerNatural = blackjackHandValue(dealer).blackjack;
-  if (!forced && !playerNatural && !dealerNatural) return row;
+  if (!forced && hands.some((hand) => hand.status === "playing")) return row;
 
   if (forced === "dealer") {
-    while (true) {
-      const value = blackjackHandValue(dealer);
-      if (value.total >= 17) break;
-      dealer.push(shoe[shoePosition]);
-      shoePosition += 1;
+    if (hands.some((hand) => !["bust", "blackjack", "loss"].includes(hand.status))) {
+      while (true) {
+        const value = blackjackHandValue(dealer);
+        if (value.total >= 17) break;
+        dealer.push(shoe[shoePosition]);
+        shoePosition += 1;
+      }
     }
     const dealerValue = blackjackHandValue(dealer);
     for (const hand of hands) {
+      if (hand.status === "blackjack") { payoutUnits += Number(hand.payoutUnits || 0); continue; }
       const value = blackjackHandValue(hand.cards);
       let handPayout = 0;
       if (value.bust) hand.status = "loss";
@@ -1453,17 +1502,8 @@ async function settleBlackjackRound(env, row, state, timestamp = now(), forced =
       hand.payoutUnits = handPayout;
       payoutUnits += handPayout;
     }
-  } else if (playerNatural && dealerNatural) {
-    hands[0].status = "push";
-    hands[0].payoutUnits = Number(row.base_wager_units);
-    payoutUnits = Number(row.base_wager_units);
-  } else if (playerNatural) {
-    hands[0].status = "blackjack";
-    hands[0].payoutUnits = payoutFromMultiplier(Number(row.base_wager_units), 2_500_000);
-    payoutUnits = hands[0].payoutUnits;
   } else {
-    hands[0].status = "loss";
-    hands[0].payoutUnits = 0;
+    payoutUnits += hands.reduce((total, hand) => total + Number(hand.payoutUnits || 0), 0);
   }
 
   if (payoutUnits > Number(row.wager_units)) outcome = "win";
@@ -1510,25 +1550,61 @@ async function handleStartBlackjackRound(request, env, user) {
   const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
   const active = await env.DB.prepare("SELECT * FROM blackjack_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
   if (active) return json(request, env, 200, { round: blackjackRoundResponse(active), wallet: await walletResponse(env, user.sub) });
-  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
-  if (wagerUnits > Math.floor(Number.MAX_SAFE_INTEGER / 8)) throw httpError(400, "That Blackjack wager is too large");
+  const displayFiat = body.displayFiat === true;
+  const handCount = Number(body.handCount || 1);
+  if (!Number.isInteger(handCount) || handCount < 1 || handCount > 3) throw httpError(400, "Choose one, two, or three Blackjack hands");
+  const baseWagerUnits = await gameWagerUnits(env, asset, body.wager, displayFiat);
+  const sideInput = body.sideBets && typeof body.sideBets === "object" && !Array.isArray(body.sideBets) ? body.sideBets : {};
+  const sideWagerUnits = async (value) => {
+    if (value === undefined || value === null || String(value).trim() === "" || Number(value) === 0) return 0;
+    return gameWagerUnits(env, asset, value, displayFiat);
+  };
+  const perfectPairsWager = await sideWagerUnits(sideInput.perfectPairs);
+  const twentyOnePlusThreeWager = await sideWagerUnits(sideInput.twentyOnePlusThree);
   const shoe = blackjackShoe();
-  const playerCards = [shoe[0], shoe[2]];
-  const dealerCards = [shoe[1], shoe[3]];
-  const hands = [{ cards: playerCards, status: "playing", doubled: false, wagerUnits, payoutUnits: 0 }];
+  let shoePosition = 0;
+  const hands = Array.from({ length: handCount }, (_, seat) => ({ seat, cards: [shoe[shoePosition++]], status: "playing", doubled: false, wagerUnits: baseWagerUnits, payoutUnits: 0 }));
+  const dealerCards = [shoe[shoePosition++]];
+  hands.forEach((hand) => hand.cards.push(shoe[shoePosition++]));
+  dealerCards.push(shoe[shoePosition++]);
+  const dealerNatural = blackjackHandValue(dealerCards).blackjack;
+  hands.forEach((hand) => {
+    const natural = blackjackHandValue(hand.cards).blackjack;
+    if (dealerNatural) {
+      hand.status = natural ? "push" : "loss";
+      hand.payoutUnits = natural ? baseWagerUnits : 0;
+    } else if (natural) {
+      hand.status = "blackjack";
+      hand.payoutUnits = payoutFromMultiplier(baseWagerUnits, 2_500_000);
+    }
+  });
+  let sideState;
+  let totalSideWager;
+  let totalSidePayout;
+  let wagerUnits;
+  try {
+    sideState = blackjackSideStateForHands(hands, dealerCards[0], perfectPairsWager, twentyOnePlusThreeWager);
+    totalSideWager = Object.values(sideState).reduce((total, bet) => total + bet.wagerUnits, 0);
+    totalSidePayout = Object.values(sideState).reduce((total, bet) => total + bet.payoutUnits, 0);
+    wagerUnits = baseWagerUnits * handCount + totalSideWager;
+    const maximumMainPayout = payoutFromMultiplier(baseWagerUnits * handCount, 2_500_000);
+    if (![wagerUnits, totalSidePayout, maximumMainPayout + totalSidePayout].every(Number.isSafeInteger)) throw new Error("That Blackjack wager is too large");
+  } catch (error) { throw httpError(400, error.message || "That Blackjack wager is too large"); }
+  const activeHand = hands.findIndex((hand) => hand.status === "playing");
   const timestamp = now();
   const id = crypto.randomUUID();
   try {
     const results = await env.DB.batch([
     env.DB.prepare(`
       INSERT INTO blackjack_rounds(
-        id, request_id, uid, currency, base_wager_units, wager_units, shoe_json, shoe_position,
-        dealer_cards_json, player_hands_json, active_hand, split_hand, status, created_at, updated_at
+        id, request_id, uid, currency, base_wager_units, wager_units, hand_count, side_wager_units,
+        side_payout_units, side_bets_json, shoe_json, shoe_position, dealer_cards_json,
+        player_hands_json, active_hand, split_hand, status, created_at, updated_at
       )
-      SELECT ?, ?, ?, ?, ?, ?, ?, 4, ?, ?, 0, 0, 'active', ?, ?
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?, ?
       FROM crypto_balances WHERE uid = ? AND currency = ? AND available_units >= ?
         AND NOT EXISTS(SELECT 1 FROM blackjack_rounds WHERE uid = ? AND currency = ? AND status = 'active')
-    `).bind(id, requestId, user.sub, asset.code, wagerUnits, wagerUnits, JSON.stringify(shoe), JSON.stringify(dealerCards), JSON.stringify(hands), timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
+    `).bind(id, requestId, user.sub, asset.code, baseWagerUnits, wagerUnits, handCount, totalSideWager, totalSidePayout, JSON.stringify(sideState), JSON.stringify(shoe), shoePosition, JSON.stringify(dealerCards), JSON.stringify(hands), Math.max(0, activeHand), timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
     env.DB.prepare(`
       UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
       WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM blackjack_rounds WHERE id = ?)
@@ -1541,7 +1617,7 @@ async function handleStartBlackjackRound(request, env, user) {
     ]);
     if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Finish your active Blackjack hand or check your available balance");
     let row = await env.DB.prepare("SELECT * FROM blackjack_rounds WHERE id = ?").bind(id).first();
-    row = await settleBlackjackRound(env, row, blackjackState(row), timestamp);
+    if (dealerNatural || activeHand < 0) row = await settleBlackjackRound(env, row, blackjackState(row), timestamp, "initial");
     return json(request, env, 201, { round: blackjackRoundResponse(row), wallet: await walletResponse(env, user.sub) });
   } catch (error) {
     const duplicate = await env.DB.prepare("SELECT * FROM blackjack_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
@@ -1587,16 +1663,16 @@ async function handleBlackjackAction(request, env, user, roundIdValue) {
     shoePosition += 1;
     hand.status = blackjackHandValue(hand.cards).bust ? "bust" : "stood";
   } else {
-    extraWager = Number(row.base_wager_units);
+    extraWager = Number(hand.wagerUnits);
     const first = hand.cards[0];
     const second = hand.cards[1];
     const splitAces = Number(first) % 13 === 0;
-    state.hands = [
-      { cards: [first, state.shoe[shoePosition]], status: splitAces ? "stood" : "playing", doubled: false, wagerUnits: Number(row.base_wager_units), payoutUnits: 0 },
-      { cards: [second, state.shoe[shoePosition + 1]], status: splitAces ? "stood" : "playing", doubled: false, wagerUnits: Number(row.base_wager_units), payoutUnits: 0 },
-    ];
+    const seat = Number.isInteger(Number(hand.seat)) ? Number(hand.seat) : activeHand;
+    state.hands.splice(activeHand, 1,
+      { seat, cards: [first, state.shoe[shoePosition]], status: splitAces ? "stood" : "playing", doubled: false, wagerUnits: extraWager, payoutUnits: 0 },
+      { seat, cards: [second, state.shoe[shoePosition + 1]], status: splitAces ? "stood" : "playing", doubled: false, wagerUnits: extraWager, payoutUnits: 0 },
+    );
     shoePosition += 2;
-    activeHand = 0;
   }
 
   if (state.hands[activeHand]?.status !== "playing") {
