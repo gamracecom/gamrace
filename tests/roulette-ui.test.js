@@ -28,6 +28,9 @@ test("Roulette animates only the server-authoritative result and settles the wal
   assert.match(script, /\/games\/roulette\/live\?currency=/);
   assert.match(script, /animateSharedRound/);
   assert.match(script, /trackAnimation\.currentTime = elapsed/);
+  assert.match(script, /const previousRound = activeRound/);
+  assert.match(script, /if \(!previousRound\) renderIdleTrack\(\)/);
+  assert.match(script, /track\.style\.transform = `translateX\(\$\{positions\.centre\}px\)`/);
   assert.match(script, /gamraceWallet\.applyGameResult/);
   assert.doesNotMatch(script, /getRandomValues/);
   assert.match(worker, /secureRouletteResult\(\)/);

@@ -121,6 +121,10 @@
           [{ transform: `translateX(${positions.landed}px)` }, { transform: `translateX(${positions.centre}px)` }],
           { duration: CENTRE_MS, easing: "cubic-bezier(.2, .72, .24, 1)", fill: "forwards" },
         );
+        trackAnimation.onfinish = () => {
+          track.style.transform = `translateX(${positions.centre}px)`;
+          trackAnimation = null;
+        };
       };
       return;
     }
@@ -130,6 +134,10 @@
       { duration: CENTRE_MS, easing: "cubic-bezier(.2, .72, .24, 1)", fill: "forwards" },
     );
     trackAnimation.currentTime = elapsed - SPIN_MS;
+    trackAnimation.onfinish = () => {
+      track.style.transform = `translateX(${positions.centre}px)`;
+      trackAnimation = null;
+    };
   }
 
   function cleanAmount() {
@@ -185,6 +193,7 @@
   }
 
   function applyRound(round, serverNow) {
+    const previousRound = activeRound;
     const isNewRound = activeRound?.id !== round?.id;
     activeRound = round;
     if (!round) return;
@@ -194,7 +203,7 @@
     if (isNewRound) {
       animatedRoundId = "";
       walletRefreshRoundId = "";
-      renderIdleTrack();
+      if (!previousRound) renderIdleTrack();
     }
     if (round.phase === "spinning") {
       animateSharedRound(round, serverNow);

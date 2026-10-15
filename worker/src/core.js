@@ -397,6 +397,21 @@ export function payoutFromMultiplier(wagerUnits, multiplierMicros) {
   return payout;
 }
 
+export function blackjackHandValue(cardsValue) {
+  const cards = Array.isArray(cardsValue) ? cardsValue : [];
+  let total = 0;
+  let aces = 0;
+  for (const cardIdValue of cards) {
+    const cardId = Number(cardIdValue);
+    if (!Number.isInteger(cardId) || cardId < 0 || cardId >= 312) throw new Error("Invalid Blackjack card");
+    const rank = cardId % 13;
+    if (rank === 0) { total += 11; aces += 1; }
+    else total += rank >= 9 ? 10 : rank + 1;
+  }
+  while (total > 21 && aces > 0) { total -= 10; aces -= 1; }
+  return { total, soft: aces > 0, blackjack: cards.length === 2 && total === 21, bust: total > 21 };
+}
+
 export function normalizeAddress(value) {
   const address = String(value || "").trim();
   if (address.length < 10 || address.length > 256 || /\s/.test(address)) throw new Error("Enter a valid wallet address");

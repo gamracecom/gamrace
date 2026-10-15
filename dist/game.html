@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=game-tools-1&amp;crash=2" />
+    <link rel="stylesheet" href="styles.css?v=game-tools-1&amp;blackjack=1&amp;plinko=2" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -668,6 +668,51 @@
             </div>
             <section class="mines-history crash-history" hidden aria-labelledby="crash-history-heading"><div class="history-toolbar"><div class="history-tabs" role="tablist"><button class="history-tab active" id="crash-history-heading" data-crash-history-view="top">Top Wins</button><button class="history-tab" data-crash-history-view="lucky">Lucky Wins</button></div><label class="history-period"><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Crash results"><tr class="history-skeleton"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div></section>
           </section>
+          <section class="blackjack-game" id="blackjack-game" hidden aria-label="Blackjack">
+            <div class="blackjack-stage">
+              <section class="blackjack-controls" aria-label="Blackjack controls">
+                <div class="blackjack-mode-tabs"><button class="active" type="button">Manual</button></div>
+                <div class="blackjack-control-stack">
+                  <label class="blackjack-field">
+                    <span><strong>Bet Amount</strong><small data-blackjack-balance>0.00000000 COIN</small></span>
+                    <span class="blackjack-input-shell"><span data-blackjack-currency>$</span><input id="blackjack-bet-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="0.00" aria-label="Blackjack bet amount" /><button type="button" data-blackjack-bet-action="half">½</button><button type="button" data-blackjack-bet-action="double">2×</button></span>
+                  </label>
+                  <button class="blackjack-primary" id="blackjack-deal" type="button" disabled>Deal</button>
+                  <div class="blackjack-actions" aria-label="Blackjack actions" hidden>
+                    <button type="button" data-blackjack-action="hit">Hit</button>
+                    <button type="button" data-blackjack-action="stand">Stand</button>
+                    <button type="button" data-blackjack-action="double">Double</button>
+                    <button type="button" data-blackjack-action="split">Split</button>
+                  </div>
+                  <div class="blackjack-rules"><span>Blackjack pays <strong>3:2</strong></span><span>Dealer stands on <strong>soft 17</strong></span></div>
+                  <p class="blackjack-message" id="blackjack-message" role="status" aria-live="polite" hidden></p>
+                </div>
+              </section>
+              <section class="blackjack-table" aria-label="Blackjack table">
+                <header class="blackjack-table-header"><span><i></i>Six-deck shoe</span><strong id="blackjack-round-state">Place your bet</strong></header>
+                <div class="blackjack-seat dealer-seat">
+                  <div class="blackjack-seat-label"><span>Dealer</span><strong id="blackjack-dealer-total">—</strong></div>
+                  <div class="blackjack-card-row" id="blackjack-dealer-cards" aria-label="Dealer cards"></div>
+                </div>
+                <div class="blackjack-table-mark" aria-hidden="true"><strong>BLACKJACK</strong><span>PAYS 3 TO 2</span></div>
+                <div class="blackjack-player-hands" id="blackjack-player-hands" aria-label="Your Blackjack hands">
+                  <div class="blackjack-empty-seat"><span>♠</span><strong>Your cards appear here</strong></div>
+                </div>
+              </section>
+              <footer class="blackjack-footer">
+                <div class="game-tools" data-shared-game-tools="blackjack" aria-label="Game tools">
+                  <button class="game-tool-button" type="button" data-shared-game-tool="settings" aria-label="Blackjack settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-shared-game-favorite="blackjack" aria-label="Add Blackjack to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-shared-game-tool="stats" aria-label="Blackjack session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button>
+                  <button class="game-tool-button" type="button" data-shared-game-tool="info" aria-label="Blackjack information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
+                  <section class="game-tool-panel settings-panel" data-shared-game-tool-panel="settings" hidden><header><div><strong>Game settings</strong><span>Choose how Blackjack plays</span></div><button type="button" data-close-shared-tool aria-label="Close settings">×</button></header><button class="game-setting-row" type="button" role="switch" aria-checked="false" data-shared-game-setting="mute"><span><strong>Mute</strong><small>Turn off card and chip sounds</small></span><i aria-hidden="true"></i></button><button class="game-setting-row" type="button" role="switch" aria-checked="false" data-shared-game-setting="reducedMotion"><span><strong>Reduced motion</strong><small>Simplify card dealing animations</small></span><i aria-hidden="true"></i></button></section>
+                  <section class="game-tool-panel stats-panel" data-shared-game-tool-panel="stats" hidden><header><div><strong>Session statistics</strong><span>Resets when this page closes</span></div><button type="button" data-close-shared-tool aria-label="Close statistics">×</button></header><div class="game-stats-grid"><article><span>Profit</span><strong data-shared-stat="profit">0.00</strong></article><article><span>Wins</span><strong data-shared-stat="wins">0</strong></article><article><span>Wagered</span><strong data-shared-stat="wagered">0.00</strong></article><article><span>Losses</span><strong data-shared-stat="losses">0</strong></article></div></section>
+                  <section class="game-tool-panel info-panel" data-shared-game-tool-panel="info" hidden><header><div><strong>Blackjack</strong><span>Game information</span></div><button type="button" data-close-shared-tool aria-label="Close game information">×</button></header><p>Build a hand closer to 21 than the dealer without going over. Split matching ranks and double any opening two-card hand.</p><dl><div><dt>Decks</dt><dd>6</dd></div><div><dt>Natural blackjack</dt><dd>3:2</dd></div><div><dt>Dealer rule</dt><dd>Stands soft 17</dd></div><div><dt>Return to player</dt><dd data-game-rtp="blackjack">99.5%</dd></div></dl></section>
+                </div><span>GamRace</span><button class="fairness-label" type="button">Fair Play</button>
+              </footer>
+            </div>
+            <section class="mines-history blackjack-history" hidden aria-labelledby="blackjack-history-heading"><div class="history-toolbar"><div class="history-tabs" role="tablist"><button class="history-tab active" id="blackjack-history-heading" data-blackjack-history-view="top">Top Wins</button><button class="history-tab" data-blackjack-history-view="lucky">Lucky Wins</button></div><label class="history-period"><select><option value="lifetime">Lifetime</option><option value="30d">Past 30 days</option><option value="90d">Past 90 days</option></select></label></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>User</th><th>Date</th><th>Bet Amount</th><th>Multiplier</th><th>Payout</th></tr></thead><tbody aria-label="Loading live Blackjack results"><tr class="history-skeleton"><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td><td><i></i></td></tr></tbody></table></div></section>
+          </section>
           <section class="game-blank-state" id="game-blank-state" aria-label="Game coming later"></section>
         </div>
       </main>
@@ -685,14 +730,15 @@
     <script src="game-tools.js?v=shared-tools-1" defer></script>
     <script src="mines.js?v=live-edge-1" defer></script>
     <script src="dice.js?v=live-edge-1" defer></script>
-    <script src="plinko.js?v=live-edge-1" defer></script>
-    <script src="roulette.js?v=slower-spins-1" defer></script>
+    <script src="plinko.js?v=three-launch-pins-1" defer></script>
+    <script src="roulette.js?v=landed-tile-1" defer></script>
     <script src="keno.js?v=live-edge-1" defer></script>
     <script src="wheel.js?v=live-edge-1" defer></script>
     <script src="hilo.js?v=hilo-fix-1" defer></script>
     <script src="coinflip.js?v=coinflip-tools-1" defer></script>
     <script src="crash.js?v=crash-live-3" defer></script>
-    <script src="game-history.js?v=crash-1" defer></script>
+    <script src="blackjack.js?v=blackjack-1" defer></script>
+    <script src="game-history.js?v=blackjack-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=shell-stability-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>

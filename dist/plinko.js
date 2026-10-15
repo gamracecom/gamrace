@@ -169,11 +169,12 @@
 
   function boardGeometry(rows) {
     const side = 24;
-    const top = 48;
-    const pegBottom = canvas.height - 104;
+    const top = 92;
+    const pegBottom = canvas.height - 116;
     const slotGap = (canvas.width - side * 2) / (rows + 1);
     return {
       center: canvas.width / 2,
+      launcherY: 34,
       top,
       pegBottom,
       cupY: canvas.height - 28,
@@ -189,7 +190,7 @@
     context.fill();
     context.beginPath();
     context.arc(x - radius * .25, y - radius * .28, radius * .32, 0, Math.PI * 2);
-    context.fillStyle = "rgba(255,255,255,.46)";
+    context.fillStyle = "rgba(255,255,255,.58)";
     context.fill();
   }
 
@@ -197,7 +198,7 @@
     if (ball.collision) {
       context.beginPath();
       context.arc(ball.collision.x, ball.collision.y, 8 + 12 * ball.collision.strength, 0, Math.PI * 2);
-      context.strokeStyle = `rgba(63, 207, 255, ${.42 * (1 - ball.collision.strength)})`;
+      context.strokeStyle = `rgba(47, 128, 255, ${.34 * (1 - ball.collision.strength)})`;
       context.lineWidth = 2;
       context.stroke();
     }
@@ -205,12 +206,12 @@
     context.arc(ball.x, ball.y, 9, 0, Math.PI * 2);
     const fill = context.createRadialGradient(ball.x - 3, ball.y - 4, 1, ball.x, ball.y, 11);
     fill.addColorStop(0, "#ffffff");
-    fill.addColorStop(.28, "#8eeaff");
-    fill.addColorStop(1, "#078bd4");
+    fill.addColorStop(.28, "#8fc7ff");
+    fill.addColorStop(1, "#168bff");
     context.fillStyle = fill;
     context.fill();
     context.lineWidth = 1.5;
-    context.strokeStyle = "#58cfff";
+    context.strokeStyle = "#72b9ff";
     context.stroke();
   }
 
@@ -218,11 +219,15 @@
     const rows = activeBalls.size ? activeBalls.values().next().value.rows : Number(rowsSelect.value);
     const geometry = boardGeometry(rows);
     context.clearRect(0, 0, canvas.width, canvas.height);
+    const launcherGap = Math.min(58, geometry.slotGap * .7);
+    [-1, 0, 1].forEach((offset) => {
+      drawPeg(geometry.center + offset * launcherGap, geometry.launcherY, offset === 0 ? "#2f80ff" : "#758291", 5.4);
+    });
     for (let row = 0; row < rows; row += 1) {
       const y = geometry.top + row * geometry.rowGap;
       for (let peg = 0; peg <= row; peg += 1) {
         const x = geometry.center + (peg - row / 2) * geometry.slotGap;
-        drawPeg(x, y, "#64bedf", rows > 13 ? 4.1 : 4.8);
+        drawPeg(x, y, row % 2 ? "#8a96a3" : "#a8b2bd", rows > 13 ? 4.1 : 4.8);
       }
     }
     balls.forEach(drawBall);
@@ -231,7 +236,7 @@
   function buildBallPoints(path) {
     const rows = path.length;
     const geometry = boardGeometry(rows);
-    const points = [{ x: geometry.center, y: geometry.top - 34, peg: null }];
+    const points = [{ x: geometry.center, y: geometry.launcherY - 24, peg: null }];
     let rights = 0;
     path.forEach((step, index) => {
       const pegX = geometry.center + (rights - index / 2) * geometry.slotGap;

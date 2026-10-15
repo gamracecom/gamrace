@@ -27,6 +27,8 @@ test("Plinko outcome and animation are server-authoritative", () => {
   assert.match(script, /animatePath\(response\.bet\.path/);
   assert.match(script, /const activeBalls = new Map\(\)/);
   assert.match(script, /requestAnimationFrame\(animateBalls\)/);
+  assert.match(script, /\[-1, 0, 1\]\.forEach/);
+  assert.match(script, /geometry\.launcherY/);
   assert.doesNotMatch(script, /getRandomValues/);
   assert.doesNotMatch(script, /cancelAnimationFrame/);
 });

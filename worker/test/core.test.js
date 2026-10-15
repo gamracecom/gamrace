@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 import {
+  blackjackHandValue,
   createIpnSignature,
   createRawHmacSignature,
   crashDurationMs,
@@ -30,6 +31,13 @@ import {
   signaturesMatch,
   sortObject,
 } from "../src/core.js";
+
+test("Blackjack values aces, naturals, face cards and busts correctly", () => {
+  assert.deepEqual(blackjackHandValue([0, 9]), { total: 21, soft: true, blackjack: true, bust: false });
+  assert.deepEqual(blackjackHandValue([0, 13, 8, 9]), { total: 21, soft: false, blackjack: false, bust: false });
+  assert.deepEqual(blackjackHandValue([9, 10, 4]), { total: 25, soft: false, blackjack: false, bust: true });
+  assert.deepEqual(blackjackHandValue([0, 13, 26, 39]), { total: 14, soft: true, blackjack: false, bust: false });
+});
 
 test("IPN signing recursively sorts object keys", async () => {
   const payload = { z: 1, a: { y: 2, b: 3 }, list: [{ d: 4, c: 5 }] };
