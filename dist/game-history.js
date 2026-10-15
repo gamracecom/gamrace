@@ -2,7 +2,7 @@
   "use strict";
 
   const gameName = new URLSearchParams(window.location.search).get("game")?.toLowerCase();
-  if (!["mines", "dice", "plinko", "roulette", "keno", "wheel", "hi-lo", "coinflip", "crash", "blackjack", "towers"].includes(gameName)) return;
+  if (!["mines", "dice", "plinko", "roulette", "keno", "wheel", "hi-lo", "coinflip", "crash", "blackjack", "towers", "limbo"].includes(gameName)) return;
   const historyClass = gameName === "hi-lo" ? "hilo" : gameName;
   const section = document.querySelector(`.${historyClass}-history`) || (gameName === "mines" ? document.querySelector(".mines-history:not(.dice-history):not(.plinko-history):not(.roulette-history):not(.keno-history):not(.wheel-history):not(.hilo-history)") : null);
   if (!section) return;

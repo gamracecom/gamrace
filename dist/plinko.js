@@ -168,13 +168,13 @@
   }
 
   function boardGeometry(rows) {
-    const side = 62;
-    const top = 112;
-    const pegBottom = canvas.height - 88;
+    const side = 48;
+    const top = 124;
+    const pegBottom = canvas.height - 92;
     const slotGap = (canvas.width - side * 2) / (rows + 1);
     return {
       center: canvas.width / 2,
-      launcherY: 42,
+      launcherY: 36,
       top,
       pegBottom,
       cupY: canvas.height - 27,
@@ -215,7 +215,7 @@
     const rows = activeBalls.size ? activeBalls.values().next().value.rows : Number(rowsSelect.value);
     const geometry = boardGeometry(rows);
     context.clearRect(0, 0, canvas.width, canvas.height);
-    const launcherGap = Math.min(58, geometry.slotGap * .7);
+    const launcherGap = Math.min(42, geometry.slotGap * .62);
     [-1, 0, 1].forEach((offset) => {
       drawPeg(geometry.center + offset * launcherGap, geometry.launcherY, 6.5);
     });

@@ -11,6 +11,8 @@ import {
   hiloChoice,
   hiloWins,
   kenoPayout,
+  limboPayout,
+  limboResultMicros,
   maskAddress,
   minesMultiplierMicros,
   towersMultiplierMicros,
@@ -66,6 +68,7 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "roulette", name: "Roulette", editable: false, fixedHouseEdgeBasisPoints: 1765, reason: "Determined by the live 17-tile distribution" },
   { id: "blackjack", name: "Blackjack", editable: false, fixedHouseEdgeBasisPoints: 50, reason: "Determined by six-deck, 3:2 blackjack rules and player decisions" },
   { id: "towers", name: "Towers", editable: true },
+  { id: "limbo", name: "Limbo", editable: true },
 ]);
 
 async function gameHouseEdgeBasisPoints(env, gameId) {
@@ -900,6 +903,77 @@ async function handleDiceBet(request, env, user) {
   }
   const created = await env.DB.prepare("SELECT * FROM dice_bets WHERE id = ?").bind(id).first();
   return json(request, env, 201, { bet: diceBetResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+function limboBetResponse(row) {
+  return {
+    id: row.id,
+    game: "limbo",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    net: assetUnitsToString(Math.abs(Number(row.payout_units) - Number(row.wager_units)), false),
+    netDirection: Number(row.payout_units) >= Number(row.wager_units) ? "credit" : "debit",
+    targetMultiplier: Number(row.target_multiplier_micros) / 1_000_000,
+    resultMultiplier: Number(row.result_multiplier_micros) / 1_000_000,
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    outcome: row.outcome,
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleLimboBet(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM limbo_bets WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { bet: limboBetResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const targetMultiplierMicros = Math.round(Number(body.targetMultiplier) * 1_000_000);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "limbo");
+  const resultMultiplierMicros = limboResultMicros(secureRandomInt(100_000_000) + 1, houseFactorMicros);
+  let settlement;
+  try { settlement = limboPayout(wagerUnits, targetMultiplierMicros, resultMultiplierMicros); }
+  catch (error) { throw httpError(400, error.message); }
+  const timestamp = now();
+  const id = crypto.randomUUID();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO limbo_bets(
+          id, request_id, uid, currency, wager_units, payout_units,
+          target_multiplier_micros, result_multiplier_micros, multiplier_micros,
+          outcome, house_factor_micros, created_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+      `).bind(
+        id, requestId, user.sub, asset.code, wagerUnits, settlement.payoutUnits,
+        targetMultiplierMicros, resultMultiplierMicros, settlement.multiplierMicros,
+        settlement.won ? "win" : "loss", houseFactorMicros, timestamp,
+        user.sub, asset.code, wagerUnits,
+      ),
+      env.DB.prepare(`
+        UPDATE crypto_balances
+        SET available_units = available_units - ? + ?, updated_at = ?
+        WHERE uid = ? AND currency = ?
+          AND EXISTS(SELECT 1 FROM limbo_bets WHERE id = ?)
+      `).bind(wagerUnits, settlement.payoutUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'limbo_' || id, uid, currency, 'game_bet', payout_units - wager_units, id, created_at
+        FROM limbo_bets WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM limbo_bets WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { bet: limboBetResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM limbo_bets WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { bet: limboBetResponse(created), wallet: await walletResponse(env, user.sub) });
 }
 
 function plinkoBetResponse(row) {
@@ -2201,6 +2275,7 @@ async function handleGameHistory(request, env, user) {
     crash: { table: "crash_wagers", where: "b.status = 'cashed_out'" },
     blackjack: { table: "blackjack_rounds", where: "b.status = 'settled'" },
     towers: { table: "towers_rounds", where: "b.status IN ('cashed_out', 'won')" },
+    limbo: { table: "limbo_bets", where: "1 = 1" },
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
@@ -4041,6 +4116,7 @@ async function route(request, env) {
   const coinflipCashoutMatch = path.match(/^\/games\/coinflip\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
   if (request.method === "POST" && coinflipCashoutMatch) return handleCoinflipCashout(request, env, user, coinflipCashoutMatch[1]);
   if (request.method === "POST" && path === "/games/dice/bets") return handleDiceBet(request, env, user);
+  if (request.method === "POST" && path === "/games/limbo/bets") return handleLimboBet(request, env, user);
   if (request.method === "POST" && path === "/games/plinko/bets") return handlePlinkoBet(request, env, user);
   if (request.method === "GET" && path === "/games/wheel/bets/active") return handleGetActiveWheelBet(request, env, user);
   if (request.method === "POST" && path === "/games/wheel/bets") return handleStartWheelBet(request, env, user);

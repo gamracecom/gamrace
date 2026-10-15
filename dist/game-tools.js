@@ -7,7 +7,7 @@
   const GAME_LABELS = {
     all: "All games", mines: "Mines", dice: "Dice", plinko: "Plinko", roulette: "Roulette",
     keno: "Keno", wheel: "Wheel", "hi-lo": "Hi-Lo", coinflip: "Coinflip", crash: "Crash",
-    blackjack: "Blackjack", towers: "Towers",
+    blackjack: "Blackjack", towers: "Towers", limbo: "Limbo",
   };
   const roots = [...document.querySelectorAll("[data-shared-game-tools]")];
 

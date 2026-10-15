@@ -396,6 +396,29 @@ export function crashPointMicros(drawValue, houseFactorMicrosValue = 990_000) {
   return Math.min(CRASH_MAX_MULTIPLIER_MICROS, Math.max(1_000_000, Math.floor(houseFactorMicros * 1_000_000 / draw)));
 }
 
+export const LIMBO_MAX_MULTIPLIER_MICROS = 1_000_000_000_000;
+
+export function limboResultMicros(drawValue, houseFactorMicrosValue = 990_000) {
+  const draw = Number(drawValue);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(draw) || draw < 1 || draw > 100_000_000) throw new Error("Invalid Limbo draw");
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  const raw = Math.floor(houseFactorMicros * 100_000_000 / draw / 10_000) * 10_000;
+  return Math.min(LIMBO_MAX_MULTIPLIER_MICROS, Math.max(1_000_000, raw));
+}
+
+export function limboPayout(wagerUnits, targetMultiplierMicrosValue, resultMultiplierMicrosValue) {
+  const wager = Number(wagerUnits);
+  const targetMultiplierMicros = Number(targetMultiplierMicrosValue);
+  const resultMultiplierMicros = Number(resultMultiplierMicrosValue);
+  if (!Number.isSafeInteger(wager) || wager <= 0) throw new Error("Invalid Limbo wager");
+  if (!Number.isSafeInteger(targetMultiplierMicros) || targetMultiplierMicros < 1_010_000 || targetMultiplierMicros > LIMBO_MAX_MULTIPLIER_MICROS) throw new Error("Choose a Limbo target between 1.01x and 1,000,000x");
+  if (!Number.isSafeInteger(resultMultiplierMicros) || resultMultiplierMicros < 1_000_000 || resultMultiplierMicros > LIMBO_MAX_MULTIPLIER_MICROS) throw new Error("Invalid Limbo result");
+  const won = resultMultiplierMicros >= targetMultiplierMicros;
+  const multiplierMicros = won ? targetMultiplierMicros : 0;
+  return { won, multiplierMicros, payoutUnits: won ? payoutFromMultiplier(wager, targetMultiplierMicros) : 0 };
+}
+
 export function crashDurationMs(multiplierMicrosValue) {
   const multiplierMicros = Number(multiplierMicrosValue);
   if (!Number.isSafeInteger(multiplierMicros) || multiplierMicros < 1_000_000 || multiplierMicros > CRASH_MAX_MULTIPLIER_MICROS) throw new Error("Invalid Crash multiplier");
