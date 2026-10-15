@@ -1469,6 +1469,8 @@ async function handleCoinflipCashout(request, env, user, roundIdValue) {
 const CRASH_BETTING_MS = 8_000;
 const CRASH_POST_CRASH_MS = 3_000;
 const CRASH_ROUND_BUCKET_MS = 5_000;
+const CRASH_MAX_CATCHUP_ROUNDS = 24;
+const CRASH_MAX_IDLE_CATCHUP_MS = 5 * 60 * 1000;
 
 function crashRoundId(startsAt) {
   return `crash_${startsAt}`;
@@ -1485,6 +1487,26 @@ function crashCurrentMultiplier(row, timestamp = now()) {
   return Math.min(Number(row.crash_multiplier_micros), crashMultiplierMicros(timestamp - Number(row.launches_at)));
 }
 
+async function createCrashRound(env, startsAt, createdAt = now(), settleBefore = 0) {
+  const houseFactorMicros = await gameHouseFactorMicros(env, "crash");
+  const crashMultiplierMicrosValue = crashPointMicros(secureRandomInt(1_000_000) + 1, houseFactorMicros);
+  const launchesAt = startsAt + CRASH_BETTING_MS;
+  const crashesAt = launchesAt + crashDurationMs(crashMultiplierMicrosValue);
+  const endsAt = crashesAt + CRASH_POST_CRASH_MS;
+  const settled = settleBefore > 0 && endsAt <= settleBefore;
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO crash_live_rounds(
+      id, starts_at, launches_at, crashes_at, ends_at, crash_multiplier_micros,
+      house_factor_micros, status, created_at, settled_at
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    crashRoundId(startsAt), startsAt, launchesAt, crashesAt, endsAt,
+    crashMultiplierMicrosValue, houseFactorMicros, settled ? "settled" : "open", createdAt,
+    settled ? endsAt : null,
+  ).run();
+  return env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
+}
+
 async function ensureCrashRound(env, timestamp = now()) {
   let row = await env.DB.prepare(`
     SELECT * FROM crash_live_rounds
@@ -1492,29 +1514,25 @@ async function ensureCrashRound(env, timestamp = now()) {
     ORDER BY starts_at DESC LIMIT 1
   `).bind(timestamp, timestamp).first();
   if (row) return row;
-  const latest = await env.DB.prepare("SELECT * FROM crash_live_rounds ORDER BY starts_at DESC LIMIT 1").first();
+
+  let latest = await env.DB.prepare("SELECT * FROM crash_live_rounds ORDER BY starts_at DESC LIMIT 1").first();
   const bucketStart = Math.floor(timestamp / CRASH_ROUND_BUCKET_MS) * CRASH_ROUND_BUCKET_MS;
-  const startsAt = Math.max(bucketStart, Number(latest?.ends_at || 0));
-  const houseFactorMicros = await gameHouseFactorMicros(env, "crash");
-  const crashMultiplierMicrosValue = crashPointMicros(secureRandomInt(1_000_000) + 1, houseFactorMicros);
-  const launchesAt = startsAt + CRASH_BETTING_MS;
-  const crashesAt = launchesAt + crashDurationMs(crashMultiplierMicrosValue);
-  const endsAt = crashesAt + CRASH_POST_CRASH_MS;
-  await env.DB.prepare(`
-    INSERT OR IGNORE INTO crash_live_rounds(
-      id, starts_at, launches_at, crashes_at, ends_at, crash_multiplier_micros,
-      house_factor_micros, status, created_at
-    ) VALUES(?, ?, ?, ?, ?, ?, ?, 'open', ?)
-  `).bind(
-    crashRoundId(startsAt), startsAt, launchesAt, crashesAt, endsAt,
-    crashMultiplierMicrosValue, houseFactorMicros, timestamp,
-  ).run();
-  row = await env.DB.prepare(`
-    SELECT * FROM crash_live_rounds
-    WHERE starts_at <= ? AND ends_at > ?
-    ORDER BY starts_at DESC LIMIT 1
-  `).bind(timestamp, timestamp).first();
-  row ||= await env.DB.prepare("SELECT * FROM crash_live_rounds WHERE starts_at = ?").bind(startsAt).first();
+  let startsAt = latest ? Number(latest.ends_at) : bucketStart;
+
+  // A deployment can inherit an arbitrarily old final round. Do not make clients
+  // replay days of empty flights; anchor the first maintained flight to real time.
+  if (latest && timestamp - startsAt > CRASH_MAX_IDLE_CATCHUP_MS) startsAt = bucketStart;
+
+  for (let index = 0; index < CRASH_MAX_CATCHUP_ROUNDS; index += 1) {
+    row = await createCrashRound(env, startsAt, timestamp, timestamp);
+    if (!row) break;
+    if (Number(row.starts_at) <= timestamp && Number(row.ends_at) > timestamp) return row;
+    startsAt = Number(row.ends_at);
+  }
+
+  // Safety valve for an unusually long Worker outage. Future scheduled runs keep
+  // the chain continuous; this branch only prevents a stale response today.
+  row = await createCrashRound(env, bucketStart, timestamp, 0);
   if (!row) throw httpError(503, "The Crash round could not be opened");
   return row;
 }
@@ -1578,6 +1596,24 @@ async function settleCrashRoundIfDue(env, row, timestamp = now()) {
   return env.DB.prepare("SELECT * FROM crash_live_rounds WHERE id = ?").bind(row.id).first();
 }
 
+async function settleDueCrashRounds(env, timestamp = now()) {
+  const due = await env.DB.prepare(`
+    SELECT * FROM crash_live_rounds
+    WHERE status <> 'settled' AND crashes_at <= ?
+    ORDER BY crashes_at ASC LIMIT 100
+  `).bind(timestamp).all();
+  for (const round of due.results || []) await settleCrashRoundIfDue(env, round, timestamp);
+}
+
+async function maintainCrashTimeline(env, timestamp = now()) {
+  await settleDueCrashRounds(env, timestamp);
+  const round = await ensureCrashRound(env, timestamp);
+  if (crashPhase(round, timestamp) === "flying") {
+    await settleCrashAutomaticWagers(env, round, crashCurrentMultiplier(round, timestamp), timestamp);
+  }
+  return settleCrashRoundIfDue(env, round, timestamp);
+}
+
 function crashWagerResponse(row) {
   return {
     id: row.id,
@@ -1630,11 +1666,7 @@ async function handleCrashLive(request, env, user) {
   const timestamp = now();
   const currencyValue = new URL(request.url).searchParams.get("currency");
   const currency = currencyValue ? normalizeCurrency(currencyValue) : "";
-  let round = await ensureCrashRound(env, timestamp);
-  if (crashPhase(round, timestamp) === "flying") {
-    await settleCrashAutomaticWagers(env, round, crashCurrentMultiplier(round, timestamp), timestamp);
-  }
-  round = await settleCrashRoundIfDue(env, round, timestamp);
+  const round = await maintainCrashTimeline(env, timestamp);
   return json(request, env, 200, {
     serverNow: timestamp,
     round: await crashRoundResponse(env, round, user, currency, timestamp),
@@ -1802,6 +1834,7 @@ function rouletteBetResponse(row) {
 const ROULETTE_BETTING_MS = 12_000;
 const ROULETTE_ANIMATION_MS = 8_000;
 const ROULETTE_CYCLE_MS = ROULETTE_BETTING_MS + ROULETTE_ANIMATION_MS;
+const ROULETTE_MAX_CATCHUP_ROUNDS = 10;
 
 async function rouletteRecent(env) {
   const result = await env.DB.prepare(`
@@ -1817,15 +1850,34 @@ async function rouletteRecent(env) {
 
 async function ensureSharedRouletteRound(env, timestamp = now()) {
   const startsAt = Math.floor(timestamp / ROULETTE_CYCLE_MS) * ROULETTE_CYCLE_MS;
+  return createSharedRouletteRound(env, startsAt, timestamp, false);
+}
+
+async function createSharedRouletteRound(env, startsAt, createdAt = now(), settled = false) {
   const closesAt = startsAt + ROULETTE_BETTING_MS;
   const endsAt = startsAt + ROULETTE_CYCLE_MS;
   const id = `roulette_${startsAt}`;
   await env.DB.prepare(`
     INSERT OR IGNORE INTO roulette_live_rounds(
-      id, starts_at, closes_at, ends_at, result, landing_basis_points, status, created_at
-    ) VALUES(?, ?, ?, ?, ?, ?, 'open', ?)
-  `).bind(id, startsAt, closesAt, endsAt, secureRouletteResult(), secureRandomInt(6401) - 3200, timestamp).run();
+      id, starts_at, closes_at, ends_at, result, landing_basis_points, status, created_at, settled_at
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    id, startsAt, closesAt, endsAt, secureRouletteResult(), secureRandomInt(6401) - 3200,
+    settled ? "settled" : "open", createdAt, settled ? endsAt : null,
+  ).run();
   return env.DB.prepare("SELECT * FROM roulette_live_rounds WHERE id = ?").bind(id).first();
+}
+
+async function backfillSharedRouletteRounds(env, timestamp = now()) {
+  const currentStartsAt = Math.floor(timestamp / ROULETTE_CYCLE_MS) * ROULETTE_CYCLE_MS;
+  const latest = await env.DB.prepare("SELECT starts_at FROM roulette_live_rounds ORDER BY starts_at DESC LIMIT 1").first();
+  let startsAt = latest ? Number(latest.starts_at) + ROULETTE_CYCLE_MS : currentStartsAt;
+  const earliest = currentStartsAt - (ROULETTE_MAX_CATCHUP_ROUNDS - 1) * ROULETTE_CYCLE_MS;
+  if (startsAt < earliest) startsAt = earliest;
+  for (; startsAt <= currentStartsAt; startsAt += ROULETTE_CYCLE_MS) {
+    await createSharedRouletteRound(env, startsAt, timestamp, startsAt < currentStartsAt);
+  }
+  return ensureSharedRouletteRound(env, timestamp);
 }
 
 async function settleSharedRouletteRound(env, round, timestamp = now()) {
@@ -1959,13 +2011,19 @@ async function handleSharedRouletteRound(request, env, user) {
   const currencyValue = new URL(request.url).searchParams.get("currency");
   const currency = currencyValue ? normalizeCurrency(currencyValue) : "";
   await settleDueSharedRouletteRounds(env, timestamp);
-  let round = await ensureSharedRouletteRound(env, timestamp);
+  let round = await backfillSharedRouletteRounds(env, timestamp);
   if (timestamp >= Number(round.closes_at)) round = await settleSharedRouletteRound(env, round, timestamp);
   return json(request, env, 200, {
     serverNow: timestamp,
     round: await sharedRouletteRoundResponse(env, round, user, currency, timestamp),
     recent: await rouletteRecent(env),
   });
+}
+
+async function maintainLiveGameTimelines(env, timestamp = now()) {
+  await backfillSharedRouletteRounds(env, timestamp);
+  await settleDueSharedRouletteRounds(env, timestamp);
+  await maintainCrashTimeline(env, timestamp);
 }
 
 async function handleSharedRouletteWager(request, env, user) {
@@ -3394,5 +3452,8 @@ export default {
       if (status >= 500) console.error("Wallet request failed", { path: pathFrom(request), message: error?.message, code: error?.code });
       return json(request, env, status, { error: publicError(error) });
     }
+  },
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(maintainLiveGameTimelines(env, now()));
   },
 };

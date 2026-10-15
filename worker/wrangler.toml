@@ -7,6 +7,9 @@ workers_dev = true
 enabled = true
 head_sampling_rate = 1
 
+[triggers]
+crons = ["* * * * *"]
+
 [vars]
 FIREBASE_PROJECT_ID = "gamrace"
 ALLOWED_ORIGINS = "https://gamrace.com,https://www.gamrace.com,http://localhost:4173,http://localhost:8080"

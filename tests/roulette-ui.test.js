@@ -47,6 +47,8 @@ test("Roulette animates only the server-authoritative result and settles the wal
   assert.match(worker, /available_units = available_units - \?/);
   assert.match(worker, /settlement_token/);
   assert.match(worker, /settleDueSharedRouletteRounds/);
+  assert.match(worker, /backfillSharedRouletteRounds/);
+  assert.match(worker, /maintainLiveGameTimelines/);
   assert.match(worker, /status <> 'settled' AND closes_at <= \?/);
 });
 

@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [html, script, styles, worker, migration, history] = await Promise.all([
+const [html, script, styles, worker, migration, history, workerConfig] = await Promise.all([
   readFile(new URL("../dist/game.html", import.meta.url), "utf8"),
   readFile(new URL("../dist/crash.js", import.meta.url), "utf8"),
   readFile(new URL("../dist/styles.css", import.meta.url), "utf8"),
   readFile(new URL("../worker/src/index.js", import.meta.url), "utf8"),
   readFile(new URL("../worker/migrations/0018_crash_live.sql", import.meta.url), "utf8"),
   readFile(new URL("../dist/game-history.js", import.meta.url), "utf8"),
+  readFile(new URL("../worker/wrangler.toml", import.meta.url), "utf8"),
 ]);
 
 test("Crash has a live flight surface, four independent Dual slips and full animation states", () => {
@@ -42,6 +43,10 @@ test("Crash is a shared server-authoritative round with immediate wallet debits"
   assert.match(migration, /auto_cashout_micros/);
   assert.match(script, /\/ 80000/);
   assert.match(html, /data-crash-auto-infinite/);
+  assert.match(worker, /maintainCrashTimeline/);
+  assert.match(worker, /settleDueCrashRounds/);
+  assert.match(worker, /async scheduled\(controller, env, ctx\)/);
+  assert.match(workerConfig, /crons = \["\* \* \* \* \*"\]/);
 });
 
 test("Crash uses the shared tools, live RTP and winning history", () => {
