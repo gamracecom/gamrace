@@ -732,37 +732,57 @@ async function listActivity(env, uid) {
   return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows, ...blackjackRows, ...towersRows, ...molesRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
-const PLAYER_BET_UNION_SQL = `
+const PLAYER_BET_UNION_SQL_A = `
   SELECT 'Dice' AS game, id, currency, wager_units, payout_units, multiplier_micros,
     outcome AS status, created_at FROM dice_bets WHERE uid = ?
   UNION ALL SELECT 'Limbo', id, currency, wager_units, payout_units, multiplier_micros,
     outcome, created_at FROM limbo_bets WHERE uid = ?
   UNION ALL SELECT 'Mines', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM mines_rounds WHERE uid = ?
-  UNION ALL SELECT 'Plinko', id, currency, wager_units, payout_units, multiplier_micros,
-    outcome, created_at FROM plinko_bets WHERE uid = ?
-  UNION ALL SELECT 'Roulette', id, currency, wager_units, payout_units, multiplier_micros,
-    outcome, created_at FROM roulette_rounds WHERE uid = ?
+`;
+
+const PLAYER_BET_UNION_SQL_B = `
+  SELECT 'Plinko' AS game, id, currency, wager_units, payout_units, multiplier_micros,
+    outcome AS status, created_at FROM plinko_bets WHERE uid = ?
+`;
+
+const PLAYER_BET_UNION_SQL_C = `
+  SELECT 'Roulette' AS game, id, currency, wager_units, payout_units, multiplier_micros,
+    outcome AS status, created_at FROM roulette_rounds WHERE uid = ?
   UNION ALL SELECT 'Keno', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'revealing' THEN 'open' ELSE outcome END, created_at FROM keno_bets WHERE uid = ?
   UNION ALL SELECT 'Wheel', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'spinning' THEN 'open' ELSE outcome END, created_at FROM wheel_bets WHERE uid = ?
-  UNION ALL SELECT 'Hi-Lo', id, currency, wager_units, payout_units, multiplier_micros,
-    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM hilo_rounds WHERE uid = ?
+`;
+
+const PLAYER_BET_UNION_SQL_D = `
+  SELECT 'Hi-Lo' AS game, id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END AS status, created_at FROM hilo_rounds WHERE uid = ?
   UNION ALL SELECT 'Coinflip', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM coinflip_rounds WHERE uid = ?
   UNION ALL SELECT 'Crash', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'open' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM crash_wagers WHERE uid = ?
-  UNION ALL SELECT 'Blackjack', id, currency, wager_units, payout_units, multiplier_micros,
-    CASE WHEN status = 'active' THEN 'open' ELSE COALESCE(outcome, 'loss') END, created_at FROM blackjack_rounds WHERE uid = ?
+`;
+
+const PLAYER_BET_UNION_SQL_E = `
+  SELECT 'Blackjack' AS game, id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' ELSE COALESCE(outcome, 'loss') END AS status, created_at FROM blackjack_rounds WHERE uid = ?
   UNION ALL SELECT 'Towers', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM towers_rounds WHERE uid = ?
   UNION ALL SELECT 'Moles', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM moles_rounds WHERE uid = ?
 `;
 
-function playerBetBindings(uid) {
-  return Array.from({ length: 13 }, () => uid);
+const PLAYER_BET_UNION_GROUPS = [
+  { sql: PLAYER_BET_UNION_SQL_A, count: 3 },
+  { sql: PLAYER_BET_UNION_SQL_B, count: 1 },
+  { sql: PLAYER_BET_UNION_SQL_C, count: 3 },
+  { sql: PLAYER_BET_UNION_SQL_D, count: 3 },
+  { sql: PLAYER_BET_UNION_SQL_E, count: 3 },
+];
+
+function playerBetBindings(uid, count) {
+  return Array.from({ length: count }, () => uid);
 }
 
 function stablecoinPrice(asset) {
@@ -770,31 +790,34 @@ function stablecoinPrice(asset) {
 }
 
 async function liveAccountSnapshot(env, uid, { includeActivity = true } = {}) {
-  const bindings = playerBetBindings(uid);
-  const queries = [
-    env.DB.prepare(`
-      SELECT currency,
-        COUNT(*) AS total_bets,
-        SUM(CASE WHEN status = 'win' THEN 1 ELSE 0 END) AS wins,
-        SUM(CASE WHEN status = 'loss' THEN 1 ELSE 0 END) AS losses,
-        SUM(wager_units) AS wager_units,
-        SUM(payout_units - wager_units) AS net_units,
-        MAX(payout_units) AS biggest_payout_units,
-        MAX(multiplier_micros) AS highest_multiplier_micros
-      FROM (${PLAYER_BET_UNION_SQL}) GROUP BY currency
-    `).bind(...bindings),
-    env.DB.prepare(`
-      SELECT game, COUNT(*) AS plays FROM (${PLAYER_BET_UNION_SQL})
-      GROUP BY game ORDER BY plays DESC, game ASC LIMIT 1
-    `).bind(...bindings),
-  ];
-  if (includeActivity) {
-    queries.push(env.DB.prepare(`
-      SELECT game, id, currency, wager_units, payout_units, multiplier_micros, status, created_at
-      FROM (${PLAYER_BET_UNION_SQL}) ORDER BY created_at DESC LIMIT 100
-    `).bind(...bindings));
-  }
-  const [summaryResult, favouriteResult, activityResult] = await env.DB.batch(queries);
+  const summarySql = (unionSql) => `
+    SELECT currency,
+      COUNT(*) AS total_bets,
+      SUM(CASE WHEN status = 'win' THEN 1 ELSE 0 END) AS wins,
+      SUM(CASE WHEN status = 'loss' THEN 1 ELSE 0 END) AS losses,
+      SUM(wager_units) AS wager_units,
+      SUM(payout_units - wager_units) AS net_units,
+      MAX(payout_units) AS biggest_payout_units,
+      MAX(multiplier_micros) AS highest_multiplier_micros
+    FROM (${unionSql}) GROUP BY currency
+  `;
+  const favouriteSql = (unionSql) => `
+    SELECT game, COUNT(*) AS plays FROM (${unionSql}) GROUP BY game
+  `;
+  const summaryQueries = PLAYER_BET_UNION_GROUPS.map(({ sql, count }) =>
+    env.DB.prepare(summarySql(sql)).bind(...playerBetBindings(uid, count)));
+  const favouriteQueries = PLAYER_BET_UNION_GROUPS.map(({ sql, count }) =>
+    env.DB.prepare(favouriteSql(sql)).bind(...playerBetBindings(uid, count)));
+  const activityQueries = includeActivity ? PLAYER_BET_UNION_GROUPS.map(({ sql, count }) => env.DB.prepare(`
+    SELECT game, id, currency, wager_units, payout_units, multiplier_micros, status, created_at
+    FROM (${sql}) ORDER BY created_at DESC LIMIT 100
+  `).bind(...playerBetBindings(uid, count))) : [];
+  const queries = [...summaryQueries, ...favouriteQueries, ...activityQueries];
+  const results = await env.DB.batch(queries);
+  const groupCount = PLAYER_BET_UNION_GROUPS.length;
+  const summaryRows = results.slice(0, groupCount).flatMap((result) => result.results || []);
+  const favouriteRows = results.slice(groupCount, groupCount * 2).flatMap((result) => result.results || []);
+  const favouriteResult = favouriteRows.sort((left, right) => Number(right.plays || 0) - Number(left.plays || 0) || String(left.game).localeCompare(String(right.game)))[0];
   let prices = {};
   try { prices = await providerPrices(env); } catch { prices = {}; }
   let totalWagered = 0;
@@ -804,11 +827,15 @@ async function liveAccountSnapshot(env, uid, { includeActivity = true } = {}) {
   let wins = 0;
   let losses = 0;
   let highestMultiplier = 0;
-  for (const row of summaryResult.results || []) {
+  for (const row of summaryRows) {
     const asset = getWalletAsset(row.currency);
     if (!asset) continue;
     const price = Number(prices?.[asset.providerCurrency] || stablecoinPrice(asset));
-    const toUsd = (units) => Number(assetUnitsToString(Number(units || 0), false)) * price;
+    const toUsd = (units) => {
+      const numericUnits = Number(units || 0);
+      const sign = numericUnits < 0 ? -1 : 1;
+      return Number(assetUnitsToString(Math.abs(numericUnits), false)) * price * sign;
+    };
     totalWagered += toUsd(row.wager_units);
     netProfitLoss += toUsd(row.net_units);
     biggestWin = Math.max(biggestWin, toUsd(row.biggest_payout_units));
@@ -829,13 +856,15 @@ async function liveAccountSnapshot(env, uid, { includeActivity = true } = {}) {
     netProfitLoss: Math.round(netProfitLoss * 100) / 100,
     biggestWin: Math.round(biggestWin * 100) / 100,
     highestMultiplier: Math.round(highestMultiplier * 100) / 100,
-    favouriteGame: String(favouriteResult.results?.[0]?.game || "—"),
-    mostPlayedGame: String(favouriteResult.results?.[0]?.game || "—"),
+    favouriteGame: String(favouriteResult?.game || "—"),
+    mostPlayedGame: String(favouriteResult?.game || "—"),
     pvpWins: 0,
     pvpLosses: 0,
     pvpWinRate: 0,
   };
-  const activity = (activityResult?.results || []).map((row) => ({
+  const activityRows = results.slice(groupCount * 2).flatMap((result) => result.results || [])
+    .sort((left, right) => Number(right.created_at) - Number(left.created_at)).slice(0, 100);
+  const activity = activityRows.map((row) => ({
     id: row.id,
     type: "bet",
     game: row.game,

@@ -30,6 +30,13 @@ test("transactions render live bets and wallet history uses the same account sou
   assert.match(services, /\/account\?compact=1/);
 });
 
+test("live account aggregation stays within D1 compound limits and accepts signed profit", () => {
+  assert.match(worker, /const PLAYER_BET_UNION_GROUPS = \[/);
+  assert.match(worker, /env\.DB\.batch\(queries\)/);
+  assert.match(worker, /assetUnitsToString\(Math\.abs\(numericUnits\), false\)/);
+  assert.match(worker, /numericUnits < 0 \? -1 : 1/);
+});
+
 test("player settings persist in D1 and sync across devices", () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS player_preferences/);
   assert.match(worker, /path === "\/account\/preferences"/);
