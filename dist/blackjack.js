@@ -35,6 +35,7 @@
   let busy = false;
   let handCount = 1;
   let renderedSignature = "";
+  let previousCards = null;
   const recordedRounds = new Set();
 
   function requestId() {
@@ -73,18 +74,18 @@
     message.hidden = !text;
   }
 
-  function cardNode(card, index) {
+  function cardNode(card, { dealIndex = 0, animate = false, flip = false } = {}) {
     const element = document.createElement("span");
-    element.style.setProperty("--deal-index", String(index));
+    element.style.setProperty("--deal-index", String(dealIndex));
     if (card?.hidden) {
-      element.className = "blackjack-card hidden-card";
-      element.innerHTML = `<i></i><i></i><i></i>`;
+      element.className = `blackjack-card hidden-card${animate ? " is-dealing" : ""}`;
+      element.innerHTML = `<img src="assets/brand/gamrace-icon.png" alt="" />`;
       element.setAttribute("aria-label", "Hidden dealer card");
       return element;
     }
     const suit = SUITS[card?.suit] || "♠";
     const red = card?.suit === "hearts" || card?.suit === "diamonds";
-    element.className = `blackjack-card${red ? " red" : ""}`;
+    element.className = `blackjack-card${red ? " red" : ""}${animate ? " is-dealing" : ""}${flip ? " is-flipping" : ""}`;
     element.innerHTML = `<span class="blackjack-card-corner top"><strong>${card?.rank || "?"}</strong><i>${suit}</i></span><b class="blackjack-card-suit">${suit}</b><span class="blackjack-card-corner bottom"><strong>${card?.rank || "?"}</strong><i>${suit}</i></span>`;
     element.setAttribute("aria-label", `${card?.rank || "Card"} of ${card?.suit || "unknown suit"}`);
     return element;
@@ -114,9 +115,12 @@
   }
 
   function renderRound(nextRound) {
+    const prior = previousCards;
     round = nextRound || null;
     const signature = round ? `${round.id}:${round.updatedAt}:${round.status}` : "empty";
-    const animate = signature !== renderedSignature && !settings().blackjackReducedMotion;
+    const changed = signature !== renderedSignature;
+    const reducedMotion = Boolean(settings().blackjackReducedMotion);
+    const openingDeal = Boolean(round && (!prior || prior.id !== round.id));
     renderedSignature = signature;
     game.classList.toggle("has-round", Boolean(round));
     game.classList.toggle("round-settled", round?.status === "settled");
@@ -127,23 +131,39 @@
       playerHands.innerHTML = `<div class="blackjack-empty-seat"><span>♠</span></div>`;
       actionPanel.hidden = true;
       dealButton.textContent = "Deal";
+      previousCards = null;
       updateAvailability();
       return;
     }
 
     if (Number.isInteger(Number(round.handCount))) selectHandCount(Number(round.handCount), false);
 
-    dealerCards.replaceChildren(...round.dealer.cards.map(cardNode));
+    const totalHands = Math.max(1, round.hands.length);
+    dealerCards.replaceChildren(...round.dealer.cards.map((card, cardIndex) => {
+      const priorCard = prior?.id === round.id ? prior.dealer[cardIndex] : null;
+      const animate = changed && !reducedMotion && (openingDeal || !priorCard);
+      const flip = changed && !reducedMotion && Boolean(priorCard?.hidden && !card.hidden);
+      const dealIndex = cardIndex === 0 ? totalHands : cardIndex === 1 ? totalHands * 2 + 1 : 0;
+      return cardNode(card, { dealIndex, animate, flip });
+    }));
     dealerTotal.textContent = round.status === "settled" ? String(round.dealer.total) : `${round.dealer.total} + ?`;
     playerHands.replaceChildren(...round.hands.map((hand, index) => {
       const article = document.createElement("article");
       article.className = `blackjack-hand${index === round.activeHand && round.status === "active" ? " active" : ""} status-${hand.status}`;
       article.innerHTML = `<header><span>${handLabel(hand, index)}</span><strong>${hand.total}</strong></header><div class="blackjack-card-row"></div><footer class="blackjack-side-results">${sideResults(Number.isInteger(Number(hand.seat)) ? Number(hand.seat) : index)}</footer>`;
-      article.querySelector(".blackjack-card-row").replaceChildren(...hand.cards.map(cardNode));
+      article.querySelector(".blackjack-card-row").replaceChildren(...hand.cards.map((card, cardIndex) => {
+        const existed = prior?.id === round.id && prior.hands[index]?.[cardIndex];
+        const animate = changed && !reducedMotion && (openingDeal || !existed);
+        const dealIndex = cardIndex === 0 ? index : cardIndex === 1 ? totalHands + 1 + index : 0;
+        return cardNode(card, { dealIndex, animate });
+      }));
       return article;
     }));
-    game.classList.toggle("deal-animate", animate);
-    if (animate) requestAnimationFrame(() => window.setTimeout(() => game.classList.remove("deal-animate"), 650));
+    previousCards = {
+      id: round.id,
+      dealer: round.dealer.cards.map((card) => ({ hidden: Boolean(card.hidden) })),
+      hands: round.hands.map((hand) => hand.cards.map(() => true)),
+    };
 
     actionPanel.hidden = round.status !== "active";
     dealButton.textContent = round.status === "settled" ? "Deal Again" : "Hand in progress";

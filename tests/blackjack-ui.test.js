@@ -29,6 +29,11 @@ test("Blackjack has a responsive table and complete game tools", () => {
   assert.match(styles, /data-blackjack-action="split"[^}]*background:#8b5cf6/);
   assert.match(styles, /\.blackjack-card-corner\.bottom/);
   assert.match(styles, /\.blackjack-card-suit/);
+  assert.match(html, /class="blackjack-shoe"/);
+  assert.match(script, /assets\/brand\/gamrace-icon\.png/);
+  assert.match(script, /totalHands \* 2 \+ 1/);
+  assert.match(styles, /@keyframes blackjack-sweep-deal/);
+  assert.match(styles, /\.blackjack-hand\.active\{border-color:transparent/);
   assert.match(html, /data-blackjack-view="side-bets"/);
   assert.equal((html.match(/data-blackjack-hand-count=/g) || []).length, 3);
   assert.match(html, /id="blackjack-perfect-pairs"/);

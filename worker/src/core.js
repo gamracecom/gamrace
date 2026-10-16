@@ -374,6 +374,24 @@ export function towersMultiplierMicros(columnsValue, trapsValue, clearedRowsValu
   return Number(result > 1_000_000_000_000n ? 1_000_000_000_000n : result);
 }
 
+export function molesMultiplierMicros(moleCountValue, hitsValue, houseFactorMicrosValue = 980_000) {
+  const moleCount = Number(moleCountValue);
+  const hits = Number(hitsValue);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  if (!Number.isInteger(moleCount) || moleCount < 1 || moleCount > 6) throw new Error("Choose between 1 and 6 moles");
+  if (!Number.isInteger(hits) || hits < 0 || hits > 8) throw new Error("Invalid Moles hit count");
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  if (hits === 0) return 1_000_000;
+  let numerator = BigInt(houseFactorMicros);
+  let denominator = 1n;
+  for (let hit = 0; hit < hits; hit += 1) {
+    numerator *= 7n;
+    denominator *= BigInt(moleCount);
+  }
+  const result = numerator / denominator;
+  return Number(result > 9_000_000_000_000n ? 9_000_000_000_000n : result);
+}
+
 export function coinflipMultiplierMicros(streakValue, houseFactorMicrosValue = 990_000) {
   const streak = Number(streakValue);
   const houseFactorMicros = Number(houseFactorMicrosValue);

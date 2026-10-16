@@ -15,6 +15,7 @@ import {
   limboResultMicros,
   maskAddress,
   minesMultiplierMicros,
+  molesMultiplierMicros,
   towersMultiplierMicros,
   normalizeAddress,
   normalizeCurrency,
@@ -68,6 +69,7 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "roulette", name: "Roulette", editable: false, fixedHouseEdgeBasisPoints: 1765, reason: "Determined by the live 17-tile distribution" },
   { id: "blackjack", name: "Blackjack", editable: false, fixedHouseEdgeBasisPoints: 50, reason: "Determined by six-deck, 3:2 blackjack rules and player decisions" },
   { id: "towers", name: "Towers", editable: true },
+  { id: "moles", name: "Moles", editable: true },
   { id: "limbo", name: "Limbo", editable: true },
 ]);
 
@@ -557,7 +559,7 @@ async function enforceCooldown(env, uid, action, seconds) {
 }
 
 async function listActivity(env, uid) {
-  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult, hiloResult, blackjackResult, towersResult] = await Promise.all([
+  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult, hiloResult, blackjackResult, towersResult, molesResult] = await Promise.all([
     env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
            pay_currency AS currency, created_at
@@ -603,6 +605,10 @@ async function listActivity(env, uid) {
     env.DB.prepare(`
       SELECT id, currency, wager_units, payout_units, multiplier_micros, status, created_at
       FROM towers_rounds WHERE uid = ? ORDER BY created_at DESC LIMIT 50
+    `).bind(uid).all(),
+    env.DB.prepare(`
+      SELECT id, currency, wager_units, payout_units, multiplier_micros, status, created_at
+      FROM moles_rounds WHERE uid = ? ORDER BY created_at DESC LIMIT 50
     `).bind(uid).all(),
   ]);
   const walletRows = (walletResult.results || []).map((row) => ({
@@ -712,7 +718,18 @@ async function listActivity(env, uid) {
     currency: row.currency,
     createdAt: Number(row.created_at),
   }));
-  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows, ...blackjackRows, ...towersRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
+  const molesRows = (molesResult.results || []).map((row) => ({
+    id: row.id,
+    type: "bet",
+    game: "Moles",
+    status: row.status === "active" ? "open" : row.status === "lost" ? "loss" : "win",
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows, ...blackjackRows, ...towersRows, ...molesRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
 async function handleGetWallet(request, env, user) {
@@ -2290,6 +2307,7 @@ async function handleGameHistory(request, env, user) {
     crash: { table: "crash_wagers", where: "b.status = 'cashed_out'" },
     blackjack: { table: "blackjack_rounds", where: "b.status = 'settled'" },
     towers: { table: "towers_rounds", where: "b.status IN ('cashed_out', 'won')" },
+    moles: { table: "moles_rounds", where: "b.status IN ('cashed_out', 'won')" },
     limbo: { table: "limbo_bets", where: "1 = 1" },
   };
   const config = games[game];
@@ -3225,6 +3243,198 @@ async function handleCashoutTowersRound(request, env, user, roundId) {
   return json(request, env, 200, { round: towersRoundResponse(current), wallet: await walletResponse(env, user.sub) });
 }
 
+const MOLES_HOLES = 7;
+const MOLES_MAX_HITS = 8;
+
+function molesJsonArray(value) {
+  try {
+    const parsed = JSON.parse(String(value || "[]"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function shuffledMolesPositions(moleCount) {
+  const holes = Array.from({ length: MOLES_HOLES }, (_, index) => index);
+  for (let index = holes.length - 1; index > 0; index -= 1) {
+    const other = secureRandomInt(index + 1);
+    [holes[index], holes[other]] = [holes[other], holes[index]];
+  }
+  return holes.slice(0, moleCount).sort((left, right) => left - right);
+}
+
+function molesLayouts(moleCount) {
+  return Array.from({ length: MOLES_MAX_HITS }, () => shuffledMolesPositions(moleCount));
+}
+
+function molesRoundResponse(row) {
+  if (!row) return null;
+  const picks = molesJsonArray(row.picks_json).map(Number);
+  const layouts = molesJsonArray(row.hole_layouts_json);
+  const moleCount = Number(row.mole_count);
+  const houseFactorMicros = Number(row.house_factor_micros || 980_000);
+  const lastStage = picks.length - 1;
+  const lastPositions = lastStage >= 0 && Array.isArray(layouts[lastStage]) ? layouts[lastStage].map(Number) : [];
+  const terminal = row.status !== "active";
+  return {
+    id: row.id,
+    game: "moles",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units || 0), false),
+    moleCount,
+    maxHits: Number(row.max_hits),
+    hits: Number(row.hit_count),
+    picks,
+    multiplier: Number(row.multiplier_micros || 1_000_000) / 1_000_000,
+    stepMultipliers: Array.from({ length: MOLES_MAX_HITS }, (_, index) => molesMultiplierMicros(moleCount, index + 1, houseFactorMicros) / 1_000_000),
+    lastReveal: lastStage >= 0 ? {
+      stage: lastStage,
+      selectedHole: picks[lastStage],
+      molePositions: lastPositions,
+      hit: lastPositions.includes(picks[lastStage]),
+    } : null,
+    status: row.status,
+    outcome: row.status === "lost" ? "loss" : terminal ? "win" : "open",
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+    updatedAt: new Date(Number(row.updated_at)).toISOString(),
+  };
+}
+
+async function handleGetActiveMolesRound(request, env, user) {
+  const currency = normalizeCurrency(new URL(request.url).searchParams.get("currency"));
+  const row = await env.DB.prepare(`
+    SELECT * FROM moles_rounds WHERE uid = ? AND currency = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, currency).first();
+  return json(request, env, 200, { round: molesRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleStartMolesRound(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM moles_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { round: molesRoundResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const active = await env.DB.prepare("SELECT * FROM moles_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+  if (active) return json(request, env, 200, { round: molesRoundResponse(active), wallet: await walletResponse(env, user.sub) });
+  const moleCount = Number(body.moleCount);
+  if (!Number.isInteger(moleCount) || moleCount < 1 || moleCount > 6) throw httpError(400, "Choose between 1 and 6 moles");
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "moles");
+  const maxMultiplierMicros = molesMultiplierMicros(moleCount, MOLES_MAX_HITS, houseFactorMicros);
+  const maximumSafeWager = Number(BigInt(Number.MAX_SAFE_INTEGER) * 1_000_000n / BigInt(maxMultiplierMicros));
+  if (wagerUnits > maximumSafeWager) throw httpError(400, "Lower the wager for that Moles risk level");
+  const id = crypto.randomUUID();
+  const timestamp = now();
+  const layouts = JSON.stringify(molesLayouts(moleCount));
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO moles_rounds(
+          id, request_id, uid, currency, wager_units, mole_count, max_hits, hole_layouts_json,
+          picks_json, hit_count, multiplier_micros, house_factor_micros, status, settled, created_at, updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 1000000, ?, 'active', 0, ?, ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+          AND NOT EXISTS(SELECT 1 FROM moles_rounds WHERE uid = ? AND currency = ? AND status = 'active')
+      `).bind(id, requestId, user.sub, asset.code, wagerUnits, moleCount, MOLES_MAX_HITS, layouts, houseFactorMicros, timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM moles_rounds WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'moles_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
+        FROM moles_rounds WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM moles_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { round: molesRoundResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    const current = await env.DB.prepare("SELECT * FROM moles_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+    if (current) return json(request, env, 200, { round: molesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM moles_rounds WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { round: molesRoundResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+async function ownedMolesRound(env, uid, id) {
+  const row = await env.DB.prepare("SELECT * FROM moles_rounds WHERE id = ? AND uid = ?").bind(id, uid).first();
+  if (!row) throw httpError(404, "That Moles round was not found");
+  return row;
+}
+
+async function settleMolesRound(env, current, { status, picks, hits, multiplierMicros, payoutUnits, actionId, timestamp }) {
+  const results = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE moles_rounds SET picks_json = ?, hit_count = ?, multiplier_micros = ?, payout_units = ?,
+        status = ?, last_action_id = ?, updated_at = ?, settled_at = ?
+      WHERE id = ? AND uid = ? AND status = 'active' AND picks_json = ?
+    `).bind(JSON.stringify(picks), hits, multiplierMicros, payoutUnits, status, actionId, timestamp, timestamp, current.id, current.uid, current.picks_json),
+    env.DB.prepare(`
+      UPDATE crypto_balances SET available_units = available_units + ?, updated_at = ?
+      WHERE uid = ? AND currency = ? AND ? > 0
+        AND EXISTS(SELECT 1 FROM moles_rounds WHERE id = ? AND uid = ? AND status = ? AND settled = 0)
+    `).bind(payoutUnits, timestamp, current.uid, current.currency, payoutUnits, current.id, current.uid, status),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'moles_payout_' || id, uid, currency, 'game_payout', payout_units, id, ?
+      FROM moles_rounds WHERE id = ? AND uid = ? AND status = ? AND settled = 0 AND payout_units > 0
+    `).bind(timestamp, current.id, current.uid, status),
+    env.DB.prepare("UPDATE moles_rounds SET settled = 1 WHERE id = ? AND uid = ? AND status = ? AND settled = 0").bind(current.id, current.uid, status),
+  ]);
+  return Number(results[0]?.meta?.changes || 0) === 1;
+}
+
+async function handleChooseMolesHole(request, env, user, roundId) {
+  const body = await requestJson(request);
+  const hole = Number(body.hole);
+  const actionId = normalizeRequestId(body.actionId);
+  let current = await ownedMolesRound(env, user.sub, roundId);
+  if (current.status !== "active" || current.last_action_id === actionId) return json(request, env, 200, { round: molesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+  if (!Number.isInteger(hole) || hole < 0 || hole >= MOLES_HOLES) throw httpError(400, "Choose a valid Moles hole");
+  const picks = molesJsonArray(current.picks_json).map(Number);
+  const stage = picks.length;
+  if (stage >= MOLES_MAX_HITS) throw httpError(409, "That Moles round is complete");
+  const layouts = molesJsonArray(current.hole_layouts_json);
+  const positions = Array.isArray(layouts[stage]) ? layouts[stage].map(Number) : [];
+  const hit = positions.includes(hole);
+  const nextPicks = [...picks, hole];
+  const nextHits = hit ? Number(current.hit_count) + 1 : Number(current.hit_count);
+  const multiplierMicros = hit ? molesMultiplierMicros(Number(current.mole_count), nextHits, Number(current.house_factor_micros)) : Number(current.multiplier_micros);
+  const timestamp = now();
+  if (!hit || nextHits === MOLES_MAX_HITS) {
+    const status = hit ? "won" : "lost";
+    const payoutUnits = hit ? payoutFromMultiplier(Number(current.wager_units), multiplierMicros) : 0;
+    await settleMolesRound(env, current, { status, picks: nextPicks, hits: nextHits, multiplierMicros, payoutUnits, actionId, timestamp });
+  } else {
+    await env.DB.prepare(`
+      UPDATE moles_rounds SET picks_json = ?, hit_count = ?, multiplier_micros = ?, last_action_id = ?, updated_at = ?
+      WHERE id = ? AND uid = ? AND status = 'active' AND picks_json = ?
+    `).bind(JSON.stringify(nextPicks), nextHits, multiplierMicros, actionId, timestamp, roundId, user.sub, current.picks_json).run();
+  }
+  current = await ownedMolesRound(env, user.sub, roundId);
+  return json(request, env, 200, { round: molesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleCashoutMolesRound(request, env, user, roundId) {
+  const body = await requestJson(request);
+  const actionId = normalizeRequestId(body.actionId);
+  let current = await ownedMolesRound(env, user.sub, roundId);
+  if (current.status !== "active" || current.last_action_id === actionId) return json(request, env, 200, { round: molesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+  const hits = Number(current.hit_count);
+  if (hits < 1) throw httpError(409, "Hit one mole before cashing out");
+  const picks = molesJsonArray(current.picks_json).map(Number);
+  const multiplierMicros = molesMultiplierMicros(Number(current.mole_count), hits, Number(current.house_factor_micros));
+  const payoutUnits = payoutFromMultiplier(Number(current.wager_units), multiplierMicros);
+  await settleMolesRound(env, current, { status: "cashed_out", picks, hits, multiplierMicros, payoutUnits, actionId, timestamp: now() });
+  current = await ownedMolesRound(env, user.sub, roundId);
+  return json(request, env, 200, { round: molesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+}
+
 async function existingDepositForCurrency(env, uid, payCurrency) {
   return env.DB.prepare(`
     SELECT * FROM crypto_deposits
@@ -3688,7 +3898,7 @@ async function handleAdminStartLeaderboard(request, env, user, cadence) {
 const ADMIN_LEDGER_GAME_PREFIXES = Object.freeze([
   ["blackjack", "Blackjack"], ["coinflip", "Coinflip"], ["roulette", "Roulette"],
   ["plinko", "Plinko"], ["towers", "Towers"], ["crash", "Crash"],
-  ["mines", "Mines"], ["limbo", "Limbo"], ["wheel", "Wheel"],
+  ["mines", "Mines"], ["moles", "Moles"], ["limbo", "Limbo"], ["wheel", "Wheel"],
   ["keno", "Keno"], ["hilo", "Hi-Lo"], ["dice", "Dice"],
 ]);
 
@@ -4196,6 +4406,12 @@ async function route(request, env) {
   if (request.method === "POST" && towersChooseMatch) return handleChooseTowersTile(request, env, user, towersChooseMatch[1]);
   const towersCashoutMatch = path.match(/^\/games\/towers\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
   if (request.method === "POST" && towersCashoutMatch) return handleCashoutTowersRound(request, env, user, towersCashoutMatch[1]);
+  if (request.method === "GET" && path === "/games/moles/rounds/active") return handleGetActiveMolesRound(request, env, user);
+  if (request.method === "POST" && path === "/games/moles/rounds") return handleStartMolesRound(request, env, user);
+  const molesChooseMatch = path.match(/^\/games\/moles\/rounds\/([A-Za-z0-9-]+)\/choose$/);
+  if (request.method === "POST" && molesChooseMatch) return handleChooseMolesHole(request, env, user, molesChooseMatch[1]);
+  const molesCashoutMatch = path.match(/^\/games\/moles\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
+  if (request.method === "POST" && molesCashoutMatch) return handleCashoutMolesRound(request, env, user, molesCashoutMatch[1]);
   if (request.method === "GET" && path === "/games/blackjack/rounds/active") return handleGetActiveBlackjackRound(request, env, user);
   if (request.method === "POST" && path === "/games/blackjack/rounds") return handleStartBlackjackRound(request, env, user);
   const blackjackActionMatch = path.match(/^\/games\/blackjack\/rounds\/([A-Za-z0-9-]+)\/action$/);

@@ -9,7 +9,7 @@ const [html, tools, worker] = await Promise.all([
 ]);
 
 test("every implemented game displays its live return-to-player value", () => {
-  for (const game of ["mines", "dice", "plinko", "roulette", "keno", "wheel", "hi-lo", "coinflip", "blackjack", "towers"]) {
+  for (const game of ["mines", "dice", "plinko", "roulette", "keno", "wheel", "hi-lo", "coinflip", "blackjack", "towers", "moles", "limbo"]) {
     assert.match(html, new RegExp(`data-game-rtp="${game}"`));
   }
   assert.match(tools, /games\/settings/);
