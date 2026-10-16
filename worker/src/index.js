@@ -732,8 +732,190 @@ async function listActivity(env, uid) {
   return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows, ...blackjackRows, ...towersRows, ...molesRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
+const PLAYER_BET_UNION_SQL = `
+  SELECT 'Dice' AS game, id, currency, wager_units, payout_units, multiplier_micros,
+    outcome AS status, created_at FROM dice_bets WHERE uid = ?
+  UNION ALL SELECT 'Limbo', id, currency, wager_units, payout_units, multiplier_micros,
+    outcome, created_at FROM limbo_bets WHERE uid = ?
+  UNION ALL SELECT 'Mines', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM mines_rounds WHERE uid = ?
+  UNION ALL SELECT 'Plinko', id, currency, wager_units, payout_units, multiplier_micros,
+    outcome, created_at FROM plinko_bets WHERE uid = ?
+  UNION ALL SELECT 'Roulette', id, currency, wager_units, payout_units, multiplier_micros,
+    outcome, created_at FROM roulette_rounds WHERE uid = ?
+  UNION ALL SELECT 'Keno', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'revealing' THEN 'open' ELSE outcome END, created_at FROM keno_bets WHERE uid = ?
+  UNION ALL SELECT 'Wheel', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'spinning' THEN 'open' ELSE outcome END, created_at FROM wheel_bets WHERE uid = ?
+  UNION ALL SELECT 'Hi-Lo', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM hilo_rounds WHERE uid = ?
+  UNION ALL SELECT 'Coinflip', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM coinflip_rounds WHERE uid = ?
+  UNION ALL SELECT 'Crash', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'open' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM crash_wagers WHERE uid = ?
+  UNION ALL SELECT 'Blackjack', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' ELSE COALESCE(outcome, 'loss') END, created_at FROM blackjack_rounds WHERE uid = ?
+  UNION ALL SELECT 'Towers', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM towers_rounds WHERE uid = ?
+  UNION ALL SELECT 'Moles', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM moles_rounds WHERE uid = ?
+`;
+
+function playerBetBindings(uid) {
+  return Array.from({ length: 13 }, () => uid);
+}
+
+function stablecoinPrice(asset) {
+  return ["USDT", "USDC"].includes(asset?.providerCurrency) ? 1 : 0;
+}
+
+async function liveAccountSnapshot(env, uid, { includeActivity = true } = {}) {
+  const bindings = playerBetBindings(uid);
+  const queries = [
+    env.DB.prepare(`
+      SELECT currency,
+        COUNT(*) AS total_bets,
+        SUM(CASE WHEN status = 'win' THEN 1 ELSE 0 END) AS wins,
+        SUM(CASE WHEN status = 'loss' THEN 1 ELSE 0 END) AS losses,
+        SUM(wager_units) AS wager_units,
+        SUM(payout_units - wager_units) AS net_units,
+        MAX(payout_units) AS biggest_payout_units,
+        MAX(multiplier_micros) AS highest_multiplier_micros
+      FROM (${PLAYER_BET_UNION_SQL}) GROUP BY currency
+    `).bind(...bindings),
+    env.DB.prepare(`
+      SELECT game, COUNT(*) AS plays FROM (${PLAYER_BET_UNION_SQL})
+      GROUP BY game ORDER BY plays DESC, game ASC LIMIT 1
+    `).bind(...bindings),
+  ];
+  if (includeActivity) {
+    queries.push(env.DB.prepare(`
+      SELECT game, id, currency, wager_units, payout_units, multiplier_micros, status, created_at
+      FROM (${PLAYER_BET_UNION_SQL}) ORDER BY created_at DESC LIMIT 100
+    `).bind(...bindings));
+  }
+  const [summaryResult, favouriteResult, activityResult] = await env.DB.batch(queries);
+  let prices = {};
+  try { prices = await providerPrices(env); } catch { prices = {}; }
+  let totalWagered = 0;
+  let netProfitLoss = 0;
+  let biggestWin = 0;
+  let totalBets = 0;
+  let wins = 0;
+  let losses = 0;
+  let highestMultiplier = 0;
+  for (const row of summaryResult.results || []) {
+    const asset = getWalletAsset(row.currency);
+    if (!asset) continue;
+    const price = Number(prices?.[asset.providerCurrency] || stablecoinPrice(asset));
+    const toUsd = (units) => Number(assetUnitsToString(Number(units || 0), false)) * price;
+    totalWagered += toUsd(row.wager_units);
+    netProfitLoss += toUsd(row.net_units);
+    biggestWin = Math.max(biggestWin, toUsd(row.biggest_payout_units));
+    totalBets += Number(row.total_bets || 0);
+    wins += Number(row.wins || 0);
+    losses += Number(row.losses || 0);
+    highestMultiplier = Math.max(highestMultiplier, Number(row.highest_multiplier_micros || 0) / 1_000_000);
+  }
+  const settled = wins + losses;
+  const summary = {
+    totalWagered: Math.round(totalWagered * 100) / 100,
+    lifetimeRawWager: Math.round(totalWagered * 100) / 100,
+    lifetimeWeightedWager: Math.round(totalWagered * 100) / 100,
+    totalBets,
+    wins,
+    losses,
+    winRate: settled ? Math.round((wins / settled) * 10_000) / 100 : 0,
+    netProfitLoss: Math.round(netProfitLoss * 100) / 100,
+    biggestWin: Math.round(biggestWin * 100) / 100,
+    highestMultiplier: Math.round(highestMultiplier * 100) / 100,
+    favouriteGame: String(favouriteResult.results?.[0]?.game || "—"),
+    mostPlayedGame: String(favouriteResult.results?.[0]?.game || "—"),
+    pvpWins: 0,
+    pvpLosses: 0,
+    pvpWinRate: 0,
+  };
+  const activity = (activityResult?.results || []).map((row) => ({
+    id: row.id,
+    type: "bet",
+    game: row.game,
+    status: row.status,
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros || 0) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+  return { summary, activity };
+}
+
+const ACCOUNT_PREFERENCE_KEYS = new Set([
+  "profilePublic", "showUsername", "showWagers", "showProfit", "showFavorites",
+  "showRank", "showOnline", "allowTips", "marketingConsent",
+]);
+
+function safeAccountPreferences(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([key, entry]) =>
+    typeof entry === "boolean" && (ACCOUNT_PREFERENCE_KEYS.has(key) || /^notification-[a-z0-9-]{1,80}$/.test(key))));
+}
+
+async function readAccountPreferences(env, uid) {
+  const row = await env.DB.prepare("SELECT preferences_json FROM player_preferences WHERE uid = ?").bind(uid).first();
+  if (!row) return {};
+  try { return safeAccountPreferences(JSON.parse(String(row.preferences_json || "{}"))); }
+  catch { return {}; }
+}
+
+async function handleAccountSnapshot(request, env, user) {
+  const compact = new URL(request.url).searchParams.get("compact") === "1";
+  const [account, preferences] = await Promise.all([
+    liveAccountSnapshot(env, user.sub, { includeActivity: !compact }),
+    readAccountPreferences(env, user.sub),
+  ]);
+  return json(request, env, 200, { ...account, preferences });
+}
+
+async function handleAccountPreferences(request, env, user) {
+  const body = await requestJson(request);
+  const next = safeAccountPreferences(body.preferences);
+  const current = await readAccountPreferences(env, user.sub);
+  const preferences = { ...current, ...next };
+  await env.DB.prepare(`
+    INSERT INTO player_preferences(uid, preferences_json, updated_at) VALUES(?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET preferences_json = excluded.preferences_json, updated_at = excluded.updated_at
+  `).bind(user.sub, JSON.stringify(preferences), now()).run();
+  return json(request, env, 200, { preferences });
+}
+
+async function walletFundingActivity(env, uid) {
+  const result = await env.DB.prepare(`
+    SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
+      pay_currency AS currency, created_at FROM crypto_deposits
+    WHERE uid = ? AND status <> 'address_ready'
+    UNION ALL
+    SELECT id, 'withdrawal' AS type, status, payout_amount AS amount,
+      payout_currency AS currency, created_at FROM crypto_withdrawals WHERE uid = ?
+    ORDER BY created_at DESC LIMIT 50
+  `).bind(uid, uid).all();
+  return (result.results || []).map((row) => ({
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    amount: String(row.amount || "0"),
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+}
+
 async function handleGetWallet(request, env, user) {
-  return json(request, env, 200, { wallet: await walletResponse(env, user.sub), activity: await listActivity(env, user.sub) });
+  const [wallet, account, funding] = await Promise.all([
+    walletResponse(env, user.sub),
+    liveAccountSnapshot(env, user.sub),
+    walletFundingActivity(env, user.sub),
+  ]);
+  const activity = [...account.activity, ...funding].sort((left, right) => right.createdAt - left.createdAt).slice(0, 100);
+  return json(request, env, 200, { wallet, activity });
 }
 
 async function handleSyncProfile(request, env, user) {
@@ -4397,6 +4579,8 @@ async function route(request, env) {
   }
   if (request.method === "GET" && path === "/sessions") return handleSessions(request, env, user);
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
+  if (request.method === "GET" && path === "/account") return handleAccountSnapshot(request, env, user);
+  if (request.method === "POST" && path === "/account/preferences") return handleAccountPreferences(request, env, user);
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);

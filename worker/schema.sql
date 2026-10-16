@@ -205,6 +205,12 @@ CREATE TABLE IF NOT EXISTS player_profiles (
 );
 CREATE INDEX IF NOT EXISTS player_profiles_username_idx ON player_profiles(username COLLATE NOCASE);
 
+CREATE TABLE IF NOT EXISTS player_preferences (
+  uid TEXT PRIMARY KEY,
+  preferences_json TEXT NOT NULL DEFAULT '{}',
+  updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS crypto_deposit_requests (
   id TEXT PRIMARY KEY,
   uid TEXT NOT NULL,

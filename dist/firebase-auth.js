@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signO
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getPlayerRankStats } from "./player-rank-service.js?v=rank-badges-1";
 import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS, TIME_FILTERS } from "./profile-config.js";
-import { profileServices } from "./profile-services.js";
+import { profileServices } from "./profile-services.js?v=live-account-1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBS3pib3PsHnSJGaQqBc--S99qI7sqhDuU",
@@ -32,6 +32,9 @@ const USERNAME_NOUNS = ["Falcon", "Racer", "Comet", "Knight", "Tiger", "Rocket",
 let currentProfile = null;
 let profileBusy = false;
 let preferences = profileServices.preferences.load();
+let accountSnapshot = { summary: {}, activity: [] };
+let accountRefreshTimer = 0;
+let accountActivityDays = Infinity;
 provider.setCustomParameters({ prompt: "select_account" });
 auth.useDeviceLanguage();
 
@@ -150,8 +153,8 @@ function createProfileDialog() {
 
           <section class="profile-section" data-profile-panel="transactions" hidden>
             <span class="profile-section-label">TRANSACTIONS</span><h3>Play history</h3><p class="settings-copy">Review bets, player matches, and performance statistics.</p>
-            <div class="account-subtabs" role="tablist">${ACTIVITY_TABS.map((tab, index) => `<button class="account-subtab ${index === 0 ? "active" : ""}" type="button" data-activity-tab="${tab.id}" aria-selected="${index === 0}">${tab.label}</button>`).join("")}</div><div class="account-filters">${TIME_FILTERS.map((filter, index) => `<button type="button" class="account-filter ${index === 3 ? "active" : ""}">${filter}</button>`).join("")}</div>
-            <div data-activity-panel="bets"><div class="bet-category-chips"><span>Casino bets</span><span>Originals</span><span>Slots</span><span>Live casino</span><span>Open bets</span><span>Settled bets</span></div><div class="account-table"><div class="account-table-head"><span>Game</span><span>Bet</span><span>Multiplier</span><span>Payout</span><span>Result</span><span>Date</span></div><div class="account-empty"><strong>No bets yet</strong><span>Your settled and open bets will appear here.</span></div></div></div>
+            <div class="account-subtabs" role="tablist">${ACTIVITY_TABS.map((tab, index) => `<button class="account-subtab ${index === 0 ? "active" : ""}" type="button" data-activity-tab="${tab.id}" aria-selected="${index === 0}">${tab.label}</button>`).join("")}</div><div class="account-filters">${TIME_FILTERS.map((filter, index) => `<button type="button" class="account-filter ${index === 3 ? "active" : ""}" data-account-days="${[1, 7, 30, "all"][index]}">${filter}</button>`).join("")}</div>
+            <div data-activity-panel="bets"><div class="bet-category-chips"><span>Casino bets</span><span>Originals</span><span>Open bets</span><span>Settled bets</span></div><div class="account-table"><div class="account-table-head"><span>Game</span><span>Bet</span><span>Multiplier</span><span>Payout</span><span>Result</span><span>Date</span></div><div class="account-table-body"></div></div></div>
             <div data-activity-panel="pvp" hidden><div class="account-table"><div class="account-table-head pvp"><span>Opponent</span><span>Game</span><span>Stake</span><span>Result</span><span>Profit / loss</span><span>Date</span></div><div class="account-empty"><strong>No PvP matches yet</strong><span>Player-versus-player results will appear here.</span></div></div></div>
             <div data-activity-panel="statistics" hidden><div class="statistics-grid"></div></div>
           </section>
@@ -183,7 +186,7 @@ function createProfileDialog() {
     </section>`;
   document.body.append(overlay);
   return {
-    overlay, close: overlay.querySelector(".profile-close"), tabs: [...overlay.querySelectorAll("[data-profile-section]")], panels: [...overlay.querySelectorAll("[data-profile-panel]")], settingsTabs: [...overlay.querySelectorAll("[data-settings-section]")], settingsPanels: [...overlay.querySelectorAll("[data-settings-panel]")], activityTabs: [...overlay.querySelectorAll("[data-activity-tab]")], activityPanels: [...overlay.querySelectorAll("[data-activity-panel]")], currentName: overlay.querySelector(".profile-current-name"), email: overlay.querySelector(".profile-email"), avatar: overlay.querySelector(".profile-avatar"), joinDate: overlay.querySelector(".profile-join-date"), inlineRank: overlay.querySelector(".profile-inline-rank"), dataUsername: overlay.querySelector(".profile-data-username"), displayName: overlay.querySelector(".profile-display-name"), profileUrl: overlay.querySelector(".profile-url"), settingsEmail: overlay.querySelector(".settings-email"), settingsDisplayName: overlay.querySelector(".settings-display-name"), rankBadge: overlay.querySelector(".rank-badge"), rankBadgeImage: overlay.querySelector(".rank-badge-image"), rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"), rankBadgeTier: overlay.querySelector(".rank-badge-tier"), rankName: overlay.querySelector(".rank-name"), rankSubtitle: overlay.querySelector(".rank-subtitle"), rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")], rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"), rankProgressValues: overlay.querySelector(".rank-progress-values"), rankNext: overlay.querySelector(".rank-next"), rankProgressTrack: overlay.querySelector(".rank-progress-track"), rankProgressFill: overlay.querySelector(".rank-progress-fill"), form: overlay.querySelector(".username-form"), input: overlay.querySelector("#profile-username"), help: overlay.querySelector(".username-help"), save: overlay.querySelector(".username-save"), status: overlay.querySelector(".profile-status"), verificationLevels: overlay.querySelector(".verification-levels"), sessionList: overlay.querySelector(".session-list"), statisticsGrid: overlay.querySelector(".statistics-grid"), referralLink: overlay.querySelector(".referral-link"), preferenceInputs: [...overlay.querySelectorAll("[data-preference]")],
+    overlay, close: overlay.querySelector(".profile-close"), tabs: [...overlay.querySelectorAll("[data-profile-section]")], panels: [...overlay.querySelectorAll("[data-profile-panel]")], settingsTabs: [...overlay.querySelectorAll("[data-settings-section]")], settingsPanels: [...overlay.querySelectorAll("[data-settings-panel]")], activityTabs: [...overlay.querySelectorAll("[data-activity-tab]")], activityPanels: [...overlay.querySelectorAll("[data-activity-panel]")], timeFilters: [...overlay.querySelectorAll("[data-account-days]")], currentName: overlay.querySelector(".profile-current-name"), email: overlay.querySelector(".profile-email"), avatar: overlay.querySelector(".profile-avatar"), joinDate: overlay.querySelector(".profile-join-date"), inlineRank: overlay.querySelector(".profile-inline-rank"), dataUsername: overlay.querySelector(".profile-data-username"), displayName: overlay.querySelector(".profile-display-name"), profileUrl: overlay.querySelector(".profile-url"), settingsEmail: overlay.querySelector(".settings-email"), settingsDisplayName: overlay.querySelector(".settings-display-name"), rankBadge: overlay.querySelector(".rank-badge"), rankBadgeImage: overlay.querySelector(".rank-badge-image"), rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"), rankBadgeTier: overlay.querySelector(".rank-badge-tier"), rankName: overlay.querySelector(".rank-name"), rankSubtitle: overlay.querySelector(".rank-subtitle"), rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")], rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"), rankProgressValues: overlay.querySelector(".rank-progress-values"), rankNext: overlay.querySelector(".rank-next"), rankProgressTrack: overlay.querySelector(".rank-progress-track"), rankProgressFill: overlay.querySelector(".rank-progress-fill"), form: overlay.querySelector(".username-form"), input: overlay.querySelector("#profile-username"), help: overlay.querySelector(".username-help"), save: overlay.querySelector(".username-save"), status: overlay.querySelector(".profile-status"), verificationLevels: overlay.querySelector(".verification-levels"), sessionList: overlay.querySelector(".session-list"), statisticsGrid: overlay.querySelector(".statistics-grid"), betsTableBody: overlay.querySelector(".account-table-body"), referralLink: overlay.querySelector(".referral-link"), preferenceInputs: [...overlay.querySelectorAll("[data-preference]")],
   };
 }
 
@@ -193,6 +196,7 @@ const profileDialog = createProfileDialog();
 function selectProfileSection(section) {
   profileDialog.tabs.forEach((tab) => { const selected = tab.dataset.profileSection === section; tab.classList.toggle("active", selected); tab.setAttribute("aria-selected", String(selected)); });
   profileDialog.panels.forEach((panel) => { panel.hidden = panel.dataset.profilePanel !== section; });
+  if (["vip", "transactions", "settings"].includes(section)) refreshLiveAccountData({ compact: false }).catch(() => {});
 }
 
 function selectSettingsSection(section) {
@@ -261,13 +265,58 @@ function escapeMarkup(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 }
 
-async function loadMockAccountData() {
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-  const [verification, sessions, summary] = await Promise.all([
-    profileServices.verification.getStatus(),
-    profileServices.sessions.list(token).catch(() => ({ sessions: [], loginHistory: [] })),
-    profileServices.activity.getSummary(),
+function accountCurrencyLabel(currency) {
+  const value = String(currency || "").toLowerCase();
+  if (value.startsWith("usdt")) return "USDT";
+  if (value.startsWith("usdc")) return "USDC";
+  if (value === "bnbbsc") return "BNB";
+  return value.toUpperCase();
+}
+
+function renderBetActivity(activity = []) {
+  const cutoff = Number.isFinite(accountActivityDays) ? Date.now() - accountActivityDays * 86_400_000 : 0;
+  const visibleActivity = activity.filter((bet) => Number(bet.createdAt) >= cutoff);
+  profileDialog.betsTableBody.replaceChildren();
+  if (!visibleActivity.length) {
+    profileDialog.betsTableBody.innerHTML = '<div class="account-empty"><strong>No bets yet</strong><span>Your settled and open bets will appear here as soon as they are placed.</span></div>';
+    return;
+  }
+  for (const bet of visibleActivity) {
+    const row = document.createElement("div");
+    const status = ["win", "loss", "push", "open"].includes(bet.status) ? bet.status : "open";
+    row.className = "account-table-row";
+    row.innerHTML = `<strong>${escapeMarkup(bet.game)}</strong><span>${escapeMarkup(bet.amount)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><span>${Number(bet.multiplier || 0).toFixed(2)}×</span><span>${escapeMarkup(bet.payout)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><b data-result="${status}">${status.toUpperCase()}</b><time>${new Date(Number(bet.createdAt)).toLocaleString()}</time>`;
+    profileDialog.betsTableBody.append(row);
+  }
+}
+
+function renderAccountSummary(summary = {}) {
+  const labels = { totalWagered: "Total wagered", totalBets: "Total bets", wins: "Wins", losses: "Losses", winRate: "Win rate", netProfitLoss: "Net profit / loss", biggestWin: "Biggest win", highestMultiplier: "Highest multiplier", favouriteGame: "Favourite game", mostPlayedGame: "Most played game", pvpWins: "PvP wins", pvpLosses: "PvP losses", pvpWinRate: "PvP win rate" };
+  profileDialog.statisticsGrid.innerHTML = Object.entries(labels).map(([key, label]) => {
+    const value = summary[key] ?? (key.includes("Game") ? "—" : 0);
+    const display = ["totalWagered", "netProfitLoss", "biggestWin"].includes(key) ? formatMoney(value) : ["winRate", "pvpWinRate"].includes(key) ? `${value}%` : key === "highestMultiplier" ? `${value}×` : value;
+    return `<article><span>${label}</span><strong>${escapeMarkup(display)}</strong></article>`;
+  }).join("");
+}
+
+async function refreshLiveAccountData({ compact = false } = {}) {
+  if (!auth.currentUser || !currentProfile) return;
+  const user = auth.currentUser;
+  const token = await user.getIdToken();
+  const [verification, sessions, snapshot] = await Promise.all([
+    compact ? null : profileServices.verification.getStatus(),
+    compact ? null : profileServices.sessions.list(token).catch(() => ({ sessions: [], loginHistory: [] })),
+    profileServices.account.getSnapshot(token, { compact }),
   ]);
+  if (auth.currentUser?.uid !== user.uid) return;
+  accountSnapshot = { summary: snapshot.summary || {}, activity: snapshot.activity || accountSnapshot.activity || [] };
+  preferences = profileServices.preferences.save({ ...preferences, ...(snapshot.preferences || {}) });
+  currentProfile = { ...currentProfile, ...accountSnapshot.summary };
+  renderRank(currentProfile);
+  renderAccountSummary(accountSnapshot.summary);
+  if (!compact) renderBetActivity(accountSnapshot.activity);
+  profileDialog.preferenceInputs.forEach((input) => { input.checked = Boolean(preferences[input.dataset.preference]); });
+  if (compact) return;
   profileDialog.verificationLevels.innerHTML = verification.levels.map((level) => `<article><span>LEVEL ${level.level}</span><div><strong>${level.name}</strong><small>${level.level === 2 ? "Government ID and selfie / liveness" : level.level === 3 ? "Proof of address" : "Basic account information"}</small></div><b class="${level.status === "Approved" ? "approved" : ""}">${level.status}</b></article>`).join("");
   profileDialog.sessionList.innerHTML = sessions.sessions.length ? sessions.sessions.map((session) => {
     const location = [session.city, session.region, session.countryCode].filter(Boolean).join(", ") || "Approximate location unavailable";
@@ -275,8 +324,6 @@ async function loadMockAccountData() {
     const lastActive = session.current ? "Now" : new Date(session.lastActive).toLocaleString();
     return `<article class="session-row"><span class="session-device-mark">${session.current ? "THIS" : "DEV"}</span><div><strong>${escapeMarkup(session.device)}</strong><small>${escapeMarkup(session.operatingSystem)} · ${escapeMarkup(session.browser)}</small><small>${escapeMarkup(location)} · IP: ${escapeMarkup(session.ipAddress)}</small><small>First login: ${escapeMarkup(firstLogin)} · Last active: ${escapeMarkup(lastActive)}</small></div><b>${session.current ? "CURRENT SESSION" : "RECENT"}</b></article>`;
   }).join("") : '<div class="account-empty compact"><strong>No session history yet</strong><span>Your current device will appear after the next secure account request.</span></div>';
-  const labels = { totalWagered: "Total wagered", totalBets: "Total bets", wins: "Wins", losses: "Losses", winRate: "Win rate", netProfitLoss: "Net profit / loss", biggestWin: "Biggest win", highestMultiplier: "Highest multiplier", favouriteGame: "Favourite game", mostPlayedGame: "Most played game", pvpWins: "PvP wins", pvpLosses: "PvP losses", pvpWinRate: "PvP win rate" };
-  profileDialog.statisticsGrid.innerHTML = Object.entries(summary).map(([key, value]) => `<article><span>${labels[key]}</span><strong>${["totalWagered", "netProfitLoss", "biggestWin"].includes(key) ? formatMoney(value) : ["winRate", "pvpWinRate"].includes(key) ? `${value}%` : key === "highestMultiplier" ? `${value}×` : value}</strong></article>`).join("");
 }
 
 function refreshProfileDialog() {
@@ -463,14 +510,25 @@ window.addEventListener("resize", positionAccountMenu);
 profileDialog.tabs.forEach((tab) => tab.addEventListener("click", () => selectProfileSection(tab.dataset.profileSection)));
 profileDialog.settingsTabs.forEach((tab) => tab.addEventListener("click", () => selectSettingsSection(tab.dataset.settingsSection)));
 profileDialog.activityTabs.forEach((tab) => tab.addEventListener("click", () => selectActivityTab(tab.dataset.activityTab)));
+profileDialog.timeFilters.forEach((button) => button.addEventListener("click", () => {
+  accountActivityDays = button.dataset.accountDays === "all" ? Infinity : Number(button.dataset.accountDays);
+  profileDialog.timeFilters.forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+  renderBetActivity(accountSnapshot.activity);
+}));
 profileDialog.close.addEventListener("click", closeProfileDialog);
 profileDialog.overlay.addEventListener("click", (event) => { if (event.target === profileDialog.overlay) closeProfileDialog(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeAccountMenu(); if (!profileDialog.overlay.hidden) closeProfileDialog(); } });
-profileDialog.preferenceInputs.forEach((input) => input.addEventListener("change", () => {
+profileDialog.preferenceInputs.forEach((input) => input.addEventListener("change", async () => {
   preferences = profileServices.preferences.save({ ...preferences, [input.dataset.preference]: input.checked });
   profileDialog.preferenceInputs.filter((candidate) => candidate.dataset.preference === input.dataset.preference).forEach((candidate) => { candidate.checked = input.checked; });
-  if (["profilePublic", "showUsername", "showRank"].includes(input.dataset.preference) && auth.currentUser) {
-    syncPlayerUsername(auth.currentUser).catch((error) => console.warn("GamRace privacy sync deferred", error));
+  if (!auth.currentUser) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    preferences = await profileServices.preferences.saveRemote(token, preferences);
+    if (["profilePublic", "showUsername", "showRank"].includes(input.dataset.preference)) await syncPlayerUsername(auth.currentUser);
+  } catch (error) {
+    console.warn("GamRace preference sync deferred", error);
+    setProfileStatus("That setting is saved on this device and will sync when the service reconnects.", "error");
   }
 }));
 profileDialog.form.addEventListener("submit", async (event) => {
@@ -494,7 +552,14 @@ if (!authModal) {
 window.addEventListener("gamrace-auth-signout", async () => { try { await signOut(auth); } catch { setStatus("Sign out could not be completed. Please try again.", "error"); } });
 window.addEventListener("gamrace:open-transactions", () => openProfileDialog({ section: "transactions" }));
 
-loadMockAccountData();
+window.addEventListener("gamrace:wallet-balance-changed", () => {
+  window.clearTimeout(accountRefreshTimer);
+  accountRefreshTimer = window.setTimeout(() => refreshLiveAccountData({ compact: true }).catch(() => {}), 650);
+});
+window.addEventListener("gamrace:session-result", () => {
+  window.clearTimeout(accountRefreshTimer);
+  accountRefreshTimer = window.setTimeout(() => refreshLiveAccountData({ compact: true }).catch(() => {}), 650);
+});
 onAuthStateChanged(auth, async (user) => {
   if (!user) { renderUser(null); return; }
   renderUser(user);
@@ -505,6 +570,7 @@ onAuthStateChanged(auth, async (user) => {
     renderUser(user);
     refreshProfileDialog();
     syncPlayerUsername(user).catch((error) => console.warn("GamRace username sync deferred", error));
+    refreshLiveAccountData({ compact: false }).catch((error) => console.warn("GamRace live account sync deferred", error));
     checkOwnerAccess(user);
     if (result.created) {
       try { await updateProfile(user, { displayName: currentProfile.username }); } catch { /* Firestore remains the source of truth. */ }

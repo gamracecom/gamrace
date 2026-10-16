@@ -36,7 +36,28 @@ function clientSessionId() {
   }
 }
 
+async function accountRequest(token, path, options = {}) {
+  if (!token) throw new Error("Sign in to load your account");
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Session-Id": clientSessionId(),
+      ...(options.headers || {}),
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Your live account data is temporarily unavailable");
+  return response.json();
+}
+
 export const profileServices = Object.freeze({
+  account: Object.freeze({
+    async getSnapshot(token, { compact = false } = {}) {
+      return accountRequest(token, `/account${compact ? "?compact=1" : ""}`);
+    },
+  }),
   preferences: Object.freeze({
     load() {
       return { ...DEFAULT_PREFERENCES, ...readStoredPreferences() };
@@ -45,6 +66,22 @@ export const profileServices = Object.freeze({
       const safe = { ...DEFAULT_PREFERENCES, ...nextPreferences };
       localStorage.setItem(PREFERENCE_KEY, JSON.stringify(safe));
       return safe;
+    },
+    async loadRemote(token) {
+      const snapshot = await accountRequest(token, "/account?compact=1");
+      const safe = { ...DEFAULT_PREFERENCES, ...readStoredPreferences(), ...(snapshot.preferences || {}) };
+      localStorage.setItem(PREFERENCE_KEY, JSON.stringify(safe));
+      return { preferences: safe, summary: snapshot.summary || {} };
+    },
+    async saveRemote(token, nextPreferences) {
+      const safe = { ...DEFAULT_PREFERENCES, ...nextPreferences };
+      const result = await accountRequest(token, "/account/preferences", {
+        method: "POST",
+        body: JSON.stringify({ preferences: safe }),
+      });
+      const saved = { ...DEFAULT_PREFERENCES, ...(result.preferences || safe) };
+      localStorage.setItem(PREFERENCE_KEY, JSON.stringify(saved));
+      return saved;
     },
   }),
   verification: Object.freeze({
@@ -72,22 +109,9 @@ export const profileServices = Object.freeze({
     },
   }),
   activity: Object.freeze({
-    async getSummary() {
-      return {
-        totalWagered: 0,
-        totalBets: 0,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        netProfitLoss: 0,
-        biggestWin: 0,
-        highestMultiplier: 0,
-        favouriteGame: "—",
-        mostPlayedGame: "—",
-        pvpWins: 0,
-        pvpLosses: 0,
-        pvpWinRate: 0,
-      };
+    async getSummary(token) {
+      const snapshot = await accountRequest(token, "/account?compact=1");
+      return snapshot.summary || {};
     },
   }),
 });

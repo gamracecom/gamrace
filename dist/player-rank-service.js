@@ -18,7 +18,7 @@ function asNonNegativeNumber(value) {
 /**
  * Creates the profile-facing rank snapshot. Rank fields supplied by a caller
  * are deliberately ignored: rank is always derived from weighted lifetime wager.
- * Until a wager service is connected, missing totals remain zero.
+ * Missing totals remain zero; signed-in pages supply live totals from D1.
  *
  * @param {{lifetimeRawWager?: number, lifetimeWeightedWager?: number}} source
  * @returns {PlayerRankStats & Omit<ReturnType<typeof getRankProgress>, "currentRank"> & {rankDefinition: ReturnType<typeof getRankProgress>["currentRank"]}}
