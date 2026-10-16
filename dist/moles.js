@@ -84,8 +84,9 @@
     const values = multipliers();
     progress.replaceChildren(...values.map((value, index) => {
       const item = document.createElement("span");
+      const fractionDigits = value >= 1000 ? 0 : 2;
       item.className = `${index < hits ? "complete" : ""}${round?.status === "active" && index === hits ? " current" : ""}`;
-      item.innerHTML = `<i>${index + 1}</i><strong>${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: value >= 1000 ? 0 : 2 })}×</strong>`;
+      item.innerHTML = `<i>${index + 1}</i><strong>${Number(value).toLocaleString("en-US", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })}×</strong>`;
       return item;
     }));
   }
