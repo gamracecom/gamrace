@@ -490,6 +490,8 @@ function transactionLabel(item) {
   if (item.type === "game_payout") return `${item.game || "Game"} payout`;
   if (item.type === "admin_balance_set") return "Balance adjustment";
   if (item.type === "deposit") return "Deposit";
+  if (item.type === "withdrawal_hold") return "Withdrawal reserved";
+  if (item.type === "withdrawal_release") return "Withdrawal released";
   if (item.type === "withdrawal") return "Withdrawal";
   return String(item.type || "Wallet activity").replaceAll("_", " ");
 }
@@ -498,7 +500,7 @@ function transactionIcon(item) {
   if (item.type === "game_wager" || item.type === "game_bet") return "−";
   if (item.type === "game_payout") return "+";
   if (item.type === "deposit") return "↓";
-  if (item.type === "withdrawal") return "↑";
+  if (String(item.type || "").startsWith("withdrawal")) return "↑";
   return "±";
 }
 

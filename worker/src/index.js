@@ -3715,7 +3715,7 @@ async function handleAdminTransactions(request, env, user) {
     wagers: "l.type IN ('game_wager', 'game_bet')",
     payouts: "l.type = 'game_payout'",
     deposits: "l.type = 'deposit'",
-    withdrawals: "l.type = 'withdrawal'",
+    withdrawals: "l.type LIKE 'withdrawal%'",
     adjustments: "l.type = 'admin_balance_set'",
   };
   const gamePrefixes = new Set(ADMIN_LEDGER_GAME_PREFIXES.map(([prefix]) => prefix));
@@ -3734,35 +3734,21 @@ async function handleAdminTransactions(request, env, user) {
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const [rows, summary] = await Promise.all([
     env.DB.prepare(`
-      WITH wallet_activity AS (
-        SELECT id, uid, currency, type, amount_units, provider_reference, created_at FROM crypto_ledger
-        UNION ALL
-        SELECT 'deposit_' || payment_id, uid, pay_currency, 'deposit', credit_units, payment_id, updated_at
-        FROM crypto_deposits WHERE status <> 'address_ready'
-        UNION ALL
-        SELECT 'withdrawal_' || id, uid, payout_currency, 'withdrawal', -requested_units, provider_reference, created_at
-        FROM crypto_withdrawals
-      )
       SELECT l.id, l.uid, profile.username, l.currency, l.type, l.amount_units,
              l.provider_reference, l.created_at
-      FROM wallet_activity l
+      FROM crypto_ledger l
       LEFT JOIN player_profiles profile ON profile.uid = l.uid
       ${where}
       ORDER BY l.created_at DESC
       LIMIT ?
     `).bind(...bindings, limit).all(),
     env.DB.prepare(`
-      WITH wallet_activity AS (
-        SELECT type, created_at FROM crypto_ledger
-        UNION ALL SELECT 'deposit', updated_at FROM crypto_deposits WHERE status <> 'address_ready'
-        UNION ALL SELECT 'withdrawal', created_at FROM crypto_withdrawals
-      )
       SELECT COUNT(*) AS total,
         SUM(CASE WHEN type IN ('game_wager', 'game_bet') THEN 1 ELSE 0 END) AS wagers,
         SUM(CASE WHEN type = 'game_payout' THEN 1 ELSE 0 END) AS payouts,
         SUM(CASE WHEN type = 'deposit' THEN 1 ELSE 0 END) AS deposits,
-        SUM(CASE WHEN type = 'withdrawal' THEN 1 ELSE 0 END) AS withdrawals
-      FROM wallet_activity WHERE created_at >= ?
+        SUM(CASE WHEN type LIKE 'withdrawal%' THEN 1 ELSE 0 END) AS withdrawals
+      FROM crypto_ledger WHERE created_at >= ?
     `).bind(now() - 24 * 60 * 60 * 1000).first(),
   ]);
   return json(request, env, 200, {
@@ -3813,18 +3799,9 @@ async function handleAdminOverview(request, env, user) {
       ORDER BY deposited_units DESC, currency ASC
     `).all(),
     env.DB.prepare(`
-      WITH wallet_activity AS (
-        SELECT id, uid, currency, type, amount_units, provider_reference, created_at FROM crypto_ledger
-        UNION ALL
-        SELECT 'deposit_' || payment_id, uid, pay_currency, 'deposit', credit_units, payment_id, updated_at
-        FROM crypto_deposits WHERE status <> 'address_ready'
-        UNION ALL
-        SELECT 'withdrawal_' || id, uid, payout_currency, 'withdrawal', -requested_units, provider_reference, created_at
-        FROM crypto_withdrawals
-      )
       SELECT l.id, l.uid, profile.username, l.currency, l.type, l.amount_units,
              l.provider_reference, l.created_at AS occurred_at
-      FROM wallet_activity l
+      FROM crypto_ledger l
       LEFT JOIN player_profiles profile ON profile.uid = l.uid
       ORDER BY l.created_at DESC LIMIT 12
     `).all(),
