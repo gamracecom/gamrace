@@ -23,6 +23,12 @@ test("Blackjack has a responsive table and complete game tools", () => {
   assert.match(styles, /\.blackjack-table/);
   assert.match(styles, /@media\(max-width:780px\).*\.blackjack-stage/);
   assert.match(styles, /blackjack-footer \.fairness-label[^}]*background:transparent/);
+  assert.match(styles, /data-blackjack-action="hit"[^}]*background:#168bff/);
+  assert.match(styles, /data-blackjack-action="stand"[^}]*background:#e64b5f/);
+  assert.match(styles, /data-blackjack-action="double"[^}]*background:#d98a2b/);
+  assert.match(styles, /data-blackjack-action="split"[^}]*background:#8b5cf6/);
+  assert.match(styles, /\.blackjack-card-corner\.bottom/);
+  assert.match(styles, /\.blackjack-card-suit/);
   assert.match(html, /data-blackjack-view="side-bets"/);
   assert.equal((html.match(/data-blackjack-hand-count=/g) || []).length, 3);
   assert.match(html, /id="blackjack-perfect-pairs"/);
@@ -36,6 +42,11 @@ test("Blackjack is server authoritative, refresh safe and wallet backed", () => 
   assert.match(script, /\/games\/blackjack\/rounds\/active\?currency=/);
   assert.match(script, /\/games\/blackjack\/rounds/);
   assert.match(script, /gamraceWallet\.applyGameResult/);
+  assert.match(script, /function updateActionAvailability\(\)/);
+  assert.match(script, /updateAvailability\(\)[\s\S]*updateActionAvailability\(\)/);
+  assert.doesNotMatch(script, /button\.hidden = !round\.actions\.includes/);
+  assert.match(script, /button\.hidden = false/);
+  assert.match(script, /blackjack-card-corner top/);
   assert.doesNotMatch(script, /Math\.random/);
   assert.match(worker, /blackjackShoe/);
   assert.match(worker, /secureRandomInt\(index \+ 1\)/);

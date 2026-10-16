@@ -55,6 +55,7 @@ let gameEdgesCache = null;
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
   players: ["COMMAND", "Players"],
+  transactions: ["OPERATIONS", "Transactions"],
   deposits: ["OPERATIONS", "Deposits"],
   withdrawals: ["OPERATIONS", "Withdrawals"],
   games: ["PRODUCT", "Games"],
@@ -323,6 +324,7 @@ document.querySelector("#refresh-view").addEventListener("click", () => {
 async function loadView(view, force = false) {
   if (view === "overview") return loadOverview(force);
   if (view === "players") return loadPlayers();
+  if (view === "transactions") return loadTransactions();
   if (view === "deposits") return loadDeposits();
   if (view === "withdrawals") return loadWithdrawals();
   if (view === "games") return loadGameEdges(force);
@@ -475,12 +477,29 @@ function renderAssets(balances) {
 function renderRecent(activity) {
   const container = document.querySelector("#recent-activity-list");
   if (!activity.length) {
-    container.innerHTML = '<div class="empty-compact"><span>—</span><strong>No transaction activity</strong><small>New deposits and withdrawals will appear here.</small></div>';
+    container.innerHTML = '<div class="empty-compact"><span>—</span><strong>No transaction activity</strong><small>Player wagers and wallet movements will appear here.</small></div>';
     return;
   }
   container.innerHTML = activity.slice(0, 8).map((item) => `
-    <div class="recent-item"><span class="recent-icon ${item.type}">${item.type === "deposit" ? "↓" : "↑"}</span><div><strong>${item.type === "deposit" ? "Deposit" : "Withdrawal"} · ${formatAsset(item.currency)}</strong><small>${shortId(item.uid, 6)} · ${formatDate(item.occurredAt, true)}</small></div><b>${item.amount}</b></div>
+    <div class="recent-item"><span class="recent-icon ${statusClass(item.type)}">${transactionIcon(item)}</span><div><strong>${escapeHtml(transactionLabel(item))} · ${escapeHtml(formatAsset(item.currency))}</strong><small>${escapeHtml(item.username || shortId(item.uid, 6))} · ${formatDate(item.occurredAt, true)}</small></div><b class="transaction-amount ${item.direction || "neutral"}">${escapeHtml(item.amount)}</b></div>
   `).join("");
+}
+
+function transactionLabel(item) {
+  if (item.type === "game_wager" || item.type === "game_bet") return `${item.game || "Game"} wager`;
+  if (item.type === "game_payout") return `${item.game || "Game"} payout`;
+  if (item.type === "admin_balance_set") return "Balance adjustment";
+  if (item.type === "deposit") return "Deposit";
+  if (item.type === "withdrawal") return "Withdrawal";
+  return String(item.type || "Wallet activity").replaceAll("_", " ");
+}
+
+function transactionIcon(item) {
+  if (item.type === "game_wager" || item.type === "game_bet") return "−";
+  if (item.type === "game_payout") return "+";
+  if (item.type === "deposit") return "↓";
+  if (item.type === "withdrawal") return "↑";
+  return "±";
 }
 
 function renderAttention(pending) {
@@ -577,6 +596,36 @@ balanceDialog.addEventListener("close", () => {
 
 document.querySelector("#player-search-button").addEventListener("click", () => loadPlayers().catch((error) => showToast(error.message, "error")));
 document.querySelector("#player-search").addEventListener("keydown", (event) => { if (event.key === "Enter") loadPlayers().catch((error) => showToast(error.message, "error")); });
+
+async function loadTransactions() {
+  const type = document.querySelector("#transaction-type-filter")?.value || "all";
+  const game = document.querySelector("#transaction-game-filter")?.value || "all";
+  const query = document.querySelector("#transaction-search")?.value.trim() || "";
+  const result = await api(`/admin/transactions?limit=100&type=${encodeURIComponent(type)}&game=${encodeURIComponent(game)}${query ? `&query=${encodeURIComponent(query)}` : ""}`);
+  const summary = result.summary || {};
+  document.querySelector('[data-transaction-metric="total"]').textContent = Number(summary.total24h || 0).toLocaleString();
+  document.querySelector('[data-transaction-metric="wagers"]').textContent = Number(summary.wagers24h || 0).toLocaleString();
+  document.querySelector('[data-transaction-metric="payouts"]').textContent = Number(summary.payouts24h || 0).toLocaleString();
+  document.querySelector('[data-transaction-metric="payments"]').textContent = (Number(summary.deposits24h || 0) + Number(summary.withdrawals24h || 0)).toLocaleString();
+  const body = document.querySelector("#transactions-table-body");
+  if (!result.transactions?.length) setTableEmpty(body, 6, "No wallet transactions match these filters.");
+  else body.innerHTML = result.transactions.map((item) => `
+    <tr>
+      <td><span class="table-primary">${escapeHtml(item.username || "Username pending")}</span><span class="table-secondary" title="${escapeHtml(item.uid)}">${escapeHtml(shortId(item.uid, 8))}</span></td>
+      <td><span class="transaction-kind ${statusClass(item.type)}">${transactionIcon(item)}</span><span class="table-primary transaction-label">${escapeHtml(transactionLabel(item))}</span><span class="table-secondary">${escapeHtml(String(item.type || "activity").replaceAll("_", " "))}</span></td>
+      <td>${escapeHtml(formatAsset(item.currency))}</td>
+      <td><strong class="transaction-amount ${escapeHtml(item.direction || "neutral")}">${escapeHtml(item.amount)}</strong></td>
+      <td><span class="table-primary" title="${escapeHtml(item.id)}">${escapeHtml(shortId(item.reference || item.id, 9))}</span><span class="table-secondary">${item.game ? `${escapeHtml(item.game)} round` : "Wallet reference"}</span></td>
+      <td>${formatDate(item.createdAt, true)}</td>
+    </tr>`).join("");
+  setLastRefresh(new Date(result.generatedAt));
+}
+
+const reloadTransactions = () => loadTransactions().catch((error) => showToast(error.message, "error"));
+document.querySelector("#transaction-search-button")?.addEventListener("click", reloadTransactions);
+document.querySelector("#transaction-type-filter")?.addEventListener("change", reloadTransactions);
+document.querySelector("#transaction-game-filter")?.addEventListener("change", reloadTransactions);
+document.querySelector("#transaction-search")?.addEventListener("keydown", (event) => { if (event.key === "Enter") reloadTransactions(); });
 
 async function loadDeposits() {
   const status = document.querySelector("#deposit-status-filter").value;
@@ -730,6 +779,10 @@ document.querySelector("#leaderboard-form")?.addEventListener("submit", async (e
 setInterval(() => {
   if (activeView === "promotions" && leaderboardCache) renderLeaderboards();
 }, 1000);
+
+setInterval(() => {
+  if (activeView === "transactions" && !adminApp.hidden) loadTransactions().catch(() => {});
+}, 5000);
 
 async function loadAudit() {
   const result = await api("/admin/audit");

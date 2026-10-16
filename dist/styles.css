@@ -2379,3 +2379,34 @@ body,
   .plinko-payouts { gap: 2px !important; padding-inline: 5.85% !important; }
   .plinko-payout-slot { min-height: 31px !important; border-radius: 5px !important; }
 }
+
+/* Blackjack interaction and card polish. */
+.blackjack-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.blackjack-actions button{height:48px;border:0;border-radius:9px;color:#fff;font-weight:900;transition:filter .15s ease,transform .15s ease}
+.blackjack-actions button[data-blackjack-action="hit"]{background:#168bff}
+.blackjack-actions button[data-blackjack-action="stand"]{background:#e64b5f}
+.blackjack-actions button[data-blackjack-action="double"]{background:#d98a2b}
+.blackjack-actions button[data-blackjack-action="split"]{background:#8b5cf6}
+.blackjack-actions button:hover:not(:disabled){border-color:transparent;background:initial;filter:brightness(1.1);transform:translateY(-1px)}
+.blackjack-actions button[data-blackjack-action="hit"]:hover:not(:disabled){background:#168bff}
+.blackjack-actions button[data-blackjack-action="stand"]:hover:not(:disabled){background:#e64b5f}
+.blackjack-actions button[data-blackjack-action="double"]:hover:not(:disabled){background:#d98a2b}
+.blackjack-actions button[data-blackjack-action="split"]:hover:not(:disabled){background:#8b5cf6}
+.blackjack-actions button:disabled{cursor:not-allowed;filter:saturate(.22);opacity:.36}
+.blackjack-actions button[hidden]{display:block}
+.blackjack-card-row{padding-left:30px}
+.blackjack-card{--card-w:80px;margin-left:-30px;border-color:#d8dde3;border-radius:8px;background:linear-gradient(145deg,#fff,#edf0f3);box-shadow:0 7px 16px rgba(0,0,0,.22)}
+.blackjack-card>strong,.blackjack-card>span:not(.blackjack-card-corner),.blackjack-card>b:not(.blackjack-card-suit){position:static}
+.blackjack-card-corner{position:absolute!important;top:6px!important;left:7px!important;display:grid!important;justify-items:center;gap:0;line-height:.9}
+.blackjack-card-corner strong{font-size:.86rem}
+.blackjack-card-corner i{width:auto!important;height:auto!important;position:static!important;border-radius:0!important;background:transparent!important;font-size:.67rem;font-style:normal}
+.blackjack-card-corner.bottom{inset:auto 7px 6px auto!important;transform:rotate(180deg)}
+.blackjack-card-suit{position:absolute!important;inset:0!important;display:grid!important;place-items:center;font-size:1.58rem!important;font-weight:500}
+.blackjack-hand .blackjack-card-row{min-height:102px;padding-left:27px}
+.blackjack-hand .blackjack-card{--card-w:70px;margin-left:-27px}
+.blackjack-table-mark strong{font-size:clamp(1.05rem,2.2vw,1.75rem);letter-spacing:.22em}
+.blackjack-table-mark span{font-size:.58rem;letter-spacing:.28em}
+.blackjack-player-hands{gap:18px}
+.deal-animate .blackjack-card{animation-delay:calc(var(--deal-index)*55ms)}
+@media(max-width:1120px){.blackjack-actions{grid-template-columns:1fr 1fr}}
+@media(max-width:780px){.blackjack-card{--card-w:66px;margin-left:-26px}.blackjack-card-row{padding-left:26px}.blackjack-hand .blackjack-card{--card-w:56px;margin-left:-22px}.blackjack-hand .blackjack-card-row{padding-left:22px}}

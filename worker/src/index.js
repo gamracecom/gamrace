@@ -891,8 +891,13 @@ async function handleDiceBet(request, env, user) {
       `).bind(wagerUnits, settlement.payoutUnits, timestamp, user.sub, asset.code, id),
       env.DB.prepare(`
         INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
-        SELECT 'dice_' || id, uid, currency, 'game_bet', payout_units - wager_units, id, created_at
+        SELECT 'dice_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
         FROM dice_bets WHERE id = ?
+      `).bind(id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'dice_payout_' || id, uid, currency, 'game_payout', payout_units, id, created_at
+        FROM dice_bets WHERE id = ? AND payout_units > 0
       `).bind(id),
     ]);
     if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
@@ -962,8 +967,13 @@ async function handleLimboBet(request, env, user) {
       `).bind(wagerUnits, settlement.payoutUnits, timestamp, user.sub, asset.code, id),
       env.DB.prepare(`
         INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
-        SELECT 'limbo_' || id, uid, currency, 'game_bet', payout_units - wager_units, id, created_at
+        SELECT 'limbo_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
         FROM limbo_bets WHERE id = ?
+      `).bind(id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'limbo_payout_' || id, uid, currency, 'game_payout', payout_units, id, created_at
+        FROM limbo_bets WHERE id = ? AND payout_units > 0
       `).bind(id),
     ]);
     if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
@@ -1039,8 +1049,13 @@ async function handlePlinkoBet(request, env, user) {
       `).bind(wagerUnits, settlement.payoutUnits, timestamp, user.sub, asset.code, id),
       env.DB.prepare(`
         INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
-        SELECT 'plinko_' || id, uid, currency, 'game_bet', payout_units - wager_units, id, created_at
+        SELECT 'plinko_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
         FROM plinko_bets WHERE id = ?
+      `).bind(id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'plinko_payout_' || id, uid, currency, 'game_payout', payout_units, id, created_at
+        FROM plinko_bets WHERE id = ? AND payout_units > 0
       `).bind(id),
     ]);
     if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
@@ -3670,6 +3685,108 @@ async function handleAdminStartLeaderboard(request, env, user, cadence) {
   return json(request, env, 201, { leaderboard: leaderboardResponse(row, normalizedCadence) });
 }
 
+const ADMIN_LEDGER_GAME_PREFIXES = Object.freeze([
+  ["blackjack", "Blackjack"], ["coinflip", "Coinflip"], ["roulette", "Roulette"],
+  ["plinko", "Plinko"], ["towers", "Towers"], ["crash", "Crash"],
+  ["mines", "Mines"], ["limbo", "Limbo"], ["wheel", "Wheel"],
+  ["keno", "Keno"], ["hilo", "Hi-Lo"], ["dice", "Dice"],
+]);
+
+function adminLedgerGame(id) {
+  const normalized = String(id || "").toLowerCase();
+  return ADMIN_LEDGER_GAME_PREFIXES.find(([prefix]) => normalized.startsWith(`${prefix}_`))?.[1] || null;
+}
+
+function adminLedgerAmount(value) {
+  const units = Number(value || 0);
+  if (!Number.isSafeInteger(units)) return "0.00000000";
+  return `${units < 0 ? "-" : ""}${assetUnitsToString(Math.abs(units), false)}`;
+}
+
+async function handleAdminTransactions(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const url = new URL(request.url);
+  const category = String(url.searchParams.get("type") || "all").toLowerCase();
+  const game = String(url.searchParams.get("game") || "all").toLowerCase();
+  const query = String(url.searchParams.get("query") || "").trim().slice(0, 80);
+  const requestedLimit = Number(url.searchParams.get("limit") || 100);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(200, Math.max(25, Math.floor(requestedLimit))) : 100;
+  const categorySql = {
+    wagers: "l.type IN ('game_wager', 'game_bet')",
+    payouts: "l.type = 'game_payout'",
+    deposits: "l.type = 'deposit'",
+    withdrawals: "l.type = 'withdrawal'",
+    adjustments: "l.type = 'admin_balance_set'",
+  };
+  const gamePrefixes = new Set(ADMIN_LEDGER_GAME_PREFIXES.map(([prefix]) => prefix));
+  const clauses = [];
+  const bindings = [];
+  if (categorySql[category]) clauses.push(categorySql[category]);
+  if (gamePrefixes.has(game)) {
+    clauses.push("l.id LIKE ?");
+    bindings.push(`${game}_%`);
+  }
+  if (query) {
+    clauses.push("(l.uid LIKE ? OR profile.username LIKE ? OR l.id LIKE ? OR l.provider_reference LIKE ?)");
+    const pattern = `%${query}%`;
+    bindings.push(pattern, pattern, pattern, pattern);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const [rows, summary] = await Promise.all([
+    env.DB.prepare(`
+      WITH wallet_activity AS (
+        SELECT id, uid, currency, type, amount_units, provider_reference, created_at FROM crypto_ledger
+        UNION ALL
+        SELECT 'deposit_' || payment_id, uid, pay_currency, 'deposit', credit_units, payment_id, updated_at
+        FROM crypto_deposits WHERE status <> 'address_ready'
+        UNION ALL
+        SELECT 'withdrawal_' || id, uid, payout_currency, 'withdrawal', -requested_units, provider_reference, created_at
+        FROM crypto_withdrawals
+      )
+      SELECT l.id, l.uid, profile.username, l.currency, l.type, l.amount_units,
+             l.provider_reference, l.created_at
+      FROM wallet_activity l
+      LEFT JOIN player_profiles profile ON profile.uid = l.uid
+      ${where}
+      ORDER BY l.created_at DESC
+      LIMIT ?
+    `).bind(...bindings, limit).all(),
+    env.DB.prepare(`
+      WITH wallet_activity AS (
+        SELECT type, created_at FROM crypto_ledger
+        UNION ALL SELECT 'deposit', updated_at FROM crypto_deposits WHERE status <> 'address_ready'
+        UNION ALL SELECT 'withdrawal', created_at FROM crypto_withdrawals
+      )
+      SELECT COUNT(*) AS total,
+        SUM(CASE WHEN type IN ('game_wager', 'game_bet') THEN 1 ELSE 0 END) AS wagers,
+        SUM(CASE WHEN type = 'game_payout' THEN 1 ELSE 0 END) AS payouts,
+        SUM(CASE WHEN type = 'deposit' THEN 1 ELSE 0 END) AS deposits,
+        SUM(CASE WHEN type = 'withdrawal' THEN 1 ELSE 0 END) AS withdrawals
+      FROM wallet_activity WHERE created_at >= ?
+    `).bind(now() - 24 * 60 * 60 * 1000).first(),
+  ]);
+  return json(request, env, 200, {
+    generatedAt: new Date(now()).toISOString(),
+    summary: {
+      total24h: Number(summary?.total || 0), wagers24h: Number(summary?.wagers || 0),
+      payouts24h: Number(summary?.payouts || 0), deposits24h: Number(summary?.deposits || 0),
+      withdrawals24h: Number(summary?.withdrawals || 0),
+    },
+    transactions: (rows.results || []).map((row) => ({
+      id: row.id,
+      uid: row.uid,
+      username: row.username || null,
+      currency: row.currency,
+      type: row.type,
+      game: adminLedgerGame(row.id),
+      amount: adminLedgerAmount(row.amount_units),
+      direction: Number(row.amount_units) < 0 ? "debit" : Number(row.amount_units) > 0 ? "credit" : "neutral",
+      reference: row.provider_reference || null,
+      createdAt: new Date(Number(row.created_at)).toISOString(),
+    })),
+  });
+}
+
 async function handleAdminOverview(request, env, user) {
   await requireAdminSession(request, env, user);
   const timestamp = now();
@@ -3696,16 +3813,20 @@ async function handleAdminOverview(request, env, user) {
       ORDER BY deposited_units DESC, currency ASC
     `).all(),
     env.DB.prepare(`
-      SELECT * FROM (
-        SELECT 'deposit' AS type, payment_id AS id, uid, pay_currency AS currency,
-               pay_amount AS amount, status, updated_at AS occurred_at
+      WITH wallet_activity AS (
+        SELECT id, uid, currency, type, amount_units, provider_reference, created_at FROM crypto_ledger
+        UNION ALL
+        SELECT 'deposit_' || payment_id, uid, pay_currency, 'deposit', credit_units, payment_id, updated_at
         FROM crypto_deposits WHERE status <> 'address_ready'
         UNION ALL
-        SELECT 'withdrawal' AS type, id, uid, payout_currency AS currency,
-               payout_amount AS amount, status, updated_at AS occurred_at
+        SELECT 'withdrawal_' || id, uid, payout_currency, 'withdrawal', -requested_units, provider_reference, created_at
         FROM crypto_withdrawals
-      ) activity
-      ORDER BY occurred_at DESC LIMIT 12
+      )
+      SELECT l.id, l.uid, profile.username, l.currency, l.type, l.amount_units,
+             l.provider_reference, l.created_at AS occurred_at
+      FROM wallet_activity l
+      LEFT JOIN player_profiles profile ON profile.uid = l.uid
+      ORDER BY l.created_at DESC LIMIT 12
     `).all(),
     env.DB.prepare(`
       SELECT day, SUM(deposit_count) AS deposits, SUM(withdrawal_count) AS withdrawals FROM (
@@ -3740,9 +3861,11 @@ async function handleAdminOverview(request, env, user) {
       type: row.type,
       id: row.id,
       uid: row.uid,
+      username: row.username || null,
+      game: adminLedgerGame(row.id),
       currency: row.currency,
-      amount: String(row.amount || "0"),
-      status: row.status,
+      amount: adminLedgerAmount(row.amount_units),
+      direction: Number(row.amount_units) < 0 ? "debit" : Number(row.amount_units) > 0 ? "credit" : "neutral",
       occurredAt: new Date(Number(row.occurred_at)).toISOString(),
     })),
     dailyActivity: (daily.results || []).map((row) => ({
@@ -4064,6 +4187,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/admin/session") return handleCreateAdminSession(request, env, user);
   if (request.method === "GET" && path === "/admin/session") return handleGetAdminSession(request, env, user);
   if (request.method === "GET" && path === "/admin/overview") return handleAdminOverview(request, env, user);
+  if (request.method === "GET" && path === "/admin/transactions") return handleAdminTransactions(request, env, user);
   if (request.method === "GET" && path === "/admin/users") return handleAdminUsers(request, env, user);
   const adminBalanceMatch = path.match(/^\/admin\/users\/([^/]+)\/balances\/([A-Za-z0-9_-]+)$/);
   if (request.method === "POST" && adminBalanceMatch) return handleAdminSetBalance(request, env, user, adminBalanceMatch[1], adminBalanceMatch[2]);

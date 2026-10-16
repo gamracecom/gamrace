@@ -281,6 +281,8 @@ CREATE TABLE IF NOT EXISTS crypto_ledger (
 );
 
 CREATE INDEX IF NOT EXISTS crypto_ledger_uid_created_idx ON crypto_ledger(uid, created_at DESC);
+CREATE INDEX IF NOT EXISTS crypto_ledger_created_idx ON crypto_ledger(created_at DESC);
+CREATE INDEX IF NOT EXISTS crypto_ledger_type_created_idx ON crypto_ledger(type, created_at DESC);
 
 -- Owner-only admin control plane. Passwords and session tokens are never stored
 -- in D1; only throttling and an immutable activity trail are persisted here.

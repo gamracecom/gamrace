@@ -229,3 +229,21 @@ svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.7; strok
 
 /* Live original house-edge controls */
 .edge-summary{display:flex;gap:12px;align-items:center;margin:0 0 18px;padding:14px 16px;border:1px solid #26303b;border-radius:12px;background:#171b20;color:#9aa5b1}.edge-summary strong{color:#e9eef5}.game-edge-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.game-edge-card{padding:18px;display:grid;gap:15px}.game-edge-card.is-locked{opacity:.52;filter:saturate(.35)}.game-edge-title{display:flex;align-items:center;gap:12px}.game-edge-title>span{width:38px;height:38px;display:grid;place-items:center;border-radius:10px;background:#168bff;color:#fff;font-weight:900}.game-edge-title>div{display:grid;gap:3px;flex:1}.game-edge-title small{color:#818c98}.game-edge-title>b{font-size:10px;letter-spacing:.1em;color:#6fc1ff}.game-edge-card label,.game-edge-rtp{display:flex;align-items:center;justify-content:space-between;color:#aab3be}.game-edge-input{display:flex;align-items:center;border:1px solid #303945;border-radius:9px;background:#101317;overflow:hidden}.game-edge-input input{width:92px;padding:11px;border:0;background:transparent;color:#fff;font:inherit;text-align:right}.game-edge-input i{padding-right:12px;font-style:normal}.game-edge-rtp strong{color:#f4f7fb}.game-edge-card>p{min-height:18px;margin:0;color:#ff7777;font-size:12px}@media(max-width:760px){.game-edge-grid{grid-template-columns:1fr}.edge-summary{align-items:flex-start;flex-direction:column}}
+
+/* Live player transaction ledger */
+.transaction-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:13px}
+.transaction-summary-grid article{min-height:88px;display:grid;align-content:center;gap:7px;padding:15px 17px;border:1px solid var(--border-soft);border-radius:12px;background:var(--panel)}
+.transaction-summary-grid span{color:var(--muted);font-size:.61rem;font-weight:750}
+.transaction-summary-grid strong{color:#e6f4fb;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.transaction-toolbar .admin-search{min-width:250px}
+.transaction-toolbar .admin-select{min-width:145px}
+.transaction-table td:nth-child(2){position:relative;padding-left:49px}
+.transaction-kind{position:absolute;left:17px;top:50%;width:24px;height:24px;display:grid;place-items:center;border-radius:7px;background:#173a4f;color:#74d8ff;font-size:.72rem;font-weight:900;transform:translateY(-50%)}
+.transaction-kind.game_payout{background:#123b2e;color:#6fe2aa}
+.transaction-kind.game_wager,.transaction-kind.game_bet{background:#3d2027;color:#ff9aaa}
+.transaction-kind.admin_balance_set{background:#332a4f;color:#b7a3ff}
+.transaction-amount{font-variant-numeric:tabular-nums}
+.transaction-amount.credit{color:#5fe0a0}.transaction-amount.debit{color:#ff8798}.transaction-amount.neutral{color:#aebdc6}
+.recent-icon.game_payout{background:#123b2e;color:#6fe2aa}.recent-icon.game_wager,.recent-icon.game_bet{background:#3d2027;color:#ff9aaa}.recent-icon.admin_balance_set{background:#332a4f;color:#b7a3ff}
+@media(max-width:1000px){.transaction-summary-grid{grid-template-columns:1fr 1fr}.transaction-toolbar{flex-wrap:wrap}.transaction-toolbar .admin-search{flex-basis:100%}}
+@media(max-width:580px){.transaction-summary-grid{grid-template-columns:1fr 1fr}.transaction-summary-grid article{min-height:76px;padding:12px}.transaction-toolbar .admin-select{width:100%}}

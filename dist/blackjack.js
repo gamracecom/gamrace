@@ -85,7 +85,7 @@
     const suit = SUITS[card?.suit] || "♠";
     const red = card?.suit === "hearts" || card?.suit === "diamonds";
     element.className = `blackjack-card${red ? " red" : ""}`;
-    element.innerHTML = `<strong>${card?.rank || "?"}</strong><span>${suit}</span><b>${suit}</b>`;
+    element.innerHTML = `<span class="blackjack-card-corner top"><strong>${card?.rank || "?"}</strong><i>${suit}</i></span><b class="blackjack-card-suit">${suit}</b><span class="blackjack-card-corner bottom"><strong>${card?.rank || "?"}</strong><i>${suit}</i></span>`;
     element.setAttribute("aria-label", `${card?.rank || "Card"} of ${card?.suit || "unknown suit"}`);
     return element;
   }
@@ -147,14 +147,7 @@
 
     actionPanel.hidden = round.status !== "active";
     dealButton.textContent = round.status === "settled" ? "Deal Again" : "Hand in progress";
-    actionButtons.forEach((button) => {
-      const action = button.dataset.blackjackAction;
-      const requiresExtra = action === "double" || action === "split";
-      const activeHand = round.hands[round.activeHand];
-      const extra = Number(activeHand?.wager || round.baseWager || 0);
-      button.hidden = !round.actions.includes(action);
-      button.disabled = busy || !round.actions.includes(action) || (requiresExtra && !displayFiat && extra > availableBalance);
-    });
+    updateActionAvailability();
 
     if (round.status === "settled") {
       const payout = Number(round.payout || 0);
@@ -169,6 +162,24 @@
     updateAvailability();
   }
 
+  function updateActionAvailability() {
+    const active = round?.status === "active";
+    const legalActions = new Set(active && Array.isArray(round.actions) ? round.actions : []);
+    const activeHand = active ? round.hands?.[round.activeHand] : null;
+    const extra = Number(activeHand?.wager || round?.baseWager || 0);
+    actionButtons.forEach((button) => {
+      const action = button.dataset.blackjackAction;
+      const needsExtraWager = action === "double" || action === "split";
+      const insufficientBalance = needsExtraWager && !displayFiat && extra > availableBalance;
+      button.hidden = false;
+      button.disabled = busy || !legalActions.has(action) || insufficientBalance;
+      button.setAttribute("aria-disabled", String(button.disabled));
+      button.title = legalActions.has(action)
+        ? insufficientBalance ? `Insufficient ${selectedSymbol} balance` : `${action[0].toUpperCase()}${action.slice(1)}`
+        : action === "split" ? "Available when the opening cards have the same rank" : "Not available for this hand";
+    });
+  }
+
   function updateAvailability() {
     const amount = cleanAmount();
     const active = round?.status === "active";
@@ -177,6 +188,7 @@
     handCountButtons.forEach((button) => { button.disabled = busy || active; });
     dealButton.disabled = busy || active || !selectedCurrency || amount < minimumWager() || required > availableBalance;
     balanceLabel.textContent = formatAmount(availableBalance);
+    updateActionAvailability();
     if (round?.status !== "settled" && !active && required > availableBalance && required > 0) setMessage(`Insufficient ${selectedSymbol} balance for all selected hands and side bets.`);
   }
 
