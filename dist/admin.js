@@ -50,6 +50,7 @@ let countryAccessCache = null;
 let playersCache = [];
 let activePlayer = null;
 let leaderboardCache = null;
+let promotionsCache = null;
 let gameEdgesCache = null;
 
 const viewMeta = {
@@ -328,7 +329,7 @@ async function loadView(view, force = false) {
   if (view === "deposits") return loadDeposits();
   if (view === "withdrawals") return loadWithdrawals();
   if (view === "games") return loadGameEdges(force);
-  if (view === "promotions") return loadLeaderboards(force);
+  if (view === "promotions") return loadPromotionsWorkspace(force);
   if (view === "audit") return loadAudit();
   if (view === "risk") return loadCountryAccess(force);
   if (view === "system" || view === "integrations") return loadSystem(force);
@@ -746,6 +747,82 @@ async function loadLeaderboards(force = false) {
   renderLeaderboards();
   setLastRefresh();
 }
+
+function renderPromotions() {
+  const container = document.querySelector("#promotion-list");
+  if (!container || !promotionsCache) return;
+  if (!promotionsCache.length) {
+    container.innerHTML = '<div class="admin-empty"><strong>No promotion codes yet</strong><span>Create the first live wallet reward.</span></div>';
+    return;
+  }
+  container.innerHTML = promotionsCache.map((promo) => {
+    const availability = !promo.enabled ? "PAUSED" : promo.endsAt && Date.parse(promo.endsAt) <= Date.now() ? "ENDED" : promo.startsAt && Date.parse(promo.startsAt) > Date.now() ? "SCHEDULED" : "LIVE";
+    const limit = promo.maxClaims ? `${promo.claimCount.toLocaleString()} / ${promo.maxClaims.toLocaleString()} claims` : `${promo.claimCount.toLocaleString()} claims`;
+    const rankName = String(promo.minimumRankStage || "rookie").replaceAll("-", " ");
+    return `<article><header><div><strong>${escapeHtml(promo.code)}</strong><span>${escapeHtml(promo.title)}</span></div><b data-status="${availability.toLowerCase()}">${availability}</b></header><div class="promotion-reward">${escapeHtml(promo.rewardAmount)} ${escapeHtml(formatAsset(promo.rewardCurrency))}</div><small>Minimum ${escapeHtml(rankName)} ${["I", "II", "III"][promo.minimumRankTier - 1] || "I"} · ${escapeHtml(limit)}</small>${Number(promo.minimumDepositAmount) > 0 ? `<small>Deposit ${escapeHtml(promo.minimumDepositAmount)} ${escapeHtml(formatAsset(promo.minimumDepositCurrency))} within ${promo.depositLookbackDays || "all"} days</small>` : ""}</article>`;
+  }).join("");
+}
+
+function preparePromotionAssets() {
+  const options = assetOrder.map((code) => `<option value="${code}">${escapeHtml(formatAsset(code))}</option>`).join("");
+  for (const select of [document.querySelector("#promo-reward-currency"), document.querySelector("#promo-deposit-currency")]) {
+    if (select && !select.options.length) select.innerHTML = options;
+  }
+}
+
+async function loadPromotionsWorkspace(force = false) {
+  preparePromotionAssets();
+  const [leaderboards, promotions] = await Promise.all([
+    (!leaderboardCache || force) ? api("/admin/leaderboards") : Promise.resolve({ leaderboards: leaderboardCache }),
+    (!promotionsCache || force) ? api("/admin/promotions") : Promise.resolve({ promotions: promotionsCache }),
+  ]);
+  leaderboardCache = leaderboards.leaderboards || [];
+  promotionsCache = promotions.promotions || [];
+  renderLeaderboards();
+  renderPromotions();
+  setLastRefresh();
+}
+
+document.querySelector("#promo-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const status = document.querySelector("#promo-form-status");
+  const button = document.querySelector("#create-promo");
+  const dateValue = (selector) => {
+    const value = document.querySelector(selector).value;
+    return value ? new Date(value).toISOString() : null;
+  };
+  const payload = {
+    code: document.querySelector("#promo-code").value,
+    title: document.querySelector("#promo-title").value,
+    description: document.querySelector("#promo-description").value,
+    rewardCurrency: document.querySelector("#promo-reward-currency").value,
+    rewardAmount: document.querySelector("#promo-reward-amount").value,
+    minimumRankStage: document.querySelector("#promo-min-rank").value,
+    minimumRankTier: Number(document.querySelector("#promo-min-tier").value),
+    minimumDepositCurrency: document.querySelector("#promo-deposit-currency").value,
+    minimumDepositAmount: document.querySelector("#promo-min-deposit").value || "0",
+    depositLookbackDays: Number(document.querySelector("#promo-lookback-days").value || 0),
+    maxClaims: Number(document.querySelector("#promo-max-claims").value || 0),
+    startsAt: dateValue("#promo-starts-at"),
+    endsAt: dateValue("#promo-ends-at"),
+    enabled: document.querySelector("#promo-enabled").checked,
+  };
+  button.disabled = true;
+  button.textContent = "Creating…";
+  status.textContent = "";
+  try {
+    const result = await api("/admin/promotions", { method: "POST", body: JSON.stringify(payload) });
+    promotionsCache = [result.promotion, ...(promotionsCache || [])];
+    renderPromotions();
+    event.currentTarget.reset();
+    document.querySelector("#promo-enabled").checked = true;
+    document.querySelector("#promo-min-deposit").value = "0";
+    document.querySelector("#promo-lookback-days").value = "0";
+    document.querySelector("#promo-max-claims").value = "0";
+    showToast(`${result.promotion.code} is ready`);
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; button.textContent = "Create promotion"; }
+});
 
 document.querySelector("#leaderboard-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();

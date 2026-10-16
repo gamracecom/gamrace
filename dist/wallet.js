@@ -417,7 +417,7 @@ function updateBalanceMenus() {
       option.dataset.currency = asset.code;
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(selected));
-      const shownBalance = balancePreferences.displayFiat ? money(balance.usdCents || 0) : `${cleanCryptoAmount(balance.available)} ${asset.symbol}`;
+      const shownBalance = balancePreferences.displayFiat ? money(balance.usdCents || 0) : cleanCryptoAmount(balance.available);
       option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${shownBalance}</em></span><i aria-hidden="true"></i>`;
       option.addEventListener("click", async () => {
         closeBalanceMenus();
@@ -439,7 +439,7 @@ function updateHeader() {
     if (icon) { icon.src = iconUrl(asset); icon.alt = asset.symbol || ""; }
     balanceText = balancePreferences.displayFiat
       ? money(walletSnapshot?.selectedUsdCents || 0)
-      : `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
+      : cleanCryptoAmount(balance.available);
     if (value) value.textContent = balanceText;
     button.title = `${cleanCryptoAmount(balance.available)} ${asset.symbol || selectedCode.toUpperCase()}`;
   });

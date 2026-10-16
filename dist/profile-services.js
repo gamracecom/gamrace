@@ -12,6 +12,8 @@ const DEFAULT_PREFERENCES = Object.freeze({
   showOnline: true,
   allowTips: true,
   marketingConsent: false,
+  loginAlerts: true,
+  withdrawalConfirmation: true,
   displayCurrency: "USD",
 });
 
@@ -48,14 +50,21 @@ async function accountRequest(token, path, options = {}) {
     },
     cache: "no-store",
   });
-  if (!response.ok) throw new Error("Your live account data is temporarily unavailable");
-  return response.json();
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(body.error || "Your live account data is temporarily unavailable"), { status: response.status });
+  return body;
 }
 
 export const profileServices = Object.freeze({
   account: Object.freeze({
     async getSnapshot(token, { compact = false } = {}) {
       return accountRequest(token, `/account${compact ? "?compact=1" : ""}`);
+    },
+    async getActivity(token, { page = 1, pageSize = 20 } = {}) {
+      return accountRequest(token, `/account/activity?page=${encodeURIComponent(page)}&pageSize=${encodeURIComponent(pageSize)}`);
+    },
+    async saveDetails(token, details) {
+      return accountRequest(token, "/account/details", { method: "POST", body: JSON.stringify(details) });
     },
   }),
   preferences: Object.freeze({
@@ -84,16 +93,9 @@ export const profileServices = Object.freeze({
       return saved;
     },
   }),
-  verification: Object.freeze({
-    async getStatus() {
-      return {
-        currentLevel: 1,
-        levels: [
-          { level: 1, name: "Basic Information", status: "Approved" },
-          { level: 2, name: "Identity Verification", status: "Not started" },
-          { level: 3, name: "Address Verification", status: "Locked" },
-        ],
-      };
+  promotions: Object.freeze({
+    async claim(token, code) {
+      return accountRequest(token, "/promotions/claim", { method: "POST", body: JSON.stringify({ code }) });
     },
   }),
   sessions: Object.freeze({

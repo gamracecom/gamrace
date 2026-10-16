@@ -878,9 +878,132 @@ async function liveAccountSnapshot(env, uid, { includeActivity = true } = {}) {
   return { summary, activity };
 }
 
+function accountActivityResponse(row) {
+  return {
+    id: row.id,
+    type: "bet",
+    game: row.game,
+    status: row.status,
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros || 0) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  };
+}
+
+async function pagedAccountActivity(env, uid, pageValue = 1, pageSizeValue = 20) {
+  const page = Math.max(1, Math.floor(Number(pageValue) || 1));
+  const pageSize = Math.min(50, Math.max(10, Math.floor(Number(pageSizeValue) || 20)));
+  const maximumRows = 5000;
+  const required = Math.min(maximumRows, page * pageSize);
+  const countQueries = PLAYER_BET_UNION_GROUPS.map(({ sql, count }) => env.DB.prepare(`
+    SELECT COUNT(*) AS total FROM (${sql})
+  `).bind(...playerBetBindings(uid, count)));
+  const activityQueries = PLAYER_BET_UNION_GROUPS.map(({ sql, count }) => env.DB.prepare(`
+    SELECT game, id, currency, wager_units, payout_units, multiplier_micros, status, created_at
+    FROM (${sql}) ORDER BY created_at DESC LIMIT ?
+  `).bind(...playerBetBindings(uid, count), required));
+  const results = await env.DB.batch([...countQueries, ...activityQueries]);
+  const groupCount = PLAYER_BET_UNION_GROUPS.length;
+  const total = results.slice(0, groupCount).reduce((sum, result) => sum + Number(result.results?.[0]?.total || 0), 0);
+  const offset = (page - 1) * pageSize;
+  const items = results.slice(groupCount).flatMap((result) => result.results || [])
+    .sort((left, right) => Number(right.created_at) - Number(left.created_at))
+    .slice(offset, offset + pageSize)
+    .map(accountActivityResponse);
+  return {
+    items,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(Math.min(total, maximumRows) / pageSize)),
+  };
+}
+
+function cleanAccountText(value, maximum, label, { required = false } = {}) {
+  const text = String(value || "").trim().replace(/\s+/g, " ");
+  if (required && !text) throw httpError(400, `${label} is required`);
+  if (text.length > maximum) throw httpError(400, `${label} is too long`);
+  return text;
+}
+
+function accountProfileResponse(row) {
+  const details = {
+    legalFirstName: String(row?.legal_first_name || ""),
+    legalLastName: String(row?.legal_last_name || ""),
+    dateOfBirth: String(row?.date_of_birth || ""),
+    addressLine1: String(row?.address_line_1 || ""),
+    addressLine2: String(row?.address_line_2 || ""),
+    city: String(row?.city || ""),
+    postalCode: String(row?.postal_code || ""),
+    countryCode: String(row?.country_code || ""),
+    language: String(row?.language || "en"),
+    displayCurrency: String(row?.display_currency || "USD"),
+    timezone: String(row?.timezone || "UTC"),
+  };
+  const complete = [details.legalFirstName, details.legalLastName, details.dateOfBirth, details.addressLine1, details.city, details.postalCode, details.countryCode].every(Boolean);
+  return {
+    details,
+    verification: {
+      currentLevel: complete ? 1 : 0,
+      levels: [
+        { level: 1, name: "Basic information", status: complete ? "Complete" : "Action required", detail: "Legal name, date of birth and residential address" },
+        { level: 2, name: "Identity verification", status: "Unavailable", detail: "Requires a licensed identity-verification provider" },
+        { level: 3, name: "Enhanced verification", status: "Locked", detail: "Available only after identity verification" },
+      ],
+      levelOneCompletedAt: row?.level_one_completed_at ? new Date(Number(row.level_one_completed_at)).toISOString() : null,
+    },
+  };
+}
+
+async function readAccountProfile(env, uid) {
+  const row = await env.DB.prepare("SELECT * FROM account_profiles WHERE uid = ?").bind(uid).first();
+  return accountProfileResponse(row);
+}
+
+async function handleAccountDetails(request, env, user) {
+  const body = await requestJson(request);
+  const legalFirstName = cleanAccountText(body.legalFirstName, 80, "First name", { required: true });
+  const legalLastName = cleanAccountText(body.legalLastName, 80, "Last name", { required: true });
+  const dateOfBirth = String(body.dateOfBirth || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) throw httpError(400, "Enter a valid date of birth");
+  const birthDate = new Date(`${dateOfBirth}T00:00:00Z`);
+  const minimumAdultDate = new Date();
+  minimumAdultDate.setUTCFullYear(minimumAdultDate.getUTCFullYear() - 18);
+  if (Number.isNaN(birthDate.valueOf()) || birthDate > minimumAdultDate) throw httpError(400, "You must be at least 18 years old");
+  const addressLine1 = cleanAccountText(body.addressLine1, 120, "Address", { required: true });
+  const addressLine2 = cleanAccountText(body.addressLine2, 120, "Address line 2");
+  const city = cleanAccountText(body.city, 80, "City", { required: true });
+  const postalCode = cleanAccountText(body.postalCode, 24, "Postal code", { required: true });
+  const countryCode = String(body.countryCode || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode)) throw httpError(400, "Choose a valid country");
+  const language = String(body.language || "en").trim().toLowerCase();
+  if (!/^[a-z]{2}(?:-[a-z]{2})?$/.test(language)) throw httpError(400, "Choose a valid language");
+  const displayCurrency = String(body.displayCurrency || "USD").trim().toUpperCase();
+  if (!["USD", "GBP", "EUR"].includes(displayCurrency)) throw httpError(400, "Choose a valid display currency");
+  const timezone = cleanAccountText(body.timezone, 80, "Timezone", { required: true });
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO account_profiles(uid, legal_first_name, legal_last_name, date_of_birth, address_line_1, address_line_2, city, postal_code, country_code, language, display_currency, timezone, level_one_completed_at, updated_at)
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET legal_first_name=excluded.legal_first_name, legal_last_name=excluded.legal_last_name,
+      date_of_birth=excluded.date_of_birth, address_line_1=excluded.address_line_1, address_line_2=excluded.address_line_2,
+      city=excluded.city, postal_code=excluded.postal_code, country_code=excluded.country_code,
+      language=excluded.language, display_currency=excluded.display_currency, timezone=excluded.timezone,
+      level_one_completed_at=COALESCE(account_profiles.level_one_completed_at, excluded.level_one_completed_at), updated_at=excluded.updated_at
+  `).bind(user.sub, legalFirstName, legalLastName, dateOfBirth, addressLine1, addressLine2, city, postalCode, countryCode, language, displayCurrency, timezone, timestamp, timestamp).run();
+  return json(request, env, 200, await readAccountProfile(env, user.sub));
+}
+
+async function handleAccountActivity(request, env, user) {
+  const url = new URL(request.url);
+  return json(request, env, 200, { pagination: await pagedAccountActivity(env, user.sub, url.searchParams.get("page"), url.searchParams.get("pageSize")) });
+}
+
 const ACCOUNT_PREFERENCE_KEYS = new Set([
   "profilePublic", "showUsername", "showWagers", "showProfit", "showFavorites",
-  "showRank", "showOnline", "allowTips", "marketingConsent",
+  "showRank", "showOnline", "allowTips", "marketingConsent", "loginAlerts", "withdrawalConfirmation",
 ]);
 
 function safeAccountPreferences(value) {
@@ -898,11 +1021,22 @@ async function readAccountPreferences(env, uid) {
 
 async function handleAccountSnapshot(request, env, user) {
   const compact = new URL(request.url).searchParams.get("compact") === "1";
-  const [account, preferences] = await Promise.all([
+  const [account, preferences, profile] = await Promise.all([
     liveAccountSnapshot(env, user.sub, { includeActivity: !compact }),
     readAccountPreferences(env, user.sub),
+    readAccountProfile(env, user.sub),
   ]);
-  return json(request, env, 200, { ...account, preferences });
+  return json(request, env, 200, {
+    ...account,
+    preferences,
+    ...profile,
+    security: {
+      emailVerified: Boolean(user.email_verified),
+      provider: String(user.firebase?.sign_in_provider || "unknown"),
+      multiFactorAvailable: false,
+      passkeysAvailable: false,
+    },
+  });
 }
 
 async function handleAccountPreferences(request, env, user) {
@@ -925,8 +1059,12 @@ async function walletFundingActivity(env, uid) {
     UNION ALL
     SELECT id, 'withdrawal' AS type, status, payout_amount AS amount,
       payout_currency AS currency, created_at FROM crypto_withdrawals WHERE uid = ?
+    UNION ALL
+    SELECT id, 'promotion' AS type, 'credited' AS status,
+      printf('%.8f', amount_units / 100000000.0) AS amount,
+      currency, created_at FROM crypto_ledger WHERE uid = ? AND type = 'promo_reward'
     ORDER BY created_at DESC LIMIT 50
-  `).bind(uid, uid).all();
+  `).bind(uid, uid, uid).all();
   return (result.results || []).map((row) => ({
     id: row.id,
     type: row.type,
@@ -4023,6 +4161,148 @@ async function handleAdminLeaderboards(request, env, user) {
   return handleLeaderboards(request, env);
 }
 
+const PROMOTION_RANKS = Object.freeze([
+  ["rookie", [0, 1_000, 2_500]], ["street", [5_000, 10_000, 20_000]],
+  ["circuit", [35_000, 50_000, 75_000]], ["turbo", [100_000, 150_000, 225_000]],
+  ["velocity", [350_000, 500_000, 750_000]], ["hyper", [1_000_000, 1_500_000, 2_500_000]],
+  ["apex", [4_000_000, 6_000_000, 10_000_000]], ["pole", [15_000_000, 25_000_000, 40_000_000]],
+  ["champion", [60_000_000, 100_000_000, 175_000_000]], ["hall-of-fame", [250_000_000, 500_000_000, 1_000_000_000]],
+]);
+
+function promotionRankIndex(stage, tier) {
+  const stageIndex = PROMOTION_RANKS.findIndex(([id]) => id === String(stage || "rookie"));
+  return Math.max(0, stageIndex) * 3 + Math.min(3, Math.max(1, Number(tier) || 1)) - 1;
+}
+
+function playerRankIndex(totalWagered) {
+  let index = 0;
+  PROMOTION_RANKS.forEach(([, thresholds], stageIndex) => thresholds.forEach((threshold, tierIndex) => {
+    if (Number(totalWagered || 0) >= threshold) index = stageIndex * 3 + tierIndex;
+  }));
+  return index;
+}
+
+function promotionResponse(row) {
+  return {
+    id: row.id,
+    code: row.code,
+    title: row.title,
+    description: row.description || "",
+    rewardCurrency: row.reward_currency,
+    rewardAmount: assetUnitsToString(Number(row.reward_units), true),
+    minimumRankStage: row.minimum_rank_stage,
+    minimumRankTier: Number(row.minimum_rank_tier),
+    minimumDepositCurrency: row.minimum_deposit_currency,
+    minimumDepositAmount: assetUnitsToString(Number(row.minimum_deposit_units), true),
+    depositLookbackDays: Number(row.deposit_lookback_days),
+    maxClaims: Number(row.max_claims),
+    claimCount: Number(row.claim_count),
+    startsAt: row.starts_at ? new Date(Number(row.starts_at)).toISOString() : null,
+    endsAt: row.ends_at ? new Date(Number(row.ends_at)).toISOString() : null,
+    enabled: Boolean(row.enabled),
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleAdminPromotions(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const result = await env.DB.prepare("SELECT * FROM promotion_codes ORDER BY created_at DESC LIMIT 100").all();
+  return json(request, env, 200, { promotions: (result.results || []).map(promotionResponse) });
+}
+
+async function handleAdminCreatePromotion(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const body = await requestJson(request);
+  const code = String(body.code || "").trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) throw httpError(400, "Use 3–32 letters, numbers, dashes or underscores for the code");
+  const title = cleanAccountText(body.title, 80, "Promotion title", { required: true });
+  const description = cleanAccountText(body.description, 240, "Description");
+  const rewardCurrency = requireWalletAsset(body.rewardCurrency).code;
+  const rewardUnits = parseAssetUnits(body.rewardAmount, { maximumUnits: 100_000_000_000_000 });
+  const minimumRankStage = String(body.minimumRankStage || "rookie").toLowerCase();
+  if (!PROMOTION_RANKS.some(([id]) => id === minimumRankStage)) throw httpError(400, "Choose a valid minimum rank");
+  const minimumRankTier = Number(body.minimumRankTier || 1);
+  if (![1, 2, 3].includes(minimumRankTier)) throw httpError(400, "Choose a valid rank tier");
+  const minimumDepositCurrency = requireWalletAsset(body.minimumDepositCurrency || rewardCurrency).code;
+  const minimumDepositUnits = parseNonNegativeAssetUnits(body.minimumDepositAmount || "0", { maximumUnits: 100_000_000_000_000 });
+  const depositLookbackDays = Math.floor(Number(body.depositLookbackDays || 0));
+  if (!Number.isInteger(depositLookbackDays) || depositLookbackDays < 0 || depositLookbackDays > 3650) throw httpError(400, "Deposit lookback must be between 0 and 3650 days");
+  const maxClaims = Math.floor(Number(body.maxClaims || 0));
+  if (!Number.isInteger(maxClaims) || maxClaims < 0 || maxClaims > 10_000_000) throw httpError(400, "Maximum claims must be 0 or a positive number");
+  const parseOptionalDate = (value, label) => {
+    if (!value) return null;
+    const date = Date.parse(value);
+    if (!Number.isFinite(date)) throw httpError(400, `Enter a valid ${label}`);
+    return date;
+  };
+  const startsAt = parseOptionalDate(body.startsAt, "start date");
+  const endsAt = parseOptionalDate(body.endsAt, "end date");
+  if (startsAt && endsAt && endsAt <= startsAt) throw httpError(400, "End date must be after the start date");
+  const timestamp = now();
+  const id = crypto.randomUUID();
+  try {
+    await env.DB.prepare(`
+      INSERT INTO promotion_codes(id, code, title, description, reward_currency, reward_units, minimum_rank_stage,
+        minimum_rank_tier, minimum_deposit_currency, minimum_deposit_units, deposit_lookback_days, max_claims,
+        claim_count, starts_at, ends_at, enabled, created_at, updated_at, created_by)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
+    `).bind(id, code, title, description, rewardCurrency, rewardUnits, minimumRankStage, minimumRankTier,
+      minimumDepositCurrency, minimumDepositUnits, depositLookbackDays, maxClaims, startsAt, endsAt,
+      body.enabled === false ? 0 : 1, timestamp, timestamp, user.sub).run();
+  } catch (error) {
+    if (/unique/i.test(String(error?.message))) throw httpError(409, "That promotion code already exists");
+    throw error;
+  }
+  await writeAdminAudit(env, user, "promotion.created", id, JSON.stringify({ code, rewardCurrency, rewardUnits }));
+  const row = await env.DB.prepare("SELECT * FROM promotion_codes WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { promotion: promotionResponse(row) });
+}
+
+async function handlePromotionClaim(request, env, user) {
+  const body = await requestJson(request);
+  const code = String(body.code || "").trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) throw httpError(400, "Enter a valid promotion code");
+  const promo = await env.DB.prepare("SELECT * FROM promotion_codes WHERE code = ? COLLATE NOCASE").bind(code).first();
+  if (!promo) throw httpError(404, "That promotion code was not found");
+  const timestamp = now();
+  if (!promo.enabled || (promo.starts_at && Number(promo.starts_at) > timestamp) || (promo.ends_at && Number(promo.ends_at) <= timestamp) || (promo.max_claims && Number(promo.claim_count) >= Number(promo.max_claims))) {
+    throw httpError(409, "That promotion is not currently available");
+  }
+  const previous = await env.DB.prepare("SELECT id FROM promotion_redemptions WHERE promotion_id = ? AND uid = ?").bind(promo.id, user.sub).first();
+  if (previous) throw httpError(409, "You have already claimed this promotion");
+  const account = await liveAccountSnapshot(env, user.sub, { includeActivity: false });
+  if (playerRankIndex(account.summary.totalWagered) < promotionRankIndex(promo.minimum_rank_stage, promo.minimum_rank_tier)) {
+    throw httpError(403, "Your GamRace rank does not meet this promotion's requirement");
+  }
+  if (Number(promo.minimum_deposit_units) > 0) {
+    const cutoff = Number(promo.deposit_lookback_days) > 0 ? timestamp - Number(promo.deposit_lookback_days) * 86_400_000 : 0;
+    const deposit = await env.DB.prepare(`
+      SELECT COALESCE(SUM(amount_units), 0) AS total_units FROM crypto_ledger
+      WHERE uid = ? AND currency = ? AND type = 'deposit' AND created_at >= ?
+    `).bind(user.sub, promo.minimum_deposit_currency, cutoff).first();
+    if (Number(deposit?.total_units || 0) < Number(promo.minimum_deposit_units)) {
+      const period = Number(promo.deposit_lookback_days) > 0 ? ` in the last ${promo.deposit_lookback_days} days` : "";
+      throw httpError(403, `Deposit at least ${assetUnitsToString(Number(promo.minimum_deposit_units), true)} ${getWalletAsset(promo.minimum_deposit_currency)?.symbol || promo.minimum_deposit_currency}${period} to claim this code`);
+    }
+  }
+  const redemptionId = crypto.randomUUID();
+  try {
+    await env.DB.prepare(`
+      INSERT INTO promotion_redemptions(id, promotion_id, uid, reward_currency, reward_units, created_at)
+      VALUES(?, ?, ?, ?, ?, ?)
+    `).bind(redemptionId, promo.id, user.sub, promo.reward_currency, promo.reward_units, timestamp).run();
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (/unique/i.test(message)) throw httpError(409, "You have already claimed this promotion");
+    if (/PROMOTION_UNAVAILABLE/.test(message)) throw httpError(409, "That promotion is no longer available");
+    throw error;
+  }
+  return json(request, env, 201, {
+    reward: { currency: promo.reward_currency, amount: assetUnitsToString(Number(promo.reward_units), true), title: promo.title },
+    wallet: await walletResponse(env, user.sub),
+  });
+}
+
 async function readGameEdges(env) {
   if (gameEdgesCache && gameEdgesCacheExpiresAt > now()) return gameEdgesCache;
   const result = await env.DB.prepare("SELECT game_id, house_edge_basis_points, updated_at FROM game_settings").all();
@@ -4594,6 +4874,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
   if (request.method === "GET" && path === "/admin/country-access") return handleAdminCountryAccess(request, env, user);
   if (request.method === "GET" && path === "/admin/leaderboards") return handleAdminLeaderboards(request, env, user);
+  if (request.method === "GET" && path === "/admin/promotions") return handleAdminPromotions(request, env, user);
+  if (request.method === "POST" && path === "/admin/promotions") return handleAdminCreatePromotion(request, env, user);
   if (request.method === "GET" && path === "/admin/game-edges") return handleAdminGameEdges(request, env, user);
   const gameEdgeMatch = path.match(/^\/admin\/game-edges\/([a-z0-9-]+)$/);
   if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
@@ -4609,7 +4891,10 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/sessions") return handleSessions(request, env, user);
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
   if (request.method === "GET" && path === "/account") return handleAccountSnapshot(request, env, user);
+  if (request.method === "GET" && path === "/account/activity") return handleAccountActivity(request, env, user);
+  if (request.method === "POST" && path === "/account/details") return handleAccountDetails(request, env, user);
   if (request.method === "POST" && path === "/account/preferences") return handleAccountPreferences(request, env, user);
+  if (request.method === "POST" && path === "/promotions/claim") return handlePromotionClaim(request, env, user);
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);

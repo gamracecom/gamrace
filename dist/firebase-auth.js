@@ -2,8 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/fireba
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getPlayerRankStats } from "./player-rank-service.js?v=rank-badges-1";
-import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS, TIME_FILTERS } from "./profile-config.js";
-import { profileServices } from "./profile-services.js?v=live-account-1";
+import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS } from "./profile-config.js";
+import { profileServices } from "./profile-services.js?v=account-live-2";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBS3pib3PsHnSJGaQqBc--S99qI7sqhDuU",
@@ -34,7 +34,8 @@ let profileBusy = false;
 let preferences = profileServices.preferences.load();
 let accountSnapshot = { summary: {}, activity: [] };
 let accountRefreshTimer = 0;
-let accountActivityDays = Infinity;
+let accountActivityPage = 1;
+const accountActivityPageSize = 20;
 provider.setCustomParameters({ prompt: "select_account" });
 auth.useDeviceLanguage();
 
@@ -148,13 +149,13 @@ function createProfileDialog() {
             <article class="rank-card" aria-labelledby="profile-rank-name"><div class="rank-card-heading"><div class="rank-badge" aria-hidden="true"><span class="rank-badge-fallback"></span><img class="rank-badge-image" alt="" /><span class="rank-badge-tier"></span></div><div class="rank-title-group"><span class="rank-eyebrow">PLAYER RANK</span><h3 id="profile-rank-name" class="rank-name"></h3><p class="rank-subtitle"></p></div><div class="rank-tier-indicators" aria-label="Rank sub-level"><span data-rank-tier="I">I</span><span data-rank-tier="II">II</span><span data-rank-tier="III">III</span></div></div><div class="rank-wager-line"><span>Lifetime weighted wager</span><strong class="rank-lifetime-wager"></strong></div><div class="rank-progress-copy"><span class="rank-progress-values"></span><strong class="rank-next"></strong></div><div class="rank-progress-track" role="progressbar" aria-label="Progress to next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="rank-progress-fill"></span></div><div class="rank-benefits"><span>Current benefits</span><strong>Rank benefits will appear when rewards are configured.</strong></div></article>
             <div class="account-grid three-column reward-summary"><article class="metric-card"><span>Available rewards</span><strong>$0.00</strong><small>No rewards ready</small></article><article class="metric-card"><span>Claimed rewards</span><strong>$0.00</strong><small>All time</small></article><article class="metric-card"><span>Rakeback</span><strong>—</strong><small>Unlocks with VIP benefits</small></article></div>
             <article class="account-card"><div class="account-card-heading"><div><span class="section-kicker">REWARDS</span><h4>Reward centre</h4></div><span class="status-chip">COMING ONLINE</span></div><div class="reward-list"><span>Daily bonus</span><span>Weekly bonus</span><span>Monthly bonus</span><span>Reloads</span><span>Level-up rewards</span><span>Reward history</span></div></article>
-            <article class="account-card redeem-card"><div><span class="section-kicker">REDEEM CODE</span><h4>Promo or reward code</h4><p>Code redemption will activate when the rewards service is connected.</p></div><div><input type="text" placeholder="Enter code" disabled /><button type="button" disabled>Redeem</button></div></article>
+            <article class="account-card redeem-card"><div><span class="section-kicker">REDEEM CODE</span><h4>Promo or reward code</h4><p>Eligible rewards are credited to your live wallet immediately.</p></div><form class="promo-redeem-form"><input class="promo-code-input" type="text" minlength="3" maxlength="32" autocomplete="off" placeholder="Enter code" required /><button type="submit">Redeem</button><p class="promo-redeem-status" role="status" aria-live="polite"></p></form></article>
           </section>
 
           <section class="profile-section" data-profile-panel="transactions" hidden>
             <span class="profile-section-label">TRANSACTIONS</span><h3>Play history</h3><p class="settings-copy">Review bets, player matches, and performance statistics.</p>
-            <div class="account-subtabs" role="tablist">${ACTIVITY_TABS.map((tab, index) => `<button class="account-subtab ${index === 0 ? "active" : ""}" type="button" data-activity-tab="${tab.id}" aria-selected="${index === 0}">${tab.label}</button>`).join("")}</div><div class="account-filters">${TIME_FILTERS.map((filter, index) => `<button type="button" class="account-filter ${index === 3 ? "active" : ""}" data-account-days="${[1, 7, 30, "all"][index]}">${filter}</button>`).join("")}</div>
-            <div data-activity-panel="bets"><div class="bet-category-chips"><span>Casino bets</span><span>Originals</span><span>Open bets</span><span>Settled bets</span></div><div class="account-table"><div class="account-table-head"><span>Game</span><span>Bet</span><span>Multiplier</span><span>Payout</span><span>Result</span><span>Date</span></div><div class="account-table-body"></div></div></div>
+            <div class="account-subtabs" role="tablist">${ACTIVITY_TABS.map((tab, index) => `<button class="account-subtab ${index === 0 ? "active" : ""}" type="button" data-activity-tab="${tab.id}" aria-selected="${index === 0}">${tab.label}</button>`).join("")}</div>
+            <div data-activity-panel="bets"><div class="account-table"><div class="account-table-head"><span>Game</span><span>Bet</span><span>Multiplier</span><span>Payout</span><span>Result</span><span>Date</span></div><div class="account-table-body"></div></div><nav class="account-pagination" aria-label="Transaction pages"><button class="account-page-previous" type="button">Previous</button><label>Page <select class="account-page-select" aria-label="Transaction page"></select></label><span class="account-page-total"></span><button class="account-page-next" type="button">Next</button></nav></div>
             <div data-activity-panel="pvp" hidden><div class="account-table"><div class="account-table-head pvp"><span>Opponent</span><span>Game</span><span>Stake</span><span>Result</span><span>Profit / loss</span><span>Date</span></div><div class="account-empty"><strong>No PvP matches yet</strong><span>Player-versus-player results will appear here.</span></div></div></div>
             <div data-activity-panel="statistics" hidden><div class="statistics-grid"></div></div>
           </section>
@@ -170,10 +171,10 @@ function createProfileDialog() {
           <section class="profile-section settings-section" data-profile-panel="settings" hidden>
             <span class="profile-section-label">SETTINGS</span><h3>Account settings</h3><p class="settings-copy">Manage your account, security, privacy, and play controls.</p>
             <div class="settings-layout"><nav class="settings-navigation" aria-label="Settings sections">${settingsNavigationMarkup()}</nav><div class="settings-panels">
-              <section data-settings-panel="account"><div class="account-card-heading"><div><span class="section-kicker">ACCOUNT</span><h4>Account details</h4></div></div><form class="username-form account-form-grid"><label><span>Email</span><input class="settings-email" type="email" disabled /></label><label><span>Username</span><input id="profile-username" name="username" type="text" minlength="3" maxlength="20" autocomplete="off" spellcheck="false" required /></label><label><span>Display name</span><input class="settings-display-name" type="text" disabled /></label><label><span>Date of birth</span><input type="text" value="Not set" disabled /></label><label><span>Country</span><input type="text" value="Not set" disabled /></label><label><span>Language</span><select disabled><option>English</option></select></label><label><span>Display currency</span><select disabled><option>USD</option></select></label><label><span>Timezone</span><input type="text" value="Device timezone" disabled /></label><p class="username-help">Your username can be changed once.</p><button class="auth-submit username-save" type="submit">Save username</button><p class="profile-status" role="status" aria-live="polite"></p></form></section>
-              <section data-settings-panel="verification" hidden><div class="account-card-heading"><div><span class="section-kicker">VERIFICATION</span><h4>Verification levels</h4></div><span class="status-chip">LEVEL 1</span></div><div class="verification-levels"></div><p class="service-note">Document submission will become available when the licensed KYC service is connected.</p></section>
-              <section data-settings-panel="security" hidden><div class="account-card-heading"><div><span class="section-kicker">SECURITY</span><h4>Security controls</h4></div><span class="status-chip">PROTECTED</span></div><div class="security-list"><article><div><strong>Password</strong><span>Google manages the password for linked Google accounts.</span></div><button disabled>Change password</button></article><article><div><strong>Two-factor authentication</strong><span>Authenticator setup and recovery codes require the security backend.</span></div><button disabled>Set up 2FA</button></article><article><div><strong>Passkeys</strong><span>Add, view, and remove passkeys.</span></div><button disabled>Add passkey</button></article><article><div><strong>Linked accounts</strong><span>Google is connected. Apple and additional providers can be added later.</span></div><button disabled>Google connected</button></article><article><div><strong>Withdrawal security</strong><span>2FA for withdrawals and tips, address whitelist, cooldown, and email confirmation.</span></div><button disabled>Configure</button></article></div></section>
-              <section data-settings-panel="sessions" hidden><div class="account-card-heading"><div><span class="section-kicker">SESSIONS & DEVICES</span><h4>Active sessions</h4></div><button class="account-outline-button" type="button" disabled>Refresh</button></div><div class="session-list"></div><div class="account-card-heading login-history-heading"><div><span class="section-kicker">LOGIN HISTORY</span><h4>Recent sign-ins</h4></div></div><div class="account-empty compact"><strong>No server history yet</strong><span>Successful and failed sign-ins will appear when session logging is connected.</span></div></section>
+              <section data-settings-panel="account"><div class="account-card-heading"><div><span class="section-kicker">ACCOUNT</span><h4>Account details</h4></div></div><form class="username-form account-form-grid"><label><span>Email</span><input class="settings-email" type="email" disabled /></label><label><span>Username</span><input id="profile-username" name="username" type="text" minlength="3" maxlength="20" autocomplete="off" spellcheck="false" required /></label><label><span>Display name</span><input class="settings-display-name" type="text" disabled /></label><p class="username-help">Your username can be changed once.</p><button class="auth-submit username-save" type="submit">Save username</button><p class="profile-status" role="status" aria-live="polite"></p></form></section>
+              <section data-settings-panel="verification" hidden><div class="account-card-heading"><div><span class="section-kicker">VERIFICATION</span><h4>Personal information</h4></div><span class="status-chip verification-status-chip">NOT COMPLETE</span></div><div class="verification-levels"></div><form class="verification-form account-form-grid"><label><span>Legal first name</span><input name="legalFirstName" maxlength="80" autocomplete="given-name" required /></label><label><span>Legal last name</span><input name="legalLastName" maxlength="80" autocomplete="family-name" required /></label><label><span>Date of birth</span><input name="dateOfBirth" type="date" autocomplete="bday" required /></label><label><span>Country code</span><input name="countryCode" minlength="2" maxlength="2" placeholder="GB" autocomplete="country" required /></label><label class="wide"><span>Address</span><input name="addressLine1" maxlength="120" autocomplete="address-line1" required /></label><label class="wide"><span>Address line 2</span><input name="addressLine2" maxlength="120" autocomplete="address-line2" /></label><label><span>City</span><input name="city" maxlength="80" autocomplete="address-level2" required /></label><label><span>Postal code</span><input name="postalCode" maxlength="24" autocomplete="postal-code" required /></label><label><span>Language</span><select name="language"><option value="en">English</option></select></label><label><span>Display currency</span><select name="displayCurrency"><option>USD</option><option>GBP</option><option>EUR</option></select></label><label class="wide"><span>Timezone</span><input name="timezone" maxlength="80" required /></label><button class="auth-submit verification-save" type="submit">Save Level 1 information</button><p class="verification-form-status" role="status" aria-live="polite"></p></form><p class="service-note">Level 1 is based on your saved information. Government-document approval will only be offered after a licensed KYC provider is connected.</p></section>
+              <section data-settings-panel="security" hidden><div class="account-card-heading"><div><span class="section-kicker">SECURITY</span><h4>Security controls</h4></div><span class="status-chip security-status-chip">LIVE STATUS</span></div><div class="security-list security-live-status"></div>${toggleMarkup({ id: "loginAlerts", label: "New sign-in alerts", detail: "Keep a live preference for alerts when a new device signs in." }, preferences.loginAlerts)}${toggleMarkup({ id: "withdrawalConfirmation", label: "Withdrawal confirmation", detail: "Require confirmation prompts for withdrawal requests." }, preferences.withdrawalConfirmation)}</section>
+              <section data-settings-panel="sessions" hidden><div class="account-card-heading"><div><span class="section-kicker">SESSIONS & DEVICES</span><h4>Recent sessions</h4></div><button class="account-outline-button session-refresh" type="button">Refresh</button></div><div class="session-list"></div></section>
               <section data-settings-panel="notifications" hidden><div class="notification-panels">${notificationMarkup()}</div><article class="account-card"><div class="account-card-heading"><div><span class="section-kicker">CHANNELS</span><h4>Delivery channels</h4></div></div><div class="reward-list"><span>In-app</span><span>Email</span><span>Push notification</span></div></article></section>
               <section data-settings-panel="privacy" hidden><div class="account-card-heading"><div><span class="section-kicker">PRIVACY</span><h4>Privacy controls</h4></div></div>${PROFILE_VISIBILITY_OPTIONS.map((option) => toggleMarkup(option, preferences[option.id])).join("")}${toggleMarkup({ id: "allowTips", label: "Allow tips", detail: "Allow other GamRace users to send you tips." }, preferences.allowTips)}${toggleMarkup({ id: "marketingConsent", label: "Marketing consent", detail: "Receive promotions and casino offers." }, preferences.marketingConsent)}<div class="privacy-actions"><button disabled>Request account data</button><button disabled>Download account data</button><button class="danger" disabled>Request account closure</button></div></section>
               <section data-settings-panel="responsible-play" hidden><div class="account-card-heading"><div><span class="section-kicker">RESPONSIBLE PLAY</span><h4>Play controls</h4></div><span class="status-chip warning">PROTECTION</span></div><div class="responsible-warning">Increasing or removing a limit may require a cooling-off delay. Protections will never be removed instantly once the licensed safer-gambling service is connected.</div><div class="responsible-list">${responsiblePlayMarkup()}</div></section>
@@ -186,7 +187,7 @@ function createProfileDialog() {
     </section>`;
   document.body.append(overlay);
   return {
-    overlay, close: overlay.querySelector(".profile-close"), tabs: [...overlay.querySelectorAll("[data-profile-section]")], panels: [...overlay.querySelectorAll("[data-profile-panel]")], settingsTabs: [...overlay.querySelectorAll("[data-settings-section]")], settingsPanels: [...overlay.querySelectorAll("[data-settings-panel]")], activityTabs: [...overlay.querySelectorAll("[data-activity-tab]")], activityPanels: [...overlay.querySelectorAll("[data-activity-panel]")], timeFilters: [...overlay.querySelectorAll("[data-account-days]")], currentName: overlay.querySelector(".profile-current-name"), email: overlay.querySelector(".profile-email"), avatar: overlay.querySelector(".profile-avatar"), joinDate: overlay.querySelector(".profile-join-date"), inlineRank: overlay.querySelector(".profile-inline-rank"), dataUsername: overlay.querySelector(".profile-data-username"), displayName: overlay.querySelector(".profile-display-name"), profileUrl: overlay.querySelector(".profile-url"), settingsEmail: overlay.querySelector(".settings-email"), settingsDisplayName: overlay.querySelector(".settings-display-name"), rankBadge: overlay.querySelector(".rank-badge"), rankBadgeImage: overlay.querySelector(".rank-badge-image"), rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"), rankBadgeTier: overlay.querySelector(".rank-badge-tier"), rankName: overlay.querySelector(".rank-name"), rankSubtitle: overlay.querySelector(".rank-subtitle"), rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")], rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"), rankProgressValues: overlay.querySelector(".rank-progress-values"), rankNext: overlay.querySelector(".rank-next"), rankProgressTrack: overlay.querySelector(".rank-progress-track"), rankProgressFill: overlay.querySelector(".rank-progress-fill"), form: overlay.querySelector(".username-form"), input: overlay.querySelector("#profile-username"), help: overlay.querySelector(".username-help"), save: overlay.querySelector(".username-save"), status: overlay.querySelector(".profile-status"), verificationLevels: overlay.querySelector(".verification-levels"), sessionList: overlay.querySelector(".session-list"), statisticsGrid: overlay.querySelector(".statistics-grid"), betsTableBody: overlay.querySelector(".account-table-body"), referralLink: overlay.querySelector(".referral-link"), preferenceInputs: [...overlay.querySelectorAll("[data-preference]")],
+    overlay, close: overlay.querySelector(".profile-close"), tabs: [...overlay.querySelectorAll("[data-profile-section]")], panels: [...overlay.querySelectorAll("[data-profile-panel]")], settingsTabs: [...overlay.querySelectorAll("[data-settings-section]")], settingsPanels: [...overlay.querySelectorAll("[data-settings-panel]")], activityTabs: [...overlay.querySelectorAll("[data-activity-tab]")], activityPanels: [...overlay.querySelectorAll("[data-activity-panel]")], currentName: overlay.querySelector(".profile-current-name"), email: overlay.querySelector(".profile-email"), avatar: overlay.querySelector(".profile-avatar"), joinDate: overlay.querySelector(".profile-join-date"), inlineRank: overlay.querySelector(".profile-inline-rank"), dataUsername: overlay.querySelector(".profile-data-username"), displayName: overlay.querySelector(".profile-display-name"), profileUrl: overlay.querySelector(".profile-url"), settingsEmail: overlay.querySelector(".settings-email"), settingsDisplayName: overlay.querySelector(".settings-display-name"), rankBadge: overlay.querySelector(".rank-badge"), rankBadgeImage: overlay.querySelector(".rank-badge-image"), rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"), rankBadgeTier: overlay.querySelector(".rank-badge-tier"), rankName: overlay.querySelector(".rank-name"), rankSubtitle: overlay.querySelector(".rank-subtitle"), rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")], rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"), rankProgressValues: overlay.querySelector(".rank-progress-values"), rankNext: overlay.querySelector(".rank-next"), rankProgressTrack: overlay.querySelector(".rank-progress-track"), rankProgressFill: overlay.querySelector(".rank-progress-fill"), form: overlay.querySelector(".username-form"), input: overlay.querySelector("#profile-username"), help: overlay.querySelector(".username-help"), save: overlay.querySelector(".username-save"), status: overlay.querySelector(".profile-status"), verificationLevels: overlay.querySelector(".verification-levels"), verificationForm: overlay.querySelector(".verification-form"), verificationStatus: overlay.querySelector(".verification-form-status"), verificationChip: overlay.querySelector(".verification-status-chip"), securityStatus: overlay.querySelector(".security-live-status"), sessionList: overlay.querySelector(".session-list"), sessionRefresh: overlay.querySelector(".session-refresh"), statisticsGrid: overlay.querySelector(".statistics-grid"), betsTableBody: overlay.querySelector(".account-table-body"), pagePrevious: overlay.querySelector(".account-page-previous"), pageNext: overlay.querySelector(".account-page-next"), pageSelect: overlay.querySelector(".account-page-select"), pageTotal: overlay.querySelector(".account-page-total"), promoForm: overlay.querySelector(".promo-redeem-form"), promoInput: overlay.querySelector(".promo-code-input"), promoStatus: overlay.querySelector(".promo-redeem-status"), referralLink: overlay.querySelector(".referral-link"), preferenceInputs: [...overlay.querySelectorAll("[data-preference]")],
   };
 }
 
@@ -273,21 +274,50 @@ function accountCurrencyLabel(currency) {
   return value.toUpperCase();
 }
 
-function renderBetActivity(activity = []) {
-  const cutoff = Number.isFinite(accountActivityDays) ? Date.now() - accountActivityDays * 86_400_000 : 0;
-  const visibleActivity = activity.filter((bet) => Number(bet.createdAt) >= cutoff);
+function renderBetActivity(activity = [], pagination = accountSnapshot.pagination || {}) {
   profileDialog.betsTableBody.replaceChildren();
-  if (!visibleActivity.length) {
+  if (!activity.length) {
     profileDialog.betsTableBody.innerHTML = '<div class="account-empty"><strong>No bets yet</strong><span>Your settled and open bets will appear here as soon as they are placed.</span></div>';
-    return;
+  } else {
+    for (const bet of activity) {
+      const row = document.createElement("div");
+      const status = ["win", "loss", "push", "open"].includes(bet.status) ? bet.status : "open";
+      row.className = "account-table-row";
+      row.innerHTML = `<strong data-label="Game">${escapeMarkup(bet.game)}</strong><span data-label="Bet">${escapeMarkup(bet.amount)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><span data-label="Multiplier">${Number(bet.multiplier || 0).toFixed(2)}×</span><span data-label="Payout">${escapeMarkup(bet.payout)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><b data-label="Result" data-result="${status}">${status.toUpperCase()}</b><time data-label="Date">${new Date(Number(bet.createdAt)).toLocaleString()}</time>`;
+      profileDialog.betsTableBody.append(row);
+    }
   }
-  for (const bet of visibleActivity) {
-    const row = document.createElement("div");
-    const status = ["win", "loss", "push", "open"].includes(bet.status) ? bet.status : "open";
-    row.className = "account-table-row";
-    row.innerHTML = `<strong>${escapeMarkup(bet.game)}</strong><span>${escapeMarkup(bet.amount)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><span>${Number(bet.multiplier || 0).toFixed(2)}×</span><span>${escapeMarkup(bet.payout)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><b data-result="${status}">${status.toUpperCase()}</b><time>${new Date(Number(bet.createdAt)).toLocaleString()}</time>`;
-    profileDialog.betsTableBody.append(row);
+  const totalPages = Math.max(1, Number(pagination.totalPages || 1));
+  const page = Math.min(totalPages, Math.max(1, Number(pagination.page || accountActivityPage)));
+  profileDialog.pageSelect.innerHTML = Array.from({ length: totalPages }, (_, index) => `<option value="${index + 1}" ${index + 1 === page ? "selected" : ""}>${index + 1}</option>`).join("");
+  profileDialog.pagePrevious.disabled = page <= 1;
+  profileDialog.pageNext.disabled = page >= totalPages;
+  profileDialog.pageTotal.textContent = `${Number(pagination.total || activity.length).toLocaleString()} bets`;
+}
+
+function renderAccountDetails(snapshot = {}) {
+  const details = snapshot.details || {};
+  for (const field of profileDialog.verificationForm.elements) {
+    if (field.name && Object.hasOwn(details, field.name)) field.value = details[field.name] || "";
   }
+  if (!details.timezone) profileDialog.verificationForm.elements.timezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const verification = snapshot.verification || { levels: [] };
+  profileDialog.verificationLevels.innerHTML = (verification.levels || []).map((level) => `<article><span>LEVEL ${level.level}</span><div><strong>${escapeMarkup(level.name)}</strong><small>${escapeMarkup(level.detail || "")}</small></div><b class="${level.status === "Complete" ? "approved" : ""}">${escapeMarkup(level.status)}</b></article>`).join("");
+  profileDialog.verificationChip.textContent = verification.currentLevel >= 1 ? "LEVEL 1 COMPLETE" : "ACTION REQUIRED";
+  profileDialog.verificationChip.classList.toggle("approved", verification.currentLevel >= 1);
+  const security = snapshot.security || {};
+  const provider = security.provider === "google.com" ? "Google" : security.provider === "password" ? "Email and password" : "Identity provider";
+  profileDialog.securityStatus.innerHTML = `<article><div><strong>Email address</strong><span>${security.emailVerified ? "Verified by your identity provider" : "Not verified"}</span></div><b>${security.emailVerified ? "VERIFIED" : "ACTION REQUIRED"}</b></article><article><div><strong>Sign-in method</strong><span>${escapeMarkup(provider)} manages your credentials.</span></div><b>CONNECTED</b></article><article><div><strong>Two-factor authentication</strong><span>A secure provider is not connected yet. This is not shown as enabled.</span></div><b>UNAVAILABLE</b></article><article><div><strong>Passkeys</strong><span>Passkey registration is not configured yet.</span></div><b>UNAVAILABLE</b></article>`;
+}
+
+async function loadAccountActivity(page = 1) {
+  if (!auth.currentUser) return;
+  const token = await auth.currentUser.getIdToken();
+  const result = await profileServices.account.getActivity(token, { page, pageSize: accountActivityPageSize });
+  accountActivityPage = Number(result.pagination?.page || page);
+  accountSnapshot.activity = result.pagination?.items || [];
+  accountSnapshot.pagination = result.pagination || {};
+  renderBetActivity(accountSnapshot.activity, accountSnapshot.pagination);
 }
 
 function renderAccountSummary(summary = {}) {
@@ -303,21 +333,22 @@ async function refreshLiveAccountData({ compact = false } = {}) {
   if (!auth.currentUser || !currentProfile) return;
   const user = auth.currentUser;
   const token = await user.getIdToken();
-  const [verification, sessions, snapshot] = await Promise.all([
-    compact ? null : profileServices.verification.getStatus(),
+  const [sessions, snapshot] = await Promise.all([
     compact ? null : profileServices.sessions.list(token).catch(() => ({ sessions: [], loginHistory: [] })),
     profileServices.account.getSnapshot(token, { compact }),
   ]);
   if (auth.currentUser?.uid !== user.uid) return;
-  accountSnapshot = { summary: snapshot.summary || {}, activity: snapshot.activity || accountSnapshot.activity || [] };
+  accountSnapshot = { ...accountSnapshot, ...snapshot, summary: snapshot.summary || {}, activity: snapshot.activity || accountSnapshot.activity || [] };
   preferences = profileServices.preferences.save({ ...preferences, ...(snapshot.preferences || {}) });
   currentProfile = { ...currentProfile, ...accountSnapshot.summary };
   renderRank(currentProfile);
   renderAccountSummary(accountSnapshot.summary);
-  if (!compact) renderBetActivity(accountSnapshot.activity);
+  if (!compact) {
+    renderAccountDetails(snapshot);
+    await loadAccountActivity(accountActivityPage);
+  }
   profileDialog.preferenceInputs.forEach((input) => { input.checked = Boolean(preferences[input.dataset.preference]); });
   if (compact) return;
-  profileDialog.verificationLevels.innerHTML = verification.levels.map((level) => `<article><span>LEVEL ${level.level}</span><div><strong>${level.name}</strong><small>${level.level === 2 ? "Government ID and selfie / liveness" : level.level === 3 ? "Proof of address" : "Basic account information"}</small></div><b class="${level.status === "Approved" ? "approved" : ""}">${level.status}</b></article>`).join("");
   profileDialog.sessionList.innerHTML = sessions.sessions.length ? sessions.sessions.map((session) => {
     const location = [session.city, session.region, session.countryCode].filter(Boolean).join(", ") || "Approximate location unavailable";
     const firstLogin = new Date(session.firstLogin).toLocaleString();
@@ -496,6 +527,11 @@ accountMenu.rankImage.addEventListener("error", () => accountMenu.rankBadge.clas
 profileButton?.querySelector(".profile-rank-image")?.addEventListener("load", () => profileButton.querySelector(".profile-rank-mark")?.classList.add("has-image"));
 profileButton?.querySelector(".profile-rank-image")?.addEventListener("error", () => profileButton.querySelector(".profile-rank-mark")?.classList.remove("has-image"));
 googleButtons.forEach((button) => button.addEventListener("click", continueWithGoogle));
+document.querySelectorAll('a[href$="#promotions"]').forEach((link) => link.addEventListener("click", (event) => {
+  event.preventDefault();
+  if (auth.currentUser && currentProfile) openProfileDialog({ section: "vip" });
+  else window.location.href = "index.html?auth=login";
+}));
 profileButton?.addEventListener("click", () => accountMenu.element.hidden ? openAccountMenu() : closeAccountMenu());
 accountMenu.items.forEach((button) => button.addEventListener("click", () => {
   const item = PROFILE_MENU.find((entry) => entry.id === button.dataset.accountMenuItem);
@@ -510,11 +546,16 @@ window.addEventListener("resize", positionAccountMenu);
 profileDialog.tabs.forEach((tab) => tab.addEventListener("click", () => selectProfileSection(tab.dataset.profileSection)));
 profileDialog.settingsTabs.forEach((tab) => tab.addEventListener("click", () => selectSettingsSection(tab.dataset.settingsSection)));
 profileDialog.activityTabs.forEach((tab) => tab.addEventListener("click", () => selectActivityTab(tab.dataset.activityTab)));
-profileDialog.timeFilters.forEach((button) => button.addEventListener("click", () => {
-  accountActivityDays = button.dataset.accountDays === "all" ? Infinity : Number(button.dataset.accountDays);
-  profileDialog.timeFilters.forEach((candidate) => candidate.classList.toggle("active", candidate === button));
-  renderBetActivity(accountSnapshot.activity);
-}));
+profileDialog.pagePrevious.addEventListener("click", () => loadAccountActivity(Math.max(1, accountActivityPage - 1)).catch((error) => setProfileStatus(error.message, "error")));
+profileDialog.pageNext.addEventListener("click", () => loadAccountActivity(accountActivityPage + 1).catch((error) => setProfileStatus(error.message, "error")));
+profileDialog.pageSelect.addEventListener("change", () => loadAccountActivity(Number(profileDialog.pageSelect.value)).catch((error) => setProfileStatus(error.message, "error")));
+profileDialog.sessionRefresh.addEventListener("click", async () => {
+  profileDialog.sessionRefresh.disabled = true;
+  profileDialog.sessionRefresh.textContent = "Refreshing…";
+  try { await refreshLiveAccountData({ compact: false }); }
+  catch (error) { setProfileStatus(error.message, "error"); }
+  finally { profileDialog.sessionRefresh.disabled = false; profileDialog.sessionRefresh.textContent = "Refresh"; }
+});
 profileDialog.close.addEventListener("click", closeProfileDialog);
 profileDialog.overlay.addEventListener("click", (event) => { if (event.target === profileDialog.overlay) closeProfileDialog(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeAccountMenu(); if (!profileDialog.overlay.hidden) closeProfileDialog(); } });
@@ -544,6 +585,52 @@ profileDialog.form.addEventListener("submit", async (event) => {
   catch (error) { setProfileStatus(friendlyProfileError(error), "error"); }
   finally { profileBusy = false; refreshProfileDialog(); }
 });
+profileDialog.verificationForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!auth.currentUser) return;
+  const button = profileDialog.verificationForm.querySelector(".verification-save");
+  button.disabled = true;
+  button.textContent = "Saving securely…";
+  profileDialog.verificationStatus.textContent = "";
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const details = Object.fromEntries(new FormData(profileDialog.verificationForm).entries());
+    details.countryCode = String(details.countryCode || "").toUpperCase();
+    const result = await profileServices.account.saveDetails(token, details);
+    accountSnapshot = { ...accountSnapshot, ...result };
+    renderAccountDetails(accountSnapshot);
+    profileDialog.verificationStatus.textContent = "Level 1 information saved to your live account.";
+    profileDialog.verificationStatus.dataset.state = "success";
+  } catch (error) {
+    profileDialog.verificationStatus.textContent = error.message;
+    profileDialog.verificationStatus.dataset.state = "error";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Save Level 1 information";
+  }
+});
+profileDialog.promoForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!auth.currentUser) return;
+  const button = profileDialog.promoForm.querySelector("button");
+  button.disabled = true;
+  button.textContent = "Checking…";
+  profileDialog.promoStatus.textContent = "";
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const result = await profileServices.promotions.claim(token, profileDialog.promoInput.value);
+    profileDialog.promoStatus.textContent = `${result.reward.amount} ${accountCurrencyLabel(result.reward.currency)} added to your wallet.`;
+    profileDialog.promoStatus.dataset.state = "success";
+    profileDialog.promoInput.value = "";
+    await window.gamraceWallet?.refresh?.();
+  } catch (error) {
+    profileDialog.promoStatus.textContent = error.message;
+    profileDialog.promoStatus.dataset.state = "error";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Redeem";
+  }
+});
 
 if (!authModal) {
   headerSignIn.addEventListener("click", () => { if (document.body.dataset.authenticated !== "true") window.location.href = "index.html?auth=login"; });
@@ -572,6 +659,7 @@ onAuthStateChanged(auth, async (user) => {
     syncPlayerUsername(user).catch((error) => console.warn("GamRace username sync deferred", error));
     refreshLiveAccountData({ compact: false }).catch((error) => console.warn("GamRace live account sync deferred", error));
     checkOwnerAccess(user);
+    if (location.hash === "#promotions") { history.replaceState(null, "", location.pathname + location.search); openProfileDialog({ section: "vip" }); }
     if (result.created) {
       try { await updateProfile(user, { displayName: currentProfile.username }); } catch { /* Firestore remains the source of truth. */ }
       openProfileDialog({ welcome: true, section: "settings", settingsSection: "account" });
