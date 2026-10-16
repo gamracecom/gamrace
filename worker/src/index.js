@@ -16,6 +16,9 @@ import {
   maskAddress,
   minesMultiplierMicros,
   molesMultiplierMicros,
+  STACK_LEVELS,
+  STACK_SUCCESS_MICROS,
+  stackMultiplierMicros,
   towersMultiplierMicros,
   normalizeAddress,
   normalizeCurrency,
@@ -71,6 +74,7 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "towers", name: "Towers", editable: true },
   { id: "moles", name: "Moles", editable: true },
   { id: "limbo", name: "Limbo", editable: true },
+  { id: "stack", name: "Stack", editable: true },
 ]);
 
 async function gameHouseEdgeBasisPoints(env, gameId) {
@@ -559,7 +563,7 @@ async function enforceCooldown(env, uid, action, seconds) {
 }
 
 async function listActivity(env, uid) {
-  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult, hiloResult, blackjackResult, towersResult, molesResult] = await Promise.all([
+  const [walletResult, diceResult, minesResult, plinkoResult, rouletteResult, kenoResult, wheelResult, hiloResult, blackjackResult, towersResult, molesResult, stackResult] = await Promise.all([
     env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
            pay_currency AS currency, created_at
@@ -609,6 +613,10 @@ async function listActivity(env, uid) {
     env.DB.prepare(`
       SELECT id, currency, wager_units, payout_units, multiplier_micros, status, created_at
       FROM moles_rounds WHERE uid = ? ORDER BY created_at DESC LIMIT 50
+    `).bind(uid).all(),
+    env.DB.prepare(`
+      SELECT id, currency, wager_units, payout_units, multiplier_micros, status, created_at
+      FROM stack_rounds WHERE uid = ? ORDER BY created_at DESC LIMIT 50
     `).bind(uid).all(),
   ]);
   const walletRows = (walletResult.results || []).map((row) => ({
@@ -729,7 +737,18 @@ async function listActivity(env, uid) {
     currency: row.currency,
     createdAt: Number(row.created_at),
   }));
-  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows, ...blackjackRows, ...towersRows, ...molesRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
+  const stackRows = (stackResult.results || []).map((row) => ({
+    id: row.id,
+    type: "bet",
+    game: "Stack",
+    status: row.status === "active" ? "open" : row.status === "lost" ? "loss" : "win",
+    amount: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units), false),
+    multiplier: Number(row.multiplier_micros) / 1_000_000,
+    currency: row.currency,
+    createdAt: Number(row.created_at),
+  }));
+  return [...walletRows, ...diceRows, ...minesRows, ...plinkoRows, ...rouletteRows, ...kenoRows, ...wheelRows, ...hiloRows, ...blackjackRows, ...towersRows, ...molesRows, ...stackRows].sort((left, right) => right.createdAt - left.createdAt).slice(0, 50);
 }
 
 const PLAYER_BET_UNION_SQL_A = `
@@ -771,6 +790,8 @@ const PLAYER_BET_UNION_SQL_E = `
     CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM towers_rounds WHERE uid = ?
   UNION ALL SELECT 'Moles', id, currency, wager_units, payout_units, multiplier_micros,
     CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM moles_rounds WHERE uid = ?
+  UNION ALL SELECT 'Stack', id, currency, wager_units, payout_units, multiplier_micros,
+    CASE WHEN status = 'active' THEN 'open' WHEN status = 'lost' THEN 'loss' ELSE 'win' END, created_at FROM stack_rounds WHERE uid = ?
 `;
 
 const PLAYER_BET_UNION_GROUPS = [
@@ -778,7 +799,7 @@ const PLAYER_BET_UNION_GROUPS = [
   { sql: PLAYER_BET_UNION_SQL_B, count: 1 },
   { sql: PLAYER_BET_UNION_SQL_C, count: 3 },
   { sql: PLAYER_BET_UNION_SQL_D, count: 3 },
-  { sql: PLAYER_BET_UNION_SQL_E, count: 3 },
+  { sql: PLAYER_BET_UNION_SQL_E, count: 4 },
 ];
 
 function playerBetBindings(uid, count) {
@@ -2658,6 +2679,7 @@ async function handleGameHistory(request, env, user) {
     towers: { table: "towers_rounds", where: "b.status IN ('cashed_out', 'won')" },
     moles: { table: "moles_rounds", where: "b.status IN ('cashed_out', 'won')" },
     limbo: { table: "limbo_bets", where: "1 = 1" },
+    stack: { table: "stack_rounds", where: "b.status IN ('cashed_out', 'won')" },
   };
   const config = games[game];
   if (!config) throw httpError(400, "Choose a valid game history");
@@ -3784,6 +3806,191 @@ async function handleCashoutMolesRound(request, env, user, roundId) {
   return json(request, env, 200, { round: molesRoundResponse(current), wallet: await walletResponse(env, user.sub) });
 }
 
+function stackJsonArray(value) {
+  try {
+    const parsed = JSON.parse(String(value || "[]"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function stackRoundPlan(difficulty) {
+  const successMicros = STACK_SUCCESS_MICROS[difficulty];
+  const outcomes = Array.from({ length: STACK_LEVELS }, () => secureRandomInt(1_000_000) < successMicros);
+  return {
+    outcomes,
+    offsets: outcomes.map((landed) => {
+      const direction = secureRandomInt(2) ? 1 : -1;
+      return landed ? direction * secureRandomInt(31) : direction * (110 + secureRandomInt(41));
+    }),
+  };
+}
+
+function stackRoundResponse(row) {
+  if (!row) return null;
+  const difficulty = String(row.difficulty || "medium");
+  const completedLevels = Number(row.completed_levels || 0);
+  const houseFactorMicros = Number(row.house_factor_micros || 990_000);
+  const drops = stackJsonArray(row.drops_json).map((drop) => ({
+    level: Number(drop.level),
+    landed: Boolean(drop.landed),
+    offset: Number(drop.offset || 0),
+  }));
+  const terminal = row.status !== "active";
+  return {
+    id: row.id,
+    game: "stack",
+    currency: row.currency,
+    wager: assetUnitsToString(Number(row.wager_units), false),
+    payout: assetUnitsToString(Number(row.payout_units || 0), false),
+    difficulty,
+    maxLevels: Number(row.max_levels || STACK_LEVELS),
+    completedLevels,
+    drops,
+    lastDrop: drops.at(-1) || null,
+    multiplier: Number(row.multiplier_micros || 1_000_000) / 1_000_000,
+    levelMultipliers: Array.from({ length: STACK_LEVELS }, (_, index) => stackMultiplierMicros(difficulty, index + 1, houseFactorMicros) / 1_000_000),
+    status: row.status,
+    outcome: row.status === "lost" ? "loss" : terminal ? "win" : "open",
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+    updatedAt: new Date(Number(row.updated_at)).toISOString(),
+  };
+}
+
+async function handleGetActiveStackRound(request, env, user) {
+  const currency = normalizeCurrency(new URL(request.url).searchParams.get("currency"));
+  const row = await env.DB.prepare(`
+    SELECT * FROM stack_rounds WHERE uid = ? AND currency = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(user.sub, currency).first();
+  return json(request, env, 200, { round: stackRoundResponse(row), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleStartStackRound(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM stack_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { round: stackRoundResponse(existing), wallet: await walletResponse(env, user.sub) });
+  const asset = await requireSelectedGameAsset(env, user.sub, body.currency);
+  const active = await env.DB.prepare("SELECT * FROM stack_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+  if (active) return json(request, env, 200, { round: stackRoundResponse(active), wallet: await walletResponse(env, user.sub) });
+  const difficulty = String(body.difficulty || "").toLowerCase();
+  if (!STACK_SUCCESS_MICROS[difficulty]) throw httpError(400, "Choose a valid Stack difficulty");
+  const wagerUnits = await gameWagerUnits(env, asset, body.wager, body.displayFiat === true);
+  const houseFactorMicros = await gameHouseFactorMicros(env, "stack");
+  const maxMultiplierMicros = stackMultiplierMicros(difficulty, STACK_LEVELS, houseFactorMicros);
+  const maximumSafeWager = Number(BigInt(Number.MAX_SAFE_INTEGER) * 1_000_000n / BigInt(maxMultiplierMicros));
+  if (wagerUnits > maximumSafeWager) throw httpError(400, "Lower the wager for that Stack difficulty");
+  const plan = stackRoundPlan(difficulty);
+  const id = crypto.randomUUID();
+  const timestamp = now();
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO stack_rounds(
+          id, request_id, uid, currency, wager_units, difficulty, max_levels, outcomes_json,
+          offsets_json, drops_json, completed_levels, multiplier_micros, house_factor_micros,
+          status, settled, created_at, updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, 1000000, ?, 'active', 0, ?, ?
+        FROM crypto_balances
+        WHERE uid = ? AND currency = ? AND available_units >= ?
+          AND NOT EXISTS(SELECT 1 FROM stack_rounds WHERE uid = ? AND currency = ? AND status = 'active')
+      `).bind(id, requestId, user.sub, asset.code, wagerUnits, difficulty, STACK_LEVELS, JSON.stringify(plan.outcomes), JSON.stringify(plan.offsets), houseFactorMicros, timestamp, timestamp, user.sub, asset.code, wagerUnits, user.sub, asset.code),
+      env.DB.prepare(`
+        UPDATE crypto_balances SET available_units = available_units - ?, updated_at = ?
+        WHERE uid = ? AND currency = ? AND EXISTS(SELECT 1 FROM stack_rounds WHERE id = ?)
+      `).bind(wagerUnits, timestamp, user.sub, asset.code, id),
+      env.DB.prepare(`
+        INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+        SELECT 'stack_wager_' || id, uid, currency, 'game_wager', -wager_units, id, created_at
+        FROM stack_rounds WHERE id = ?
+      `).bind(id),
+    ]);
+    if (Number(results[0]?.meta?.changes || 0) !== 1) throw httpError(409, "Your available balance is too low");
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM stack_rounds WHERE uid = ? AND request_id = ?").bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { round: stackRoundResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    const current = await env.DB.prepare("SELECT * FROM stack_rounds WHERE uid = ? AND currency = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(user.sub, asset.code).first();
+    if (current) return json(request, env, 200, { round: stackRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM stack_rounds WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { round: stackRoundResponse(created), wallet: await walletResponse(env, user.sub) });
+}
+
+async function ownedStackRound(env, uid, id) {
+  const row = await env.DB.prepare("SELECT * FROM stack_rounds WHERE id = ? AND uid = ?").bind(id, uid).first();
+  if (!row) throw httpError(404, "That Stack round was not found");
+  return row;
+}
+
+async function settleStackRound(env, current, { status, drops, completedLevels, multiplierMicros, payoutUnits, actionId, timestamp }) {
+  const results = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE stack_rounds SET drops_json = ?, completed_levels = ?, multiplier_micros = ?, payout_units = ?,
+        status = ?, last_action_id = ?, updated_at = ?, settled_at = ?
+      WHERE id = ? AND uid = ? AND status = 'active' AND drops_json = ?
+    `).bind(JSON.stringify(drops), completedLevels, multiplierMicros, payoutUnits, status, actionId, timestamp, timestamp, current.id, current.uid, current.drops_json),
+    env.DB.prepare(`
+      UPDATE crypto_balances SET available_units = available_units + ?, updated_at = ?
+      WHERE uid = ? AND currency = ? AND ? > 0
+        AND EXISTS(SELECT 1 FROM stack_rounds WHERE id = ? AND uid = ? AND status = ? AND settled = 0)
+    `).bind(payoutUnits, timestamp, current.uid, current.currency, payoutUnits, current.id, current.uid, status),
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      SELECT 'stack_payout_' || id, uid, currency, 'game_payout', payout_units, id, ?
+      FROM stack_rounds WHERE id = ? AND uid = ? AND status = ? AND settled = 0 AND payout_units > 0
+    `).bind(timestamp, current.id, current.uid, status),
+    env.DB.prepare("UPDATE stack_rounds SET settled = 1 WHERE id = ? AND uid = ? AND status = ? AND settled = 0").bind(current.id, current.uid, status),
+  ]);
+  return Number(results[0]?.meta?.changes || 0) === 1;
+}
+
+async function handleDropStackLevel(request, env, user, roundId) {
+  const body = await requestJson(request);
+  const actionId = normalizeRequestId(body.actionId);
+  let current = await ownedStackRound(env, user.sub, roundId);
+  if (current.status !== "active" || current.last_action_id === actionId) return json(request, env, 200, { round: stackRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+  const drops = stackJsonArray(current.drops_json);
+  const level = drops.length;
+  if (level >= STACK_LEVELS) throw httpError(409, "That Stack round is complete");
+  const outcomes = stackJsonArray(current.outcomes_json);
+  const offsets = stackJsonArray(current.offsets_json);
+  const landed = outcomes[level] === true;
+  const drop = { level: level + 1, landed, offset: Number(offsets[level] || 120) };
+  const nextDrops = [...drops, drop];
+  const nextCompleted = landed ? Number(current.completed_levels) + 1 : Number(current.completed_levels);
+  const multiplierMicros = landed ? stackMultiplierMicros(current.difficulty, nextCompleted, Number(current.house_factor_micros)) : Number(current.multiplier_micros);
+  const timestamp = now();
+  if (!landed || nextCompleted === STACK_LEVELS) {
+    const status = landed ? "won" : "lost";
+    const payoutUnits = landed ? payoutFromMultiplier(Number(current.wager_units), multiplierMicros) : 0;
+    await settleStackRound(env, current, { status, drops: nextDrops, completedLevels: nextCompleted, multiplierMicros, payoutUnits, actionId, timestamp });
+  } else {
+    await env.DB.prepare(`
+      UPDATE stack_rounds SET drops_json = ?, completed_levels = ?, multiplier_micros = ?, last_action_id = ?, updated_at = ?
+      WHERE id = ? AND uid = ? AND status = 'active' AND drops_json = ?
+    `).bind(JSON.stringify(nextDrops), nextCompleted, multiplierMicros, actionId, timestamp, roundId, user.sub, current.drops_json).run();
+  }
+  current = await ownedStackRound(env, user.sub, roundId);
+  return json(request, env, 200, { round: stackRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+}
+
+async function handleCashoutStackRound(request, env, user, roundId) {
+  const body = await requestJson(request);
+  const actionId = normalizeRequestId(body.actionId);
+  let current = await ownedStackRound(env, user.sub, roundId);
+  if (current.status !== "active" || current.last_action_id === actionId) return json(request, env, 200, { round: stackRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+  const completedLevels = Number(current.completed_levels);
+  if (completedLevels < 1) throw httpError(409, "Land one platform before cashing out");
+  const drops = stackJsonArray(current.drops_json);
+  const multiplierMicros = stackMultiplierMicros(current.difficulty, completedLevels, Number(current.house_factor_micros));
+  const payoutUnits = payoutFromMultiplier(Number(current.wager_units), multiplierMicros);
+  await settleStackRound(env, current, { status: "cashed_out", drops, completedLevels, multiplierMicros, payoutUnits, actionId, timestamp: now() });
+  current = await ownedStackRound(env, user.sub, roundId);
+  return json(request, env, 200, { round: stackRoundResponse(current), wallet: await walletResponse(env, user.sub) });
+}
+
 async function existingDepositForCurrency(env, uid, payCurrency) {
   return env.DB.prepare(`
     SELECT * FROM crypto_deposits
@@ -4390,7 +4597,7 @@ const ADMIN_LEDGER_GAME_PREFIXES = Object.freeze([
   ["blackjack", "Blackjack"], ["coinflip", "Coinflip"], ["roulette", "Roulette"],
   ["plinko", "Plinko"], ["towers", "Towers"], ["crash", "Crash"],
   ["mines", "Mines"], ["moles", "Moles"], ["limbo", "Limbo"], ["wheel", "Wheel"],
-  ["keno", "Keno"], ["hilo", "Hi-Lo"], ["dice", "Dice"],
+  ["keno", "Keno"], ["hilo", "Hi-Lo"], ["dice", "Dice"], ["stack", "Stack"],
 ]);
 
 function adminLedgerGame(id) {
@@ -4910,6 +5117,12 @@ async function route(request, env) {
   if (request.method === "POST" && molesChooseMatch) return handleChooseMolesHole(request, env, user, molesChooseMatch[1]);
   const molesCashoutMatch = path.match(/^\/games\/moles\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
   if (request.method === "POST" && molesCashoutMatch) return handleCashoutMolesRound(request, env, user, molesCashoutMatch[1]);
+  if (request.method === "GET" && path === "/games/stack/rounds/active") return handleGetActiveStackRound(request, env, user);
+  if (request.method === "POST" && path === "/games/stack/rounds") return handleStartStackRound(request, env, user);
+  const stackDropMatch = path.match(/^\/games\/stack\/rounds\/([A-Za-z0-9-]+)\/drop$/);
+  if (request.method === "POST" && stackDropMatch) return handleDropStackLevel(request, env, user, stackDropMatch[1]);
+  const stackCashoutMatch = path.match(/^\/games\/stack\/rounds\/([A-Za-z0-9-]+)\/cashout$/);
+  if (request.method === "POST" && stackCashoutMatch) return handleCashoutStackRound(request, env, user, stackCashoutMatch[1]);
   if (request.method === "GET" && path === "/games/blackjack/rounds/active") return handleGetActiveBlackjackRound(request, env, user);
   if (request.method === "POST" && path === "/games/blackjack/rounds") return handleStartBlackjackRound(request, env, user);
   const blackjackActionMatch = path.match(/^\/games\/blackjack\/rounds\/([A-Za-z0-9-]+)\/action$/);

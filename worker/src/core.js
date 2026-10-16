@@ -392,6 +392,33 @@ export function molesMultiplierMicros(moleCountValue, hitsValue, houseFactorMicr
   return Number(result > 9_000_000_000_000n ? 9_000_000_000_000n : result);
 }
 
+export const STACK_LEVELS = 24;
+export const STACK_SUCCESS_MICROS = Object.freeze({
+  easy: 900_000,
+  medium: 780_000,
+  hard: 650_000,
+  extreme: 570_000,
+});
+
+export function stackMultiplierMicros(difficultyValue, completedLevelsValue, houseFactorMicrosValue = 990_000) {
+  const difficulty = String(difficultyValue || "").toLowerCase();
+  const completedLevels = Number(completedLevelsValue);
+  const houseFactorMicros = Number(houseFactorMicrosValue);
+  const successMicros = STACK_SUCCESS_MICROS[difficulty];
+  if (!successMicros) throw new Error("Choose a valid Stack difficulty");
+  if (!Number.isInteger(completedLevels) || completedLevels < 0 || completedLevels > STACK_LEVELS) throw new Error("Invalid Stack level");
+  if (!Number.isInteger(houseFactorMicros) || houseFactorMicros < 900_000 || houseFactorMicros > 1_000_000) throw new Error("Invalid house edge");
+  if (completedLevels === 0) return 1_000_000;
+  let numerator = BigInt(houseFactorMicros);
+  let denominator = 1n;
+  for (let level = 0; level < completedLevels; level += 1) {
+    numerator *= 1_000_000n;
+    denominator *= BigInt(successMicros);
+  }
+  const result = numerator / denominator;
+  return Number(result > 1_000_000_000_000n ? 1_000_000_000_000n : result);
+}
+
 export function coinflipMultiplierMicros(streakValue, houseFactorMicrosValue = 990_000) {
   const streak = Number(streakValue);
   const houseFactorMicros = Number(houseFactorMicrosValue);

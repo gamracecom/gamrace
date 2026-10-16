@@ -136,7 +136,6 @@ function createWalletDialog() {
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="withdraw">Withdraw</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="buy">Buy Crypto</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="tip"><span class="wallet-tab-desktop">Tip User</span><span class="wallet-tab-mobile">Tip</span></button>
-        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet-tab="vault">Vault</button>
       </div>
       <div class="wallet-body">
         <section class="wallet-panel" data-wallet-panel="deposit">
@@ -182,12 +181,6 @@ function createWalletDialog() {
           </div>
           <div class="wallet-transaction-list" data-wallet-transaction-list></div>
         </section>
-        <section class="wallet-panel wallet-vault-panel" data-wallet-panel="vault" hidden>
-          <div class="wallet-vault-balances"><article><span>Main balance</span><strong data-vault-main-balance>$0.00</strong></article><article><span>Vault balance</span><strong>$0.00</strong></article></div>
-          <div class="wallet-vault-actions"><button type="button" disabled>Move funds into vault</button><button type="button" disabled>Move funds out of vault</button></div>
-          <p>Funds kept in the vault cannot be wagered until they are moved back to the main balance. Transfers will activate when the secure vault ledger is connected.</p>
-        </section>
-
         <p class="wallet-status" role="status" aria-live="polite"></p>
       </div>
     </section>`;
@@ -216,7 +209,6 @@ function createWalletDialog() {
     transactionLinks: [...overlay.querySelectorAll("[data-open-transactions]")],
     transactionFilters: [...overlay.querySelectorAll("[data-wallet-transaction-filter]")],
     transactionList: overlay.querySelector("[data-wallet-transaction-list]"),
-    vaultMainBalance: overlay.querySelector("[data-vault-main-balance]"),
     status: overlay.querySelector(".wallet-status"),
   };
 }

@@ -24,6 +24,9 @@ import {
   plinkoMultipliers,
   plinkoPayout,
   roulettePayout,
+  STACK_LEVELS,
+  STACK_SUCCESS_MICROS,
+  stackMultiplierMicros,
   wheelMultipliers,
   wheelPayout,
   payoutFromMultiplier,
@@ -185,6 +188,20 @@ test("Wheel paytables preserve 99% RTP at every risk and segment count", () => {
     outcome: "win",
   });
   assert.equal(wheelPayout(100_000_000, 20, "medium", 1).payoutUnits, 0);
+});
+
+test("Stack multipliers preserve the configured return across all 24 levels", () => {
+  for (const difficulty of Object.keys(STACK_SUCCESS_MICROS)) {
+    for (const level of [1, 6, 12, STACK_LEVELS]) {
+      const multiplier = stackMultiplierMicros(difficulty, level, 990_000) / 1_000_000;
+      const survival = (STACK_SUCCESS_MICROS[difficulty] / 1_000_000) ** level;
+      const expectedReturn = Math.min(1_000_000, multiplier) * survival;
+      assert.ok(Math.abs(expectedReturn - 0.99) < 0.00001 || multiplier === 1_000_000, `${difficulty} level ${level}`);
+    }
+  }
+  assert.ok(stackMultiplierMicros("extreme", 12) > stackMultiplierMicros("hard", 12));
+  assert.ok(stackMultiplierMicros("hard", 12) > stackMultiplierMicros("medium", 12));
+  assert.throws(() => stackMultiplierMicros("skill", 1), /difficulty/);
 });
 
 test("Roulette settles multiple lane bets against one authoritative result", () => {
