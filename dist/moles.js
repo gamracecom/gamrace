@@ -52,6 +52,12 @@
     catch { return {}; }
   }
 
+  function revealDuration(resultRound = round) {
+    const loss = resultRound?.status === "lost";
+    if (settings().molesTurbo) return loss ? 700 : 360;
+    return loss ? 2400 : 1500;
+  }
+
   function inputAmount(input = betInput) {
     const value = Number.parseFloat(input?.value);
     return Number.isFinite(value) ? Math.max(0, Math.round(value * 100000000) / 100000000) : 0;
@@ -246,7 +252,7 @@
       window.gamraceWallet.applyGameResult(response);
       renderRound(response.round, true);
       window.clearTimeout(revealTimer);
-      const pause = settings().molesTurbo ? 170 : 820;
+      const pause = revealDuration(response.round);
       revealTimer = window.setTimeout(() => { showReveal = false; renderHoles(); }, pause);
       return response.round;
     } catch (error) { setMessage(error.message || "That hole could not be checked."); return null; }
@@ -282,7 +288,7 @@
       while (autoRunning && round?.status === "active" && Number(round.hits || 0) < target) {
         const result = await choose(Math.floor(Math.random() * HOLES));
         if (!result) { autoRunning = false; break; }
-        await delay(settings().molesTurbo ? 190 : 860);
+        await delay(revealDuration(result));
       }
       if (autoRunning && round?.status === "active") await cashout();
       remaining -= 1;

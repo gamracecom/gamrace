@@ -187,6 +187,7 @@ html[data-session-state="signed-in"] body[data-authenticated="pending"] .profile
 .original[data-name^="keno"] .original-card-art { --art-sx: .9773; --art-sy: .976; --art-y: .07%; }
 .original[data-name^="limbo"] .original-card-art { --art-sx: 1.0039; --art-sy: .9957; --art-y: .07%; }
 .original[data-name^="mines"] .original-card-art { --art-sx: .9981; --art-sy: 1; --art-x: .09%; }
+.original[data-name^="moles"] .original-card-art { --art-sx: .9981; --art-sy: 1; --art-x: .09%; }
 .original[data-name^="plinko"] .original-card-art { --art-sx: .9981; --art-sy: .9943; --art-x: .09%; --art-y: .14%; }
 .original[data-name^="roulette"] .original-card-art { --art-sx: 1.0078; --art-sy: 1.0117; --art-y: .41%; }
 .original[data-name^="towers"] .original-card-art { --art-sx: 1.0039; --art-sy: 1.0044; --art-y: .07%; }
@@ -2438,3 +2439,25 @@ body,
 @media(max-width:1050px){.moles-stage{grid-template-columns:290px minmax(0,1fr)}.moles-controls{padding:20px}.moles-play{padding-inline:16px}.moles-holes{gap:44px 10px}.moles-progress{gap:4px}.moles-progress>span{padding-inline:6px}.moles-progress i{display:none}}
 @media(max-width:780px){.blackjack-shoe{top:12px;right:12px;transform:scale(.78);transform-origin:top right}.blackjack-card.is-dealing{--deal-x:190px;--deal-y:-130px}.blackjack-hand .blackjack-card.is-dealing{--deal-y:-260px}.moles-stage{min-height:0;grid-template-columns:1fr;grid-template-rows:minmax(490px,auto) auto 52px}.moles-play{order:1;min-height:490px;padding:14px 8px 22px;border-radius:13px 13px 0 0}.moles-controls{order:2;padding:18px;border-top:1px solid #2b313a;border-right:0;border-radius:0}.moles-footer{order:3;grid-column:1;grid-template-columns:1fr auto}.moles-footer>span{display:none}.moles-progress{grid-template-columns:repeat(4,1fr)}.moles-arena{min-height:400px}.moles-holes{width:min(590px,100%);gap:38px 5px}.moles-hole{aspect-ratio:1.55/1}.moles-character{width:75%}}
 @media(max-width:520px){.moles-play{min-height:430px}.moles-progress>span{padding:6px 4px}.moles-progress strong{font-size:.59rem}.moles-arena{min-height:335px}.moles-holes{gap:28px 2px}.moles-hole{aspect-ratio:1.35/1}.moles-character{width:82%;height:88%}.moles-controls{padding:16px}.moles-control-stack{gap:14px;margin-top:17px}.moles-count>div{gap:4px}.moles-count button{height:40px}.moles-hammer{transform:scale(.75)}}
+
+/* Moles arena: one centre hole with six surrounding it, without decorative track lines. */
+.moles-track{display:none}
+.moles-arena{background:#0f1216}
+.moles-holes{position:relative;width:min(680px,92%);height:min(470px,92%);display:block}
+.moles-hole{position:absolute;width:24%;aspect-ratio:1.72/1;grid-column:auto;transform:translate(-50%,-50%)}
+.moles-hole:nth-child(1){left:50%;top:50%}
+.moles-hole:nth-child(2){left:50%;top:14%}
+.moles-hole:nth-child(3){left:79%;top:32%}
+.moles-hole:nth-child(4){left:79%;top:68%}
+.moles-hole:nth-child(5){left:50%;top:86%;grid-column:auto}
+.moles-hole:nth-child(6){left:21%;top:68%;grid-column:auto}
+.moles-hole:nth-child(7){left:21%;top:32%;grid-column:auto}
+.moles-head{border-color:#815536;background:linear-gradient(145deg,#bd7b47,#714326 56%,#392318)}
+.moles-head::before{position:absolute;z-index:0;left:19%;right:19%;top:40%;bottom:13%;border-radius:46% 46% 42% 42%;background:linear-gradient(145deg,#d9a06f,#9a633c);content:""}
+.moles-ear{border-color:#855638;background:linear-gradient(145deg,#a66b43,#4d2e20)}
+.moles-eye,.moles-nose,.moles-tooth{z-index:1}
+.moles-eye{background:#68c7ff;box-shadow:0 0 0 3px #281a14,0 -5px 0 -2px #392318}
+.moles-nose{background:linear-gradient(145deg,#35221c,#120d0b)}
+.moles-suit{border-color:#2fa5ff;background:linear-gradient(145deg,#123b61,#071a2b)}
+@media(max-width:780px){.moles-holes{width:min(570px,98%);height:350px}.moles-hole{width:25%}}
+@media(max-width:520px){.moles-holes{height:300px}.moles-hole{width:28%}}

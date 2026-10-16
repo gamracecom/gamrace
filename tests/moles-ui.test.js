@@ -25,6 +25,8 @@ test("Moles has a complete seven-hole animated interface and homepage artwork", 
   assert.ok(artwork.size > 100_000);
   assert.match(styles, /@keyframes moles-pop/);
   assert.match(styles, /@keyframes moles-hammer/);
+  assert.match(styles, /\.moles-hole:nth-child\(1\)\{left:50%;top:50%\}/);
+  assert.match(script, /return loss \? 2400 : 1500/);
   assert.match(script, /const HOLES = 7/);
   assert.match(script, /const MAX_HITS = 8/);
 });
