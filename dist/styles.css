@@ -2505,8 +2505,8 @@ body,
 
 /* Stack board refinement: compact solid blocks, a dedicated level rail and a clean mobile frame. */
 .stack-stage{
-  min-height:820px;
-  grid-template-rows:minmax(760px,auto) 56px;
+  min-height:690px;
+  grid-template-rows:minmax(630px,auto) 56px;
   overflow:hidden;
 }
 .stack-play{
@@ -2514,7 +2514,7 @@ body,
   background:#0f1216;
 }
 .stack-scene{
-  min-height:724px;
+  min-height:594px;
   height:100%;
   margin-top:0;
   border-radius:9px;
@@ -2572,16 +2572,17 @@ body,
 .stack-level-rail .stack-progress i.complete{background:#35d294}
 .stack-level-rail .stack-progress i.current{width:11px;background:#239dff}
 .stack-current{display:none}
+.stack-tower{transform:translateY(var(--stack-camera,0));transition:transform .32s ease}
 .stack-platform{
-  bottom:calc(16px + var(--stack-level) * 28px);
-  height:27px;
+  bottom:calc(16px + var(--stack-level) * 30px);
+  height:28px;
   border:0;
   border-radius:6px;
   background:#219cff;
   box-shadow:inset 0 3px 0 rgba(255,255,255,.18),inset 0 -4px 0 rgba(3,38,68,.28);
 }
 .stack-platform.base{
-  height:27px;
+  height:28px;
   border:0;
   background:#167fd5;
   box-shadow:inset 0 3px 0 rgba(255,255,255,.17),inset 0 -4px 0 rgba(3,38,68,.3);
@@ -2591,7 +2592,7 @@ body,
 .stack-platform:nth-child(4n+4):not(.base){border:0;background:#35ce8b}
 .stack-moving-platform{
   top:32px;
-  height:27px;
+  height:28px;
 }
 .stack-moving-platform i{
   position:relative;
@@ -2676,18 +2677,19 @@ body,
   .stack-level-rail>strong{font-size:.6rem}
   .stack-level-rail .stack-progress{gap:2px}
   .stack-platform{
-    bottom:calc(14px + var(--stack-level) * 22px);
-    height:21px;
+    bottom:calc(14px + var(--stack-level) * 28px);
+    height:26px;
     border-radius:4px;
     box-shadow:inset 0 2px 0 rgba(255,255,255,.18),inset 0 -3px 0 rgba(3,38,68,.28);
   }
-  .stack-platform.base{height:21px;box-shadow:inset 0 2px 0 rgba(255,255,255,.17),inset 0 -3px 0 rgba(3,38,68,.3)}
-  .stack-moving-platform{top:28px;height:24px}
+  .stack-platform.base{height:26px;box-shadow:inset 0 2px 0 rgba(255,255,255,.17),inset 0 -3px 0 rgba(3,38,68,.3)}
+  .stack-moving-platform{top:28px;height:26px}
   .stack-moving-platform i,.stack-moving-platform.dropping.miss i b{border-radius:4px;box-shadow:inset 0 2px 0 rgba(255,255,255,.18),inset 0 -3px 0 rgba(3,38,68,.28)}
 }
 
 @media(max-width:420px){
   .stack-play{height:min(560px,calc(100dvh - 150px));min-height:490px}
-  .stack-platform{bottom:calc(12px + var(--stack-level) * 20px);height:19px}
-  .stack-platform.base{height:19px}
+  .stack-platform{bottom:calc(12px + var(--stack-level) * 26px);height:24px}
+  .stack-platform.base{height:24px}
+  .stack-moving-platform{height:24px}
 }

@@ -75,6 +75,17 @@
     return Math.min(1_000_000, houseFactor / (SUCCESS[difficulty] ** level));
   }
 
+  function stackLayout(level = 0) {
+    const compact = window.matchMedia("(max-width:420px)").matches;
+    const mobile = window.matchMedia("(max-width:780px)").matches;
+    const step = compact ? 26 : mobile ? 28 : 30;
+    const platformHeight = compact ? 24 : mobile ? 26 : 28;
+    const startTop = mobile ? 28 : 32;
+    const baseBottom = compact ? 12 : mobile ? 14 : 16;
+    const cameraShift = Math.max(0, baseBottom + level * step + platformHeight - Math.max(0, scene.clientHeight - 58));
+    return { step, platformHeight, startTop, baseBottom, cameraShift };
+  }
+
   function renderProgress() {
     const completed = Number(round?.completedLevels || 0);
     progress.replaceChildren(...Array.from({ length: MAX_LEVELS }, (_, index) => {
@@ -101,6 +112,7 @@
     tower.replaceChildren(createPlatform(0, 0, true), ...landed.map((drop, index) => createPlatform(index + 1, drop.offset)));
     const active = round?.status === "active";
     const nextLevel = Number(round?.completedLevels || 0) + 1;
+    tower.style.setProperty("--stack-camera", `${stackLayout(nextLevel).cameraShift}px`);
     moving.style.setProperty("--next-width", `${platformWidth(nextLevel)}%`);
     moving.classList.toggle("hidden", !active || nextLevel > MAX_LEVELS);
     moving.classList.toggle("ready", active && nextLevel <= MAX_LEVELS);
@@ -222,13 +234,8 @@
     const drop = nextRound?.lastDrop;
     if (!drop || !moving) return;
     const level = Number(previousRound?.completedLevels || 0) + 1;
-    const compact = window.matchMedia("(max-width:420px)").matches;
-    const mobile = window.matchMedia("(max-width:780px)").matches;
-    const step = compact ? 20 : mobile ? 22 : 28;
-    const startTop = mobile ? 28 : 32;
-    const baseBottom = compact ? 12 : mobile ? 14 : 16;
-    const movingHeight = mobile ? 24 : 27;
-    const targetY = Math.max(70, scene.clientHeight - startTop - (baseBottom + level * step) - movingHeight);
+    const { step, startTop, baseBottom, platformHeight, cameraShift } = stackLayout(level);
+    const targetY = Math.max(58, scene.clientHeight - startTop - (baseBottom + level * step) - platformHeight + cameraShift);
     const landingX = drop.landed ? Math.max(-5, Math.min(5, Number(drop.offset || 0) * 0.15)) : (Number(drop.offset || 1) < 0 ? -118 : 118);
     moving.style.setProperty("--drop-y", `${targetY}px`);
     moving.style.setProperty("--landing-x", `${landingX}%`);
