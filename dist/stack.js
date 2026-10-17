@@ -17,7 +17,7 @@
   const actionButton = game.querySelector("#stack-action");
   const cashoutButton = game.querySelector("#stack-cashout");
   const balanceLabel = game.querySelector("[data-stack-balance]");
-  const multiplierLabel = game.querySelector("#stack-multiplier");
+  const nextMultiplierLabel = game.querySelector("#stack-next-multiplier");
   const levelLabel = game.querySelector("#stack-level");
   const message = game.querySelector("#stack-message");
   const progress = game.querySelector("#stack-progress");
@@ -68,7 +68,7 @@
     message.hidden = !text;
   }
 
-  function platformWidth(level) { return Math.max(34, 82 - level * 1.9); }
+  function platformWidth(level) { return Math.max(30, 64 - level * 1.35); }
 
   function localMultiplier(level) {
     if (!level) return 1;
@@ -90,7 +90,7 @@
     const platform = document.createElement("span");
     platform.className = `stack-platform${base ? " base" : ""}`;
     platform.style.setProperty("--stack-level", String(level));
-    platform.style.setProperty("--stack-width", `${base ? 86 : platformWidth(level)}%`);
+    platform.style.setProperty("--stack-width", `${base ? 68 : platformWidth(level)}%`);
     platform.style.setProperty("--stack-x", `${base ? 0 : Math.max(-4, Math.min(4, Number(offset || 0) * 0.12))}%`);
     platform.setAttribute("aria-hidden", "true");
     return platform;
@@ -103,6 +103,7 @@
     const nextLevel = Number(round?.completedLevels || 0) + 1;
     moving.style.setProperty("--next-width", `${platformWidth(nextLevel)}%`);
     moving.classList.toggle("hidden", !active || nextLevel > MAX_LEVELS);
+    moving.classList.toggle("ready", active && nextLevel <= MAX_LEVELS);
     moving.classList.remove("dropping", "miss");
   }
 
@@ -122,7 +123,10 @@
     if (round?.difficulty) selectDifficulty(round.difficulty, false);
     const completed = Number(round?.completedLevels || 0);
     levelLabel.textContent = `${completed} / ${MAX_LEVELS}`;
-    multiplierLabel.textContent = formatMultiplier(round?.multiplier || 1);
+    const nextMultiplier = round?.status === "active"
+      ? round.levelMultipliers?.[completed]
+      : round ? null : localMultiplier(1);
+    nextMultiplierLabel.textContent = nextMultiplier ? formatMultiplier(nextMultiplier) : "—";
     renderProgress();
     renderTower();
     if (round && round.status !== "active") {
@@ -218,9 +222,13 @@
     const drop = nextRound?.lastDrop;
     if (!drop || !moving) return;
     const level = Number(previousRound?.completedLevels || 0) + 1;
-    const mobile = window.matchMedia("(max-width:520px)").matches;
-    const step = mobile ? 15 : 20;
-    const targetY = Math.max(70, scene.clientHeight - 36 - (18 + level * step) - 25);
+    const compact = window.matchMedia("(max-width:420px)").matches;
+    const mobile = window.matchMedia("(max-width:780px)").matches;
+    const step = compact ? 20 : mobile ? 22 : 28;
+    const startTop = mobile ? 28 : 32;
+    const baseBottom = compact ? 12 : mobile ? 14 : 16;
+    const movingHeight = mobile ? 24 : 27;
+    const targetY = Math.max(70, scene.clientHeight - startTop - (baseBottom + level * step) - movingHeight);
     const landingX = drop.landed ? Math.max(-5, Math.min(5, Number(drop.offset || 0) * 0.15)) : (Number(drop.offset || 1) < 0 ? -118 : 118);
     moving.style.setProperty("--drop-y", `${targetY}px`);
     moving.style.setProperty("--landing-x", `${landingX}%`);

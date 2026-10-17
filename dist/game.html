@@ -9,7 +9,7 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-1"></script>
-    <link rel="stylesheet" href="styles.css?v=stack-1&amp;wallet=3&amp;account=2" />
+    <link rel="stylesheet" href="styles.css?v=stack-2&amp;wallet=3&amp;account=2" />
   </head>
   <body class="game-page" data-authenticated="pending">
     <div class="app-shell">
@@ -827,18 +827,21 @@
               <section class="stack-controls" aria-label="Stack controls">
                 <label class="stack-field"><span><strong>Bet Amount</strong><small data-stack-balance>0.00000000</small></span><span class="stack-input-shell"><span data-stack-currency>$</span><input id="stack-bet-amount" type="number" min="0.01" step="0.01" value="0.00" inputmode="decimal" /><button type="button" data-stack-bet-action="half">½</button><button type="button" data-stack-bet-action="double">2×</button></span></label>
                 <fieldset class="stack-difficulty"><legend>Mode</legend><div><button class="easy" type="button" data-stack-difficulty="easy">Easy</button><button class="medium active" type="button" data-stack-difficulty="medium">Medium</button><button class="hard" type="button" data-stack-difficulty="hard">Hard</button><button class="extreme" type="button" data-stack-difficulty="extreme">Extreme</button></div></fieldset>
-                <div class="stack-current"><span><small>Level</small><strong id="stack-level">0 / 24</strong></span><span><small>Multiplier</small><strong id="stack-multiplier">1.00×</strong></span></div>
                 <button class="stack-primary" id="stack-action" type="button" disabled>Start</button>
                 <button class="stack-cashout" id="stack-cashout" type="button" disabled>Cash Out</button>
                 <p class="stack-message" id="stack-message" role="status" aria-live="polite" hidden></p>
               </section>
               <section class="stack-play" aria-label="Twenty-four level Stack board">
-                <div class="stack-progress"><span>24 levels</span><div id="stack-progress" aria-label="Stack level progress"></div></div>
                 <div class="stack-scene" id="stack-scene">
                   <div class="stack-height-lines" aria-hidden="true"></div>
                   <div class="stack-tower" id="stack-tower" aria-live="polite"></div>
-                  <div class="stack-moving-platform" id="stack-moving-platform" aria-hidden="true"><i></i></div>
+                  <div class="stack-moving-platform" id="stack-moving-platform" aria-hidden="true"><i><b></b><b></b></i></div>
                 </div>
+                <aside class="stack-level-rail" aria-label="Current Stack level and next multiplier">
+                  <span>Level</span><strong id="stack-level">0 / 24</strong>
+                  <div class="stack-progress" id="stack-progress" aria-label="Stack level progress"></div>
+                  <span>Next</span><strong id="stack-next-multiplier">1.27×</strong>
+                </aside>
               </section>
               <footer class="stack-footer"><div class="game-tools" data-shared-game-tools="stack" aria-label="Game tools">
                 <button class="game-tool-button" type="button" data-shared-game-tool="settings" aria-label="Stack settings" aria-expanded="false"><img src="assets/icons/game-tools/settings.png" alt="" /></button><button class="game-tool-button" type="button" data-shared-game-favorite="stack" aria-label="Add Stack to favourites" aria-pressed="false"><img src="assets/icons/game-tools/favorite.png" alt="" /></button><button class="game-tool-button" type="button" data-shared-game-tool="stats" aria-label="Stack session statistics" aria-expanded="false"><img src="assets/icons/game-tools/stats.png" alt="" /></button><button class="game-tool-button" type="button" data-shared-game-tool="info" aria-label="Stack information" aria-expanded="false"><img src="assets/icons/game-tools/info.png" alt="" /></button>
@@ -877,7 +880,7 @@
     <script src="towers.js?v=towers-1" defer></script>
     <script src="moles.js?v=moles-3" defer></script>
     <script src="limbo.js?v=limbo-1" defer></script>
-    <script src="stack.js?v=stack-1" defer></script>
+    <script src="stack.js?v=stack-2" defer></script>
     <script src="game-history.js?v=stack-1" defer></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
     <script type="module" src="firebase-auth.js?v=account-live-2"></script>
