@@ -774,8 +774,20 @@ function renderPromotions() {
     const availability = !promo.enabled ? "PAUSED" : promo.endsAt && Date.parse(promo.endsAt) <= Date.now() ? "ENDED" : promo.startsAt && Date.parse(promo.startsAt) > Date.now() ? "SCHEDULED" : "LIVE";
     const limit = promo.maxClaims ? `${promo.claimCount.toLocaleString()} / ${promo.maxClaims.toLocaleString()} claims` : `${promo.claimCount.toLocaleString()} claims`;
     const rankName = String(promo.minimumRankStage || "rookie").replaceAll("-", " ");
-    return `<article><header><div><strong>${escapeHtml(promo.code)}</strong><span>${escapeHtml(promo.title)}</span></div><b data-status="${availability.toLowerCase()}">${availability}</b></header><div class="promotion-reward">${escapeHtml(promo.rewardAmount)} ${escapeHtml(formatAsset(promo.rewardCurrency))}</div><small>Minimum ${escapeHtml(rankName)} ${["I", "II", "III"][promo.minimumRankTier - 1] || "I"} · ${escapeHtml(limit)}</small>${Number(promo.minimumDepositUsd) > 0 ? `<small>Deposit $${escapeHtml(promo.minimumDepositUsd)} across any crypto within ${promo.depositLookbackDays || "all"} days</small>` : ""}</article>`;
+    return `<article><header><div><strong>${escapeHtml(promo.code)}</strong><span>${escapeHtml(promo.title)}</span></div><span class="promotion-card-actions"><b data-status="${availability.toLowerCase()}">${availability}</b><button type="button" data-remove-promotion="${escapeHtml(promo.id)}" aria-label="Remove ${escapeHtml(promo.code)}">Remove</button></span></header><div class="promotion-reward">${escapeHtml(promo.rewardAmount)} ${escapeHtml(formatAsset(promo.rewardCurrency))}</div><small>Minimum ${escapeHtml(rankName)} ${["I", "II", "III"][promo.minimumRankTier - 1] || "I"} · ${escapeHtml(limit)}</small>${Number(promo.minimumDepositUsd) > 0 ? `<small>Deposit $${escapeHtml(promo.minimumDepositUsd)} across any crypto within ${promo.depositLookbackDays || "all"} days</small>` : ""}</article>`;
   }).join("");
+  container.querySelectorAll("[data-remove-promotion]").forEach((button) => button.addEventListener("click", async () => {
+    const promo = promotionsCache.find((item) => item.id === button.dataset.removePromotion);
+    if (!promo || !window.confirm(`Remove promotion ${promo.code}? It will stop working immediately.`)) return;
+    button.disabled = true;
+    button.textContent = "Removing…";
+    try {
+      await api(`/admin/promotions/${encodeURIComponent(promo.id)}/remove`, { method: "POST" });
+      promotionsCache = promotionsCache.filter((item) => item.id !== promo.id);
+      renderPromotions();
+      showToast(`${promo.code} removed`);
+    } catch (error) { button.disabled = false; button.textContent = "Remove"; showToast(error.message, "error"); }
+  }));
 }
 
 function preparePromotionAssets() {

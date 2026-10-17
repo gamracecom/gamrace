@@ -246,11 +246,13 @@ CREATE TABLE IF NOT EXISTS promotion_codes (
   starts_at INTEGER,
   ends_at INTEGER,
   enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+  archived_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   created_by TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS promotion_codes_active_idx ON promotion_codes(enabled, starts_at, ends_at);
+CREATE INDEX IF NOT EXISTS promotion_codes_visible_idx ON promotion_codes(archived_at, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS promotion_redemptions (
   id TEXT PRIMARY KEY,

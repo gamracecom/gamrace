@@ -4463,8 +4463,24 @@ function promotionResponse(row) {
 
 async function handleAdminPromotions(request, env, user) {
   await requireAdminSession(request, env, user);
-  const result = await env.DB.prepare("SELECT * FROM promotion_codes ORDER BY created_at DESC LIMIT 100").all();
+  const result = await env.DB.prepare("SELECT * FROM promotion_codes WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 100").all();
   return json(request, env, 200, { promotions: (result.results || []).map(promotionResponse) });
+}
+
+async function handleAdminRemovePromotion(request, env, user, promotionIdValue) {
+  await requireAdminSession(request, env, user);
+  const promotionId = String(promotionIdValue || "").trim();
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(promotionId)) throw httpError(400, "Choose a valid promotion");
+  const current = await env.DB.prepare("SELECT id, code, archived_at FROM promotion_codes WHERE id = ?").bind(promotionId).first();
+  if (!current || current.archived_at) throw httpError(404, "That promotion was not found");
+  const timestamp = now();
+  const result = await env.DB.prepare(`
+    UPDATE promotion_codes SET enabled = 0, archived_at = ?, updated_at = ?
+    WHERE id = ? AND archived_at IS NULL
+  `).bind(timestamp, timestamp, promotionId).run();
+  if (Number(result.meta?.changes || 0) !== 1) throw httpError(409, "That promotion has already been removed");
+  await writeAdminAudit(env, user, "promotion.removed", promotionId, JSON.stringify({ code: current.code }));
+  return json(request, env, 200, { removed: true, id: promotionId });
 }
 
 async function handleAdminCreatePromotion(request, env, user) {
@@ -4522,7 +4538,7 @@ async function handlePromotionClaim(request, env, user) {
   const promo = await env.DB.prepare("SELECT * FROM promotion_codes WHERE code = ? COLLATE NOCASE").bind(code).first();
   if (!promo) throw httpError(404, "That promotion code was not found");
   const timestamp = now();
-  if (!promo.enabled || (promo.starts_at && Number(promo.starts_at) > timestamp) || (promo.ends_at && Number(promo.ends_at) <= timestamp) || (promo.max_claims && Number(promo.claim_count) >= Number(promo.max_claims))) {
+  if (promo.archived_at || !promo.enabled || (promo.starts_at && Number(promo.starts_at) > timestamp) || (promo.ends_at && Number(promo.ends_at) <= timestamp) || (promo.max_claims && Number(promo.claim_count) >= Number(promo.max_claims))) {
     throw httpError(409, "That promotion is not currently available");
   }
   const previous = await env.DB.prepare("SELECT id FROM promotion_redemptions WHERE promotion_id = ? AND uid = ?").bind(promo.id, user.sub).first();
@@ -5166,6 +5182,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/leaderboards") return handleAdminLeaderboards(request, env, user);
   if (request.method === "GET" && path === "/admin/promotions") return handleAdminPromotions(request, env, user);
   if (request.method === "POST" && path === "/admin/promotions") return handleAdminCreatePromotion(request, env, user);
+  const removePromotionMatch = path.match(/^\/admin\/promotions\/([A-Za-z0-9-]+)\/remove$/);
+  if (request.method === "POST" && removePromotionMatch) return handleAdminRemovePromotion(request, env, user, removePromotionMatch[1]);
   if (request.method === "GET" && path === "/admin/game-edges") return handleAdminGameEdges(request, env, user);
   const gameEdgeMatch = path.match(/^\/admin\/game-edges\/([a-z0-9-]+)$/);
   if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
