@@ -340,19 +340,21 @@ function renderGameEdges() {
   const container = document.querySelector("#game-edge-grid");
   if (!container || !gameEdgesCache) return;
   container.innerHTML = gameEdgesCache.map((game) => `
-    <article class="panel-card game-edge-card${game.editable ? "" : " is-locked"}" data-game-edge="${escapeHtml(game.id)}">
+    <article class="panel-card game-edge-card${game.editable ? "" : " is-fixed-edge"}${game.maintenanceMode ? " is-maintenance" : ""}" data-game-edge="${escapeHtml(game.id)}">
       <div class="game-edge-title"><span>${escapeHtml(game.name.slice(0, 1))}</span><div><strong>${escapeHtml(game.name)}</strong><small>${game.editable ? "Live configurable margin" : escapeHtml(game.reason || "Fixed game math")}</small></div><b>${game.editable ? "EDITABLE" : "FIXED"}</b></div>
-      <label><span>House edge</span><span class="game-edge-input"><input type="number" min="0" max="10" step="0.01" value="${Number(game.houseEdgePercent).toFixed(2)}" ${game.editable ? "" : "disabled"} aria-label="${escapeHtml(game.name)} house edge percentage" /><i>%</i></span></label>
+      <div class="game-maintenance-row"><span><strong>Maintenance mode</strong><small>${game.maintenanceMode ? "New bets are blocked" : "Players can start new bets"}</small></span><button class="toggle-control${game.maintenanceMode ? " on" : ""}" data-maintenance-toggle type="button" role="switch" aria-checked="${String(Boolean(game.maintenanceMode))}" aria-label="Toggle ${escapeHtml(game.name)} maintenance mode"><span></span></button></div>
+      <label class="game-edge-setting${game.editable ? "" : " is-locked"}"><span>House edge</span><span class="game-edge-input"><input data-edge-input type="number" min="0" max="10" step="0.01" value="${Number(game.houseEdgePercent).toFixed(2)}" ${game.editable ? "" : "disabled"} aria-label="${escapeHtml(game.name)} house edge percentage" /><i>%</i></span></label>
       <div class="game-edge-rtp"><span>Player RTP</span><strong>${Number(game.rtpPercent).toFixed(2)}%</strong></div>
-      <button class="solid-button" type="button" ${game.editable ? "" : "disabled"}>${game.editable ? "Save edge" : "Not adjustable"}</button>
-      <p role="status"></p>
+      <button class="solid-button" data-save-edge type="button" ${game.editable ? "" : "disabled"}>${game.editable ? "Save edge" : "Not adjustable"}</button>
+      <p data-game-setting-status role="status"></p>
     </article>`).join("");
   container.querySelectorAll("[data-game-edge]").forEach((card) => {
     const game = gameEdgesCache.find((item) => item.id === card.dataset.gameEdge);
-    const input = card.querySelector("input");
+    const input = card.querySelector("[data-edge-input]");
     const rtp = card.querySelector(".game-edge-rtp strong");
-    const button = card.querySelector("button");
-    const status = card.querySelector("p");
+    const button = card.querySelector("[data-save-edge]");
+    const maintenanceButton = card.querySelector("[data-maintenance-toggle]");
+    const status = card.querySelector("[data-game-setting-status]");
     input?.addEventListener("input", () => { const edge = Number(input.value); rtp.textContent = Number.isFinite(edge) ? `${Math.max(0, 100 - edge).toFixed(2)}%` : "—"; });
     button?.addEventListener("click", async () => {
       const edge = Number(input.value);
@@ -363,6 +365,17 @@ function renderGameEdges() {
         gameEdgesCache = gameEdgesCache.map((item) => item.id === game.id ? result.game : item);
         renderGameEdges(); showToast(`${game.name} house edge updated`);
       } catch (error) { status.textContent = error.message; button.disabled = false; button.textContent = "Save edge"; }
+    });
+    maintenanceButton?.addEventListener("click", async () => {
+      const maintenanceMode = !Boolean(game.maintenanceMode);
+      maintenanceButton.disabled = true;
+      status.textContent = "";
+      try {
+        const result = await api(`/admin/games/${encodeURIComponent(game.id)}/maintenance`, { method: "POST", body: JSON.stringify({ maintenanceMode }) });
+        gameEdgesCache = gameEdgesCache.map((item) => item.id === game.id ? result.game : item);
+        renderGameEdges();
+        showToast(`${game.name} maintenance ${maintenanceMode ? "enabled" : "disabled"}`);
+      } catch (error) { status.textContent = error.message; maintenanceButton.disabled = false; }
     });
   });
 }
@@ -533,9 +546,11 @@ function refreshBalanceEditor() {
   if (!activePlayer) return;
   const currency = document.querySelector("#balance-asset").value;
   const balance = playerBalance(activePlayer, currency);
-  document.querySelector("#balance-current-available").textContent = `${balance.available} ${formatAsset(currency)}`;
-  document.querySelector("#balance-current-held").textContent = `${balance.held} ${formatAsset(currency)}`;
-  document.querySelector("#balance-amount").value = balance.available;
+  const availableUsd = balance.availableUsd === null || balance.availableUsd === undefined ? "Rate unavailable" : `$${balance.availableUsd}`;
+  const heldUsd = balance.heldUsd === null || balance.heldUsd === undefined ? "Rate unavailable" : `$${balance.heldUsd}`;
+  document.querySelector("#balance-current-available").textContent = `${availableUsd} · ${balance.available} ${formatAsset(currency)}`;
+  document.querySelector("#balance-current-held").textContent = `${heldUsd} · ${balance.held} ${formatAsset(currency)}`;
+  document.querySelector("#balance-amount").value = balance.availableUsd ?? "";
 }
 
 function openBalanceEditor(player) {
@@ -570,7 +585,7 @@ document.querySelector("#balance-form").addEventListener("submit", async (event)
   const reason = document.querySelector("#balance-reason").value.trim();
   const status = document.querySelector("#balance-status");
   const button = document.querySelector("#confirm-balance-update");
-  if (!/^\d+(?:\.\d{1,8})?$/.test(amount)) { status.textContent = "Enter a non-negative balance with no more than 8 decimal places."; return; }
+  if (!/^\d+(?:\.\d{1,2})?$/.test(amount)) { status.textContent = "Enter a non-negative dollar balance with no more than 2 decimal places."; return; }
   if (reason.length < 3) { status.textContent = "Add a brief reason for this balance change."; return; }
   button.disabled = true;
   button.textContent = "Saving securely…";
@@ -579,7 +594,7 @@ document.querySelector("#balance-form").addEventListener("submit", async (event)
     const playerName = activePlayer.username || "Player";
     await api(`/admin/users/${encodeURIComponent(activePlayer.uid)}/balances/${encodeURIComponent(currency)}`, {
       method: "POST",
-      body: JSON.stringify({ amount, reason }),
+      body: JSON.stringify({ amountUsd: amount, reason }),
     });
     balanceDialog.close();
     showToast(`${playerName} balance updated and audited`);
@@ -759,13 +774,13 @@ function renderPromotions() {
     const availability = !promo.enabled ? "PAUSED" : promo.endsAt && Date.parse(promo.endsAt) <= Date.now() ? "ENDED" : promo.startsAt && Date.parse(promo.startsAt) > Date.now() ? "SCHEDULED" : "LIVE";
     const limit = promo.maxClaims ? `${promo.claimCount.toLocaleString()} / ${promo.maxClaims.toLocaleString()} claims` : `${promo.claimCount.toLocaleString()} claims`;
     const rankName = String(promo.minimumRankStage || "rookie").replaceAll("-", " ");
-    return `<article><header><div><strong>${escapeHtml(promo.code)}</strong><span>${escapeHtml(promo.title)}</span></div><b data-status="${availability.toLowerCase()}">${availability}</b></header><div class="promotion-reward">${escapeHtml(promo.rewardAmount)} ${escapeHtml(formatAsset(promo.rewardCurrency))}</div><small>Minimum ${escapeHtml(rankName)} ${["I", "II", "III"][promo.minimumRankTier - 1] || "I"} · ${escapeHtml(limit)}</small>${Number(promo.minimumDepositAmount) > 0 ? `<small>Deposit ${escapeHtml(promo.minimumDepositAmount)} ${escapeHtml(formatAsset(promo.minimumDepositCurrency))} within ${promo.depositLookbackDays || "all"} days</small>` : ""}</article>`;
+    return `<article><header><div><strong>${escapeHtml(promo.code)}</strong><span>${escapeHtml(promo.title)}</span></div><b data-status="${availability.toLowerCase()}">${availability}</b></header><div class="promotion-reward">${escapeHtml(promo.rewardAmount)} ${escapeHtml(formatAsset(promo.rewardCurrency))}</div><small>Minimum ${escapeHtml(rankName)} ${["I", "II", "III"][promo.minimumRankTier - 1] || "I"} · ${escapeHtml(limit)}</small>${Number(promo.minimumDepositUsd) > 0 ? `<small>Deposit $${escapeHtml(promo.minimumDepositUsd)} across any crypto within ${promo.depositLookbackDays || "all"} days</small>` : ""}</article>`;
   }).join("");
 }
 
 function preparePromotionAssets() {
   const options = assetOrder.map((code) => `<option value="${code}">${escapeHtml(formatAsset(code))}</option>`).join("");
-  for (const select of [document.querySelector("#promo-reward-currency"), document.querySelector("#promo-deposit-currency")]) {
+  for (const select of [document.querySelector("#promo-reward-currency")]) {
     if (select && !select.options.length) select.innerHTML = options;
   }
 }
@@ -799,8 +814,7 @@ document.querySelector("#promo-form")?.addEventListener("submit", async (event) 
     rewardAmount: document.querySelector("#promo-reward-amount").value,
     minimumRankStage: document.querySelector("#promo-min-rank").value,
     minimumRankTier: Number(document.querySelector("#promo-min-tier").value),
-    minimumDepositCurrency: document.querySelector("#promo-deposit-currency").value,
-    minimumDepositAmount: document.querySelector("#promo-min-deposit").value || "0",
+    minimumDepositUsd: document.querySelector("#promo-min-deposit").value || "0",
     depositLookbackDays: Number(document.querySelector("#promo-lookback-days").value || 0),
     maxClaims: Number(document.querySelector("#promo-max-claims").value || 0),
     startsAt: dateValue("#promo-starts-at"),

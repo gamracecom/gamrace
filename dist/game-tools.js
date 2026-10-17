@@ -9,7 +9,26 @@
     keno: "Keno", wheel: "Wheel", "hi-lo": "Hi-Lo", coinflip: "Coinflip", crash: "Crash",
     blackjack: "Blackjack", towers: "Towers", moles: "Moles", limbo: "Limbo", stack: "Stack",
   };
+  const currentGame = String(new URLSearchParams(location.search).get("game") || "mines").toLowerCase();
   const roots = [...document.querySelectorAll("[data-shared-game-tools]")];
+
+  function renderMaintenanceNotice(enabled) {
+    const rail = document.querySelector(".game-rail");
+    if (!rail) return;
+    let notice = rail.querySelector("[data-game-maintenance-notice]");
+    if (!enabled) {
+      notice?.remove();
+      return;
+    }
+    if (!notice) {
+      notice = document.createElement("aside");
+      notice.className = "game-maintenance-notice";
+      notice.dataset.gameMaintenanceNotice = "";
+      notice.setAttribute("role", "status");
+      rail.prepend(notice);
+    }
+    notice.innerHTML = `<strong>${GAME_LABELS[currentGame] || "This game"} is under maintenance</strong><span>New bets are paused. Any round already in progress can still be completed or cashed out.</span>`;
+  }
 
   function readObject(key, storage = localStorage) {
     try {
@@ -223,6 +242,7 @@
       const response = await fetch("https://gamrace-wallet-api.gamracecom.workers.dev/games/settings", { cache: "no-store" });
       if (!response.ok) return;
       const payload = await response.json();
+      renderMaintenanceNotice(Boolean(payload?.games?.[currentGame]?.maintenanceMode));
       document.querySelectorAll("[data-game-rtp]").forEach((node) => {
         const value = Number(payload?.games?.[node.dataset.gameRtp]?.rtpPercent);
         if (!Number.isFinite(value)) return;

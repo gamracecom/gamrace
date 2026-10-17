@@ -721,6 +721,7 @@ body.modal-open { overflow: hidden; }
 .game-page { min-height: 100dvh; background: radial-gradient(circle at 74% 16%, rgba(0, 126, 211, .08), transparent 34%), var(--bg); }
 .game-main { padding-top: 106px; padding-bottom: 54px; }
 .game-rail { width: min(100%, var(--content-max)); margin-inline: auto; }
+.game-maintenance-notice{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:12px;padding:13px 16px;border:1px solid #5c343c;border-radius:10px;background:#25171b;color:#f5f7f9}.game-maintenance-notice strong{font-size:.76rem}.game-maintenance-notice span{color:#ca9ba3;font-size:.65rem;text-align:right}@media(max-width:700px){.game-maintenance-notice{align-items:flex-start;flex-direction:column;gap:5px}.game-maintenance-notice span{text-align:left}}
 .game-result-strip { min-height: 43px; display: flex; justify-content: flex-end; gap: 7px; padding: 5px 10px; overflow-x: auto; scrollbar-width: none; }
 .game-result-strip::-webkit-scrollbar { display: none; }
 .game-result-strip[hidden] { display: none; }

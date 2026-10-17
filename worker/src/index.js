@@ -77,6 +77,23 @@ const GAME_EDGE_DEFINITIONS = Object.freeze([
   { id: "stack", name: "Stack", editable: true },
 ]);
 
+const NEW_GAME_BET_PATHS = Object.freeze({
+  "/games/mines/rounds": "mines",
+  "/games/dice/bets": "dice",
+  "/games/wheel/bets": "wheel",
+  "/games/hi-lo/rounds": "hi-lo",
+  "/games/coinflip/rounds": "coinflip",
+  "/games/crash/wagers": "crash",
+  "/games/plinko/bets": "plinko",
+  "/games/keno/bets": "keno",
+  "/games/roulette/wagers": "roulette",
+  "/games/blackjack/rounds": "blackjack",
+  "/games/towers/rounds": "towers",
+  "/games/moles/rounds": "moles",
+  "/games/limbo/bets": "limbo",
+  "/games/stack/rounds": "stack",
+});
+
 async function gameHouseEdgeBasisPoints(env, gameId) {
   const games = await readGameEdges(env);
   const game = games.find((entry) => entry.id === gameId);
@@ -87,6 +104,14 @@ async function gameHouseFactorMicros(env, gameId) {
   return 1_000_000 - await gameHouseEdgeBasisPoints(env, gameId) * 100;
 }
 
+async function requireGameAvailable(env, gameId) {
+  const setting = await env.DB.prepare("SELECT maintenance_mode FROM game_settings WHERE game_id = ?")
+    .bind(gameId).first();
+  if (Number(setting?.maintenance_mode || 0) === 1) {
+    throw httpError(503, `${GAME_EDGE_DEFINITIONS.find((game) => game.id === gameId)?.name || "This game"} is under maintenance. New bets are temporarily paused.`, "GAME_MAINTENANCE");
+  }
+}
+
 async function handleGameSettings(request, env) {
   const games = await readGameEdges(env);
   return json(request, env, 200, {
@@ -95,6 +120,7 @@ async function handleGameSettings(request, env) {
       houseEdgePercent: game.houseEdgePercent,
       houseFactorMicros: Math.round(game.rtpPercent * 10_000),
       rtpPercent: game.rtpPercent,
+      maintenanceMode: game.maintenanceMode,
     }])),
   });
 }
@@ -808,6 +834,24 @@ function playerBetBindings(uid, count) {
 
 function stablecoinPrice(asset) {
   return ["USDT", "USDC"].includes(asset?.providerCurrency) ? 1 : 0;
+}
+
+function assetUnitsToUsdCents(units, asset, prices = {}) {
+  const price = Number(prices?.[asset?.providerCurrency] || stablecoinPrice(asset));
+  if (!Number.isFinite(price) || price <= 0) return null;
+  const dollars = Number(assetUnitsToString(Math.max(0, Number(units || 0)), false)) * price;
+  const cents = Math.round(dollars * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+async function usdCentsToAssetUnits(env, usdCents, asset) {
+  if (usdCents === 0) return 0;
+  const prices = await providerPrices(env);
+  const price = Number(prices?.[asset.providerCurrency] || stablecoinPrice(asset));
+  if (!Number.isFinite(price) || price <= 0) throw httpError(503, "A live USD price is not available for that coin right now");
+  const units = Math.round((usdCents / 100 / price) * 100_000_000);
+  if (!Number.isSafeInteger(units) || units <= 0) throw httpError(400, "That dollar balance is too small for the selected coin");
+  return units;
 }
 
 async function liveAccountSnapshot(env, uid, { includeActivity = true } = {}) {
@@ -4328,11 +4372,18 @@ function adminAssetAmount(row, field = "amount_units") {
 const LEADERBOARD_CADENCES = ["daily", "biweekly"];
 
 function parsePrizeUsdCents(value) {
+  return parseUsdCents(value, "Prize amount", { allowZero: false });
+}
+
+function parseUsdCents(value, label = "Amount", { allowZero = true } = {}) {
   const text = String(value ?? "").trim();
-  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw httpError(400, "Enter a valid prize amount");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw httpError(400, `Enter a valid ${label.toLowerCase()} in USD`);
   const [whole, fraction = ""] = text.split(".");
   const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-  if (!Number.isSafeInteger(cents) || cents < 1 || cents > 10_000_000_000) throw httpError(400, "Prize amount must be between $0.01 and $100,000,000");
+  const minimum = allowZero ? 0 : 1;
+  if (!Number.isSafeInteger(cents) || cents < minimum || cents > 10_000_000_000) {
+    throw httpError(400, `${label} must be between ${allowZero ? "$0.00" : "$0.01"} and $100,000,000`);
+  }
   return cents;
 }
 
@@ -4399,8 +4450,7 @@ function promotionResponse(row) {
     rewardAmount: assetUnitsToString(Number(row.reward_units), true),
     minimumRankStage: row.minimum_rank_stage,
     minimumRankTier: Number(row.minimum_rank_tier),
-    minimumDepositCurrency: row.minimum_deposit_currency,
-    minimumDepositAmount: assetUnitsToString(Number(row.minimum_deposit_units), true),
+    minimumDepositUsd: (Number(row.minimum_deposit_usd_cents || 0) / 100).toFixed(2),
     depositLookbackDays: Number(row.deposit_lookback_days),
     maxClaims: Number(row.max_claims),
     claimCount: Number(row.claim_count),
@@ -4430,8 +4480,7 @@ async function handleAdminCreatePromotion(request, env, user) {
   if (!PROMOTION_RANKS.some(([id]) => id === minimumRankStage)) throw httpError(400, "Choose a valid minimum rank");
   const minimumRankTier = Number(body.minimumRankTier || 1);
   if (![1, 2, 3].includes(minimumRankTier)) throw httpError(400, "Choose a valid rank tier");
-  const minimumDepositCurrency = requireWalletAsset(body.minimumDepositCurrency || rewardCurrency).code;
-  const minimumDepositUnits = parseNonNegativeAssetUnits(body.minimumDepositAmount || "0", { maximumUnits: 100_000_000_000_000 });
+  const minimumDepositUsdCents = parseUsdCents(body.minimumDepositUsd || "0", "Minimum deposit");
   const depositLookbackDays = Math.floor(Number(body.depositLookbackDays || 0));
   if (!Number.isInteger(depositLookbackDays) || depositLookbackDays < 0 || depositLookbackDays > 3650) throw httpError(400, "Deposit lookback must be between 0 and 3650 days");
   const maxClaims = Math.floor(Number(body.maxClaims || 0));
@@ -4450,11 +4499,12 @@ async function handleAdminCreatePromotion(request, env, user) {
   try {
     await env.DB.prepare(`
       INSERT INTO promotion_codes(id, code, title, description, reward_currency, reward_units, minimum_rank_stage,
-        minimum_rank_tier, minimum_deposit_currency, minimum_deposit_units, deposit_lookback_days, max_claims,
+        minimum_rank_tier, minimum_deposit_currency, minimum_deposit_units, minimum_deposit_usd_cents,
+        deposit_lookback_days, max_claims,
         claim_count, starts_at, ends_at, enabled, created_at, updated_at, created_by)
-      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
     `).bind(id, code, title, description, rewardCurrency, rewardUnits, minimumRankStage, minimumRankTier,
-      minimumDepositCurrency, minimumDepositUnits, depositLookbackDays, maxClaims, startsAt, endsAt,
+      rewardCurrency, minimumDepositUsdCents, depositLookbackDays, maxClaims, startsAt, endsAt,
       body.enabled === false ? 0 : 1, timestamp, timestamp, user.sub).run();
   } catch (error) {
     if (/unique/i.test(String(error?.message))) throw httpError(409, "That promotion code already exists");
@@ -4481,15 +4531,15 @@ async function handlePromotionClaim(request, env, user) {
   if (playerRankIndex(account.summary.totalWagered) < promotionRankIndex(promo.minimum_rank_stage, promo.minimum_rank_tier)) {
     throw httpError(403, "Your GamRace rank does not meet this promotion's requirement");
   }
-  if (Number(promo.minimum_deposit_units) > 0) {
+  if (Number(promo.minimum_deposit_usd_cents) > 0) {
     const cutoff = Number(promo.deposit_lookback_days) > 0 ? timestamp - Number(promo.deposit_lookback_days) * 86_400_000 : 0;
     const deposit = await env.DB.prepare(`
-      SELECT COALESCE(SUM(amount_units), 0) AS total_units FROM crypto_ledger
-      WHERE uid = ? AND currency = ? AND type = 'deposit' AND created_at >= ?
-    `).bind(user.sub, promo.minimum_deposit_currency, cutoff).first();
-    if (Number(deposit?.total_units || 0) < Number(promo.minimum_deposit_units)) {
+      SELECT COALESCE(SUM(requested_usd_cents), 0) AS total_usd_cents FROM crypto_deposits
+      WHERE uid = ? AND credited = 1 AND updated_at >= ?
+    `).bind(user.sub, cutoff).first();
+    if (Number(deposit?.total_usd_cents || 0) < Number(promo.minimum_deposit_usd_cents)) {
       const period = Number(promo.deposit_lookback_days) > 0 ? ` in the last ${promo.deposit_lookback_days} days` : "";
-      throw httpError(403, `Deposit at least ${assetUnitsToString(Number(promo.minimum_deposit_units), true)} ${getWalletAsset(promo.minimum_deposit_currency)?.symbol || promo.minimum_deposit_currency}${period} to claim this code`);
+      throw httpError(403, `Deposit at least $${(Number(promo.minimum_deposit_usd_cents) / 100).toFixed(2)} across any supported crypto${period} to claim this code`);
     }
   }
   const redemptionId = crypto.randomUUID();
@@ -4512,7 +4562,7 @@ async function handlePromotionClaim(request, env, user) {
 
 async function readGameEdges(env) {
   if (gameEdgesCache && gameEdgesCacheExpiresAt > now()) return gameEdgesCache;
-  const result = await env.DB.prepare("SELECT game_id, house_edge_basis_points, updated_at FROM game_settings").all();
+  const result = await env.DB.prepare("SELECT game_id, house_edge_basis_points, maintenance_mode, updated_at FROM game_settings").all();
   const settings = new Map((result.results || []).map((row) => [row.game_id, row]));
   gameEdgesCache = GAME_EDGE_DEFINITIONS.map((definition) => {
     const row = settings.get(definition.id);
@@ -4524,6 +4574,7 @@ async function readGameEdges(env) {
       houseEdgeBasisPoints,
       houseEdgePercent: houseEdgeBasisPoints / 100,
       rtpPercent: 100 - houseEdgeBasisPoints / 100,
+      maintenanceMode: Boolean(row?.maintenance_mode),
       updatedAt: row?.updated_at ? new Date(Number(row.updated_at)).toISOString() : null,
     };
   });
@@ -4557,6 +4608,26 @@ async function handleAdminSetGameEdge(request, env, user, gameIdValue) {
   gameEdgesCache = null;
   gameEdgesCacheExpiresAt = 0;
   await writeAdminAudit(env, user, "game.house_edge.updated", gameId, JSON.stringify({ houseEdgeBasisPoints }));
+  return json(request, env, 200, { game: (await readGameEdges(env)).find((game) => game.id === gameId) });
+}
+
+async function handleAdminSetGameMaintenance(request, env, user, gameIdValue) {
+  await requireAdminSession(request, env, user);
+  const gameId = String(gameIdValue || "").toLowerCase();
+  const definition = GAME_EDGE_DEFINITIONS.find((game) => game.id === gameId);
+  if (!definition) throw httpError(404, "That game was not found");
+  const body = await requestJson(request);
+  if (typeof body.maintenanceMode !== "boolean") throw httpError(400, "Maintenance mode must be true or false");
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO game_settings(game_id, house_edge_basis_points, maintenance_mode, updated_at, updated_by)
+    VALUES(?, 100, ?, ?, ?)
+    ON CONFLICT(game_id) DO UPDATE SET maintenance_mode = excluded.maintenance_mode,
+      updated_at = excluded.updated_at, updated_by = excluded.updated_by
+  `).bind(gameId, body.maintenanceMode ? 1 : 0, timestamp, user.sub).run();
+  gameEdgesCache = null;
+  gameEdgesCacheExpiresAt = 0;
+  await writeAdminAudit(env, user, body.maintenanceMode ? "game.maintenance.enabled" : "game.maintenance.disabled", gameId);
   return json(request, env, 200, { game: (await readGameEdges(env)).find((game) => game.id === gameId) });
 }
 
@@ -4790,6 +4861,8 @@ async function handleAdminUsers(request, env, user) {
         LEFT JOIN crypto_balances b ON b.uid = p.uid
         GROUP BY p.uid ORDER BY COALESCE(MAX(b.updated_at), p.updated_at) DESC LIMIT ?
       `).bind(limit).all();
+  let prices = {};
+  try { prices = await providerPrices(env); } catch { prices = {}; }
   const users = await Promise.all((result.results || []).map(async (row) => {
     const balanceResult = await env.DB.prepare(`
       SELECT currency, available_units, held_units FROM crypto_balances
@@ -4801,11 +4874,18 @@ async function handleAdminUsers(request, env, user) {
       selectedCurrency: row.selected_currency,
       assetCount: Number(row.asset_count || 0),
       lastWalletActivity: new Date(Number(row.balance_updated_at || row.updated_at || 0)).toISOString(),
-      balances: (balanceResult.results || []).map((balance) => ({
-        currency: balance.currency,
-        available: assetUnitsToString(Number(balance.available_units || 0)),
-        held: assetUnitsToString(Number(balance.held_units || 0)),
-      })),
+      balances: (balanceResult.results || []).map((balance) => {
+        const asset = getWalletAsset(balance.currency);
+        const availableUsdCents = assetUnitsToUsdCents(balance.available_units, asset, prices);
+        const heldUsdCents = assetUnitsToUsdCents(balance.held_units, asset, prices);
+        return {
+          currency: balance.currency,
+          available: assetUnitsToString(Number(balance.available_units || 0)),
+          held: assetUnitsToString(Number(balance.held_units || 0)),
+          availableUsd: availableUsdCents === null ? null : (availableUsdCents / 100).toFixed(2),
+          heldUsd: heldUsdCents === null ? null : (heldUsdCents / 100).toFixed(2),
+        };
+      }),
     };
   }));
   return json(request, env, 200, { users });
@@ -4819,7 +4899,8 @@ async function handleAdminSetBalance(request, env, user, uid, currency) {
   const body = await requestJson(request);
   const reason = String(body.reason || "").trim().replace(/[\r\n]+/g, " ").slice(0, 200);
   if (reason.length < 3) throw httpError(400, "Add a brief reason for this balance change");
-  const nextUnits = parseNonNegativeAssetUnits(body.amount);
+  const requestedUsdCents = parseUsdCents(body.amountUsd, "Available balance");
+  const nextUnits = await usdCentsToAssetUnits(env, requestedUsdCents, asset);
   const account = await env.DB.prepare(`
     SELECT uid FROM wallet_preferences WHERE uid = ?
     UNION SELECT uid FROM player_profiles WHERE uid = ? LIMIT 1
@@ -4833,6 +4914,7 @@ async function handleAdminSetBalance(request, env, user, uid, currency) {
   const auditId = crypto.randomUUID();
   const detail = JSON.stringify({
     asset: asset.code,
+    requestedUsd: (requestedUsdCents / 100).toFixed(2),
     previous: assetUnitsToString(previousUnits),
     next: assetUnitsToString(nextUnits),
     reason,
@@ -4858,6 +4940,7 @@ async function handleAdminSetBalance(request, env, user, uid, currency) {
       uid: targetUid,
       currency: asset.code,
       available: assetUnitsToString(nextUnits),
+      availableUsd: (requestedUsdCents / 100).toFixed(2),
       held: assetUnitsToString(Number(current?.held_units || 0)),
       updatedAt: new Date(timestamp).toISOString(),
     },
@@ -5086,6 +5169,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/game-edges") return handleAdminGameEdges(request, env, user);
   const gameEdgeMatch = path.match(/^\/admin\/game-edges\/([a-z0-9-]+)$/);
   if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
+  const gameMaintenanceMatch = path.match(/^\/admin\/games\/([a-z0-9-]+)\/maintenance$/);
+  if (request.method === "POST" && gameMaintenanceMatch) return handleAdminSetGameMaintenance(request, env, user, gameMaintenanceMatch[1]);
   const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(daily|biweekly)\/start$/);
   if (request.method === "POST" && leaderboardStartMatch) return handleAdminStartLeaderboard(request, env, user, leaderboardStartMatch[1]);
   const countryAccessMatch = path.match(/^\/admin\/country-access\/([A-Za-z]{2})$/);
@@ -5105,6 +5190,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);
+  if (request.method === "POST" && NEW_GAME_BET_PATHS[path]) await requireGameAvailable(env, NEW_GAME_BET_PATHS[path]);
   if (request.method === "GET" && path === "/games/towers/rounds/active") return handleGetActiveTowersRound(request, env, user);
   if (request.method === "POST" && path === "/games/towers/rounds") return handleStartTowersRound(request, env, user);
   const towersChooseMatch = path.match(/^\/games\/towers\/rounds\/([A-Za-z0-9-]+)\/choose$/);
@@ -5185,6 +5271,7 @@ async function route(request, env) {
 function publicError(error) {
   const status = Number(error?.httpStatus || 500);
   if (error?.code === "ADMIN_NOT_CONFIGURED") return error.message;
+  if (error?.code === "GAME_MAINTENANCE") return error.message;
   if (isD1CapacityError(error)) return "Wallet services are temporarily unavailable because database capacity has been reached. No balance-changing action was completed. Please retry shortly.";
   if (status >= 500) return "The wallet service could not complete that request";
   return error?.message || "The wallet service could not complete that request";

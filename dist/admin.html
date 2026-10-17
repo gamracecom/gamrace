@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#040d14" />
     <title>Control Room | GamRace</title>
     <link rel="icon" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="admin.css?v=promotions-2" />
+    <link rel="stylesheet" href="admin.css?v=usd-controls-1" />
   </head>
   <body>
     <div class="admin-ambient" aria-hidden="true"></div>
@@ -149,8 +149,8 @@
           <section class="admin-view" data-admin-panel="withdrawals" hidden><div class="page-intro"><div><p class="section-kicker">FINANCE</p><h2>Withdrawal review</h2><p>Approve a request to send it through OxaPay, or reject it to release the held funds.</p></div><div class="security-note"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.8 8.3 7 10 4.2-1.7 7-5.2 7-10V6l-7-3Z"/><path d="m9.2 12 1.8 1.8 4-4"/></svg><span>Funds remain reserved until OxaPay confirms the payout</span></div></div><div class="withdrawal-queue" id="withdrawal-queue"></div></section>
 
           <section class="admin-view" data-admin-panel="games" hidden>
-            <div class="page-intro"><div><p class="section-kicker">PRODUCT</p><h2>Game house edge</h2><p>Control the live mathematical margin for supported originals. Fixed games are locked so the interface never suggests a change that cannot affect their odds.</p></div><span class="future-badge">SERVER AUTHORITATIVE</span></div>
-            <div class="edge-summary"><strong>Changes apply to new rounds only</strong><span>Existing Mines, Hi-Lo and Coinflip rounds keep the edge they started with.</span></div>
+            <div class="page-intro"><div><p class="section-kicker">PRODUCT</p><h2>Games</h2><p>Control live house edges and pause new bets for individual originals. Maintenance is enforced by the server for every player and device.</p></div><span class="future-badge">SERVER AUTHORITATIVE</span></div>
+            <div class="edge-summary"><strong>Changes apply to new bets only</strong><span>Players can still finish or cash out an already active round while its game is in maintenance.</span></div>
             <div class="game-edge-grid" id="game-edge-grid" aria-live="polite"><article class="panel-card game-edge-loading">Loading live game settings…</article></div>
           </section>
 
@@ -185,8 +185,7 @@
                   <label><span>Reward amount</span><input id="promo-reward-amount" type="number" min="0.00000001" step="0.00000001" required /></label>
                   <label><span>Minimum rank</span><select id="promo-min-rank"><option value="rookie">Rookie</option><option value="street">Street</option><option value="circuit">Circuit</option><option value="turbo">Turbo</option><option value="velocity">Velocity</option><option value="hyper">Hyper</option><option value="apex">Apex</option><option value="pole">Pole Position</option><option value="champion">Champion</option><option value="hall-of-fame">Hall of Fame</option></select></label>
                   <label><span>Rank tier</span><select id="promo-min-tier"><option value="1">I</option><option value="2">II</option><option value="3">III</option></select></label>
-                  <label><span>Deposit asset</span><select id="promo-deposit-currency"></select></label>
-                  <label><span>Minimum deposit</span><input id="promo-min-deposit" type="number" min="0" step="0.00000001" value="0" /></label>
+                  <label><span>Minimum deposit (USD)</span><div class="leaderboard-money-input"><b>$</b><input id="promo-min-deposit" type="number" inputmode="decimal" min="0" max="100000000" step="0.01" value="0" /></div><small>Counts settled deposits across every supported crypto</small></label>
                   <label><span>Deposit lookback (days)</span><input id="promo-lookback-days" type="number" min="0" max="3650" step="1" value="0" /></label>
                   <label><span>Maximum claims</span><input id="promo-max-claims" type="number" min="0" step="1" value="0" /><small>0 means unlimited</small></label>
                   <label><span>Starts</span><input id="promo-starts-at" type="datetime-local" /></label>
@@ -239,16 +238,16 @@
         <p class="section-kicker">PLAYER WALLET</p>
         <h2>Edit available balance</h2>
         <div class="balance-player-summary"><strong id="balance-player-username">Player</strong><span id="balance-player-uid">—</span></div>
-        <label>Wallet asset<select id="balance-asset" required></select></label>
+        <label>Wallet asset to update<select id="balance-asset" required></select></label>
         <div class="balance-current-grid"><div><span>Available now</span><strong id="balance-current-available">0</strong></div><div><span>Held for withdrawals</span><strong id="balance-current-held">0</strong></div></div>
-        <label>New available balance<input id="balance-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00000000" required /></label>
+        <label>New available balance (USD)<div class="leaderboard-money-input"><b>$</b><input id="balance-amount" type="number" inputmode="decimal" min="0" max="100000000" step="0.01" autocomplete="off" placeholder="0.00" required /></div></label>
         <label>Audit reason<textarea id="balance-reason" maxlength="200" placeholder="Why is this balance being changed?" required></textarea></label>
-        <p class="balance-safety-note">Held funds are protected and cannot be changed here.</p>
+        <p class="balance-safety-note">Enter dollars. The server converts that value to the selected crypto using its live USD price. Held funds are protected and cannot be changed here.</p>
         <div class="dialog-actions"><button class="outline-button" id="cancel-balance-editor" type="button">Cancel</button><button class="solid-button" id="confirm-balance-update" type="submit">Save balance</button></div>
         <p class="dialog-status" id="balance-status" role="status"></p>
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=promotions-2"></script>
+    <script type="module" src="admin.js?v=usd-controls-1"></script>
   </body>
 </html>

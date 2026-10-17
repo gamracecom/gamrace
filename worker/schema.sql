@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS promotion_codes (
   minimum_rank_tier INTEGER NOT NULL DEFAULT 1 CHECK(minimum_rank_tier BETWEEN 1 AND 3),
   minimum_deposit_currency TEXT NOT NULL,
   minimum_deposit_units INTEGER NOT NULL DEFAULT 0 CHECK(minimum_deposit_units >= 0),
+  minimum_deposit_usd_cents INTEGER NOT NULL DEFAULT 0 CHECK(minimum_deposit_usd_cents >= 0),
   deposit_lookback_days INTEGER NOT NULL DEFAULT 0 CHECK(deposit_lookback_days BETWEEN 0 AND 3650),
   max_claims INTEGER NOT NULL DEFAULT 0 CHECK(max_claims >= 0),
   claim_count INTEGER NOT NULL DEFAULT 0 CHECK(claim_count >= 0),
@@ -786,6 +787,7 @@ CREATE INDEX IF NOT EXISTS hilo_rounds_history_idx ON hilo_rounds(status, create
 CREATE TABLE IF NOT EXISTS game_settings (
   game_id TEXT PRIMARY KEY,
   house_edge_basis_points INTEGER NOT NULL DEFAULT 100 CHECK(house_edge_basis_points BETWEEN 0 AND 1000),
+  maintenance_mode INTEGER NOT NULL DEFAULT 0 CHECK(maintenance_mode IN (0, 1)),
   updated_at INTEGER NOT NULL,
   updated_by TEXT NOT NULL
 );
