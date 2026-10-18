@@ -10,9 +10,8 @@
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="ranks/rookie-i.png" />
     <script src="shell-state.js?v=shell-stability-2"></script>
-    <link rel="preload" as="image" href="assets/banners/leaderboard-circuit-v3.webp" />
-    <link rel="preload" as="image" href="assets/banners/leaderboard-race-cars-v1.webp" />
-    <link rel="stylesheet" href="styles.css?v=leaderboard-page-3&amp;wallet=4&amp;account=3" />
+    <link rel="preload" as="image" href="assets/banners/leaderboard-checkered-flag-v1.webp" />
+    <link rel="stylesheet" href="styles.css?v=leaderboard-page-4&amp;wallet=4&amp;account=3" />
   </head>
   <body class="leaderboard-page" data-authenticated="pending">
     <div class="app-shell">
@@ -63,41 +62,41 @@
             <span><i aria-hidden="true">i</i> Every eligible wager moves you up the grid</span>
           </header>
 
-          <section class="race-leaderboard-hero" aria-labelledby="leaderboard-title">
-            <img class="race-track-art" src="assets/banners/leaderboard-circuit-v3.webp" alt="" fetchpriority="high" decoding="async" />
-            <div class="race-cadence-tabs" role="tablist" aria-label="Leaderboard period">
-              <button class="active" type="button" role="tab" aria-selected="true" data-leaderboard-tab="daily"><span>Daily</span></button>
-              <button type="button" role="tab" aria-selected="false" data-leaderboard-tab="biweekly"><span>BiWeekly</span></button>
+          <section class="leaderboard-flag-stage" aria-labelledby="leaderboard-race-title">
+            <img class="real-race-flag flag-left" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" fetchpriority="high" decoding="async" />
+            <img class="real-race-flag flag-right" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" fetchpriority="high" decoding="async" />
+            <div class="flag-stage-copy">
+              <img src="assets/brand/gamrace-icon.png" alt="" aria-hidden="true" />
+              <span data-leaderboard-page-cadence>Weekly race</span>
+              <h2 id="leaderboard-race-title">King of the Track</h2>
+              <strong data-leaderboard-page-prize>Prize TBA</strong>
+              <p class="race-leaderboard-timer"><i aria-hidden="true"></i> Ends in <b data-leaderboard-page-countdown>Race opens soon</b></p>
             </div>
-            <div class="race-hero-copy">
-              <span class="race-leaderboard-timer"><i aria-hidden="true"></i> Ending in <strong data-leaderboard-page-countdown>Race opens soon</strong></span>
-              <p>King of the Track</p>
-              <h2><strong data-leaderboard-page-prize>Prize TBA</strong> <span data-leaderboard-page-cadence>Daily</span></h2>
-            </div>
-            <div class="race-car-lane" aria-hidden="true">
-              <img class="race-car-pack" src="assets/banners/leaderboard-race-cars-v1.webp" alt="" decoding="async" />
-            </div>
-            <span class="race-speed-line line-one" aria-hidden="true"></span><span class="race-speed-line line-two" aria-hidden="true"></span><span class="race-speed-line line-three" aria-hidden="true"></span>
           </section>
 
-          <section class="race-podium-section" aria-label="Top three racers">
+          <div class="race-cadence-tabs leaderboard-period-tabs" role="tablist" aria-label="Leaderboard period">
+            <button class="active" type="button" role="tab" aria-selected="true" data-leaderboard-tab="weekly"><span>Weekly</span></button>
+            <button type="button" role="tab" aria-selected="false" data-leaderboard-tab="biweekly"><span>BiWeekly</span></button>
+          </div>
+
+          <section class="race-podium-section floating-podium-section" aria-label="Top three racers">
             <div class="race-podium" data-leaderboard-podium>
-              <article class="podium-racer second" data-podium-position="2">
-                <span class="podium-flag" aria-hidden="true"></span><span class="podium-medal">2</span>
+              <article class="podium-racer floating-podium-card second" data-podium-position="2">
+                <span class="podium-aura" aria-hidden="true"></span><span class="podium-medal">2</span>
                 <div class="podium-badge"><img alt="" data-racer-badge /></div>
                 <strong data-racer-name>Grid position open</strong><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
                 <b data-racer-wager>—</b><small>Weighted wager</small>
                 <div class="podium-prize" data-racer-prize>Prize TBA</div>
               </article>
-              <article class="podium-racer first" data-podium-position="1">
-                <span class="podium-flag" aria-hidden="true"></span><span class="podium-medal">1</span>
+              <article class="podium-racer floating-podium-card first" data-podium-position="1">
+                <span class="podium-aura" aria-hidden="true"></span><span class="podium-medal">1</span>
                 <div class="podium-badge"><img alt="" data-racer-badge /></div>
                 <strong data-racer-name>Grid position open</strong><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
                 <b data-racer-wager>—</b><small>Weighted wager</small>
                 <div class="podium-prize" data-racer-prize>Prize TBA</div>
               </article>
-              <article class="podium-racer third" data-podium-position="3">
-                <span class="podium-flag" aria-hidden="true"></span><span class="podium-medal">3</span>
+              <article class="podium-racer floating-podium-card third" data-podium-position="3">
+                <span class="podium-aura" aria-hidden="true"></span><span class="podium-medal">3</span>
                 <div class="podium-badge"><img alt="" data-racer-badge /></div>
                 <strong data-racer-name>Grid position open</strong><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
                 <b data-racer-wager>—</b><small>Weighted wager</small>
@@ -106,9 +105,9 @@
             </div>
           </section>
 
-          <section class="race-grid-card" aria-labelledby="starting-grid-title">
+          <section class="race-grid-card floating-grid" aria-labelledby="starting-grid-title">
             <div class="race-grid-heading">
-              <div><span class="race-grid-icon" aria-hidden="true">▦</span><div><h2 id="starting-grid-title">Starting Grid</h2><p>Live weighted wagers for this race</p></div></div>
+              <div><div><h2 id="starting-grid-title">Starting Grid</h2><p>Live weighted wagers for this race</p></div></div>
               <span class="race-live-chip"><i aria-hidden="true"></i> Live</span>
             </div>
             <div class="race-grid-table" role="table" aria-label="Leaderboard standings">
@@ -138,6 +137,6 @@
     <script type="module" src="firebase-auth.js?v=account-live-3"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
     <script type="module" src="wallet.js?v=balance-stability-1"></script>
-    <script src="leaderboard.js?v=live-grid-2" defer></script>
+    <script src="leaderboard.js?v=live-grid-3" defer></script>
   </body>
 </html>

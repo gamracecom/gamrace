@@ -749,7 +749,7 @@ function renderLeaderboards() {
   container.innerHTML = leaderboardCache.map((leaderboard) => {
     const active = leaderboard.status === "active" && leaderboard.endsAt && Date.parse(leaderboard.endsAt) > Date.now();
     const status = active ? "live" : leaderboard.endsAt ? "ended" : "scheduled";
-    const label = leaderboard.cadence === "biweekly" ? "BiWeekly" : "Daily";
+    const label = leaderboard.cadence === "biweekly" ? "BiWeekly" : "Weekly";
     return `<article class="panel-card leaderboard-status-card" data-leaderboard-admin-cadence="${leaderboard.cadence}"><div class="leaderboard-status-head"><span>${label.toUpperCase()} RACE</span><span class="status-pill ${status}">${active ? "LIVE" : leaderboard.endsAt ? "ENDED" : "NOT STARTED"}</span></div><h3>King of the Track</h3><strong class="leaderboard-status-prize">${escapeHtml(adminPrize(leaderboard.prizeUsdCents))}</strong><b class="leaderboard-status-countdown">${escapeHtml(adminLeaderboardCountdown(leaderboard))}</b><small>${leaderboard.endsAt ? `Ends ${escapeHtml(formatDate(leaderboard.endsAt))}` : "Set the prize and duration to put this race live."}</small></article>`;
   }).join("");
 }
@@ -872,7 +872,7 @@ document.querySelector("#leaderboard-form")?.addEventListener("submit", async (e
     });
     leaderboardCache = (leaderboardCache || []).map((item) => item.cadence === result.leaderboard.cadence ? result.leaderboard : item);
     renderLeaderboards();
-    showToast(`${cadence === "biweekly" ? "BiWeekly" : "Daily"} King of the Track is live`);
+    showToast(`${cadence === "biweekly" ? "BiWeekly" : "Weekly"} King of the Track is live`);
   } catch (error) {
     status.textContent = error.message;
   } finally {

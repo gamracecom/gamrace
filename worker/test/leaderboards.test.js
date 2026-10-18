@@ -17,13 +17,13 @@ test("leaderboard schema stores one authoritative campaign per cadence", () => {
   database.prepare(`
     INSERT INTO leaderboard_campaigns(
       cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at, updated_by
-    ) VALUES('daily', 3000000, 'active', 86400, 1000, 86401000, 1000, 'owner')
+    ) VALUES('weekly', 3000000, 'active', 604800, 1000, 604801000, 1000, 'owner')
   `).run();
-  assert.equal(database.prepare("SELECT prize_usd_cents FROM leaderboard_campaigns WHERE cadence = 'daily'").get().prize_usd_cents, 3000000);
+  assert.equal(database.prepare("SELECT prize_usd_cents FROM leaderboard_campaigns WHERE cadence = 'weekly'").get().prize_usd_cents, 3000000);
   assert.throws(() => database.prepare(`
     INSERT INTO leaderboard_campaigns(
       cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at, updated_by
-    ) VALUES('weekly', 100, 'active', 60, 1, 2, 1, 'owner')
+    ) VALUES('daily', 100, 'active', 60, 1, 2, 1, 'owner')
   `).run());
 });
 

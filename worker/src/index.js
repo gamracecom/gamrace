@@ -4369,7 +4369,7 @@ function adminAssetAmount(row, field = "amount_units") {
   }
 }
 
-const LEADERBOARD_CADENCES = ["daily", "biweekly"];
+const LEADERBOARD_CADENCES = ["weekly", "biweekly"];
 
 function parsePrizeUsdCents(value) {
   return parseUsdCents(value, "Prize amount", { allowZero: false });
@@ -4471,7 +4471,7 @@ async function leaderboardStandings(env, campaign) {
 async function readLeaderboards(env) {
   const result = await env.DB.prepare(`
     SELECT cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at
-    FROM leaderboard_campaigns WHERE cadence IN ('daily', 'biweekly')
+    FROM leaderboard_campaigns WHERE cadence IN ('weekly', 'biweekly')
   `).all();
   const rows = new Map((result.results || []).map((row) => [row.cadence, row]));
   return Promise.all(LEADERBOARD_CADENCES.map(async (cadence) => {
@@ -5259,7 +5259,7 @@ async function route(request, env) {
   if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
   const gameMaintenanceMatch = path.match(/^\/admin\/games\/([a-z0-9-]+)\/maintenance$/);
   if (request.method === "POST" && gameMaintenanceMatch) return handleAdminSetGameMaintenance(request, env, user, gameMaintenanceMatch[1]);
-  const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(daily|biweekly)\/start$/);
+  const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(weekly|biweekly)\/start$/);
   if (request.method === "POST" && leaderboardStartMatch) return handleAdminStartLeaderboard(request, env, user, leaderboardStartMatch[1]);
   const countryAccessMatch = path.match(/^\/admin\/country-access\/([A-Za-z]{2})$/);
   if (request.method === "POST" && countryAccessMatch) return handleAdminSetCountryAccess(request, env, user, countryAccessMatch[1]);

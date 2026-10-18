@@ -11,7 +11,7 @@
   const cadenceLabel = document.querySelector("[data-leaderboard-page-cadence]");
   const status = document.querySelector("[data-leaderboard-status]");
   const campaigns = new Map();
-  let activeCadence = "daily";
+  let activeCadence = "weekly";
   const prizeShares = [0.35, 0.2, 0.14, 0.09, 0.065, 0.05, 0.04, 0.035, 0.02, 0.01];
 
   function moneyFromCents(value) {
@@ -105,7 +105,7 @@
     const standings = Array.isArray(campaign?.standings) ? campaign.standings : [];
     prize.textContent = moneyFromCents(campaign?.prizeUsdCents);
     countdown.textContent = countdownText(campaign);
-    cadenceLabel.textContent = activeCadence === "biweekly" ? "BiWeekly" : "Daily";
+    cadenceLabel.textContent = activeCadence === "biweekly" ? "BiWeekly race" : "Weekly race";
     tabs.forEach((tab) => {
       const active = tab.dataset.leaderboardTab === activeCadence;
       tab.classList.toggle("active", active);
@@ -133,7 +133,7 @@
   }
 
   tabs.forEach((tab) => tab.addEventListener("click", () => {
-    activeCadence = tab.dataset.leaderboardTab || "daily";
+    activeCadence = tab.dataset.leaderboardTab || "weekly";
     render();
   }));
   render();
