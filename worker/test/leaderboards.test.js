@@ -48,4 +48,20 @@ test("leaderboard routes separate public display from owner-only race control", 
   assert.match(worker, /await optionalUser\(request, env\)/);
   assert.match(worker, /currentPlayer/);
   assert.match(worker, /badgePath: `\/ranks\/\$\{stageId\}-\$\{badgeTier\}\.webp`/);
+  assert.match(worker, /async function settleEndedLeaderboards/);
+  assert.match(worker, /leaderboard_settlements/);
+  assert.match(worker, /type, amount_units, provider_reference, created_at\)\s+VALUES\(\?, \?, \?, 'leaderboard_payout'/);
+  assert.match(worker, /status = 'waiting'/);
+  assert.match(worker, /maintainLiveGameTimelines\(env, now\(\)\), settleEndedLeaderboards\(env\)/);
+});
+
+test("leaderboard settlements and shared chat are persisted and duplicate safe", () => {
+  const database = new DatabaseSync(":memory:");
+  database.exec(schema);
+  const settlementColumns = database.prepare("PRAGMA table_info(leaderboard_settlements)").all().map((column) => column.name);
+  assert.ok(settlementColumns.includes("campaign_key"));
+  const payoutIndexes = database.prepare("PRAGMA index_list(leaderboard_payouts)").all();
+  assert.ok(payoutIndexes.some((index) => index.unique === 1));
+  assert.equal(database.prepare("SELECT value_text FROM site_settings WHERE setting_key = 'chat_minimum_wager_usd_cents'").get().value_text, "10000");
+  assert.ok(database.prepare("PRAGMA table_info(chat_messages)").all().some((column) => column.name === "message"));
 });

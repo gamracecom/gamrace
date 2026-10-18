@@ -52,6 +52,7 @@ let activePlayer = null;
 let leaderboardCache = null;
 let promotionsCache = null;
 let gameEdgesCache = null;
+let chatSettingsCache = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -916,10 +917,54 @@ async function loadAudit() {
 }
 
 async function loadSystem(force = false) {
-  const data = systemCache && !force ? systemCache : await api("/admin/system");
+  const [data, chatSettings] = await Promise.all([
+    systemCache && !force ? systemCache : api("/admin/system"),
+    chatSettingsCache && !force ? chatSettingsCache : api("/admin/chat/settings"),
+  ]);
   systemCache = data;
+  chatSettingsCache = chatSettings;
   renderSystem(data);
+  renderChatSettings(chatSettings);
   setLastRefresh();
+}
+
+function ensureChatSettingsControl() {
+  let card = document.querySelector(".chat-access-control");
+  if (card) return card;
+  card = document.createElement("article");
+  card.className = "panel-card chat-access-control";
+  card.innerHTML = `<div class="panel-heading"><div><p class="section-kicker">LIVE CHAT</p><h3>Chat access requirement</h3><p>Everyone can read chat. Set the lifetime site wager required before a signed-in player can send messages.</p></div></div><form id="chat-access-form"><label><span>Minimum lifetime wager (USD)</span><div class="leaderboard-money-input"><b>$</b><input id="chat-minimum-wager" type="number" inputmode="decimal" min="0" max="100000000" step="0.01" value="100.00" required /></div></label><button class="solid-button" type="submit">Save chat requirement</button><p class="dialog-status" id="chat-access-status" role="status" aria-live="polite"></p></form>`;
+  const systemPanel = document.querySelector('[data-admin-panel="system"]');
+  systemPanel?.querySelector(".global-controls")?.before(card);
+  card.querySelector("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    const status = event.currentTarget.querySelector(".dialog-status");
+    button.disabled = true;
+    status.textContent = "";
+    try {
+      chatSettingsCache = await api("/admin/chat/settings", {
+        method: "POST",
+        body: JSON.stringify({ minimumWagerUsd: event.currentTarget.querySelector("input").value }),
+      });
+      renderChatSettings(chatSettingsCache);
+      status.textContent = "Live chat requirement updated for every player.";
+      status.dataset.state = "success";
+      showToast("Chat requirement updated");
+    } catch (error) {
+      status.textContent = error.message;
+      status.dataset.state = "error";
+    } finally {
+      button.disabled = false;
+    }
+  });
+  return card;
+}
+
+function renderChatSettings(settings) {
+  const card = ensureChatSettingsControl();
+  const input = card?.querySelector("#chat-minimum-wager");
+  if (input) input.value = (Number(settings?.minimumWagerUsdCents || 0) / 100).toFixed(2);
 }
 
 function renderSystem(data) {

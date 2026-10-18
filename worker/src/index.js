@@ -4473,11 +4473,12 @@ function parseUsdCents(value, label = "Amount", { allowZero = true } = {}) {
 function leaderboardResponse(row, cadence) {
   if (!row) return { cadence, prizeUsdCents: 0, prizePlaces: 10, status: "scheduled", startsAt: null, endsAt: null, durationSeconds: 0, standings: [] };
   const ended = Number(row.ends_at) <= now();
+  const status = row.status === "waiting" ? "waiting" : ended ? "ended" : row.status;
   return {
     cadence,
     prizeUsdCents: Number(row.prize_usd_cents),
     prizePlaces: Math.max(1, Math.min(50, Number(row.prize_places || 10))),
-    status: ended ? "ended" : row.status,
+    status,
     startsAt: new Date(Number(row.starts_at)).toISOString(),
     endsAt: new Date(Number(row.ends_at)).toISOString(),
     durationSeconds: Number(row.duration_seconds),
@@ -4499,7 +4500,18 @@ function leaderboardRank(totalWagered) {
   };
 }
 
-async function leaderboardStandings(env, campaign, prizePlaces, viewer) {
+function leaderboardPrizeUsdCents(total, places, position) {
+  const pool = Math.max(0, Number(total || 0));
+  const count = Math.max(1, Number(places || 1));
+  if (!pool || position < 1 || position > count) return 0;
+  const totalWeight = count * (count + 1) / 2;
+  if (position < count) return Math.floor(pool * (count - position + 1) / totalWeight);
+  let distributed = 0;
+  for (let index = 1; index < count; index += 1) distributed += Math.floor(pool * (count - index + 1) / totalWeight);
+  return Math.max(0, pool - distributed);
+}
+
+async function leaderboardStandings(env, campaign, prizePlaces, viewer, { includeUid = false } = {}) {
   if (!campaign) {
     if (!viewer) return { standings: [], currentPlayer: null };
     const profile = await env.DB.prepare("SELECT username FROM player_profiles WHERE uid = ?").bind(viewer.sub).first();
@@ -4556,6 +4568,7 @@ async function leaderboardStandings(env, campaign, prizePlaces, viewer) {
     const usernameVisible = isViewer || (profileVisible && Boolean(profile.show_username ?? 1));
     const rankVisible = isViewer || (profileVisible && Boolean(profile.show_rank ?? 1));
     return {
+      ...(includeUid ? { uid: racer.uid } : {}),
       position,
       username: usernameVisible ? String(profile.username || (isViewer ? viewer?.name : "Racer") || "Racer") : "Hidden Racer",
       profileVisible: usernameVisible,
@@ -4568,6 +4581,70 @@ async function leaderboardStandings(env, campaign, prizePlaces, viewer) {
     standings: leaders.map((racer, index) => entryFor(racer, index + 1, racer.uid === viewer?.sub)),
     currentPlayer: viewerRacer ? entryFor(viewerRacer, viewerIndex >= 0 ? viewerIndex + 1 : null, true) : null,
   };
+}
+
+async function settleLeaderboardCampaign(env, campaign) {
+  if (!campaign || campaign.status !== "active" || Number(campaign.ends_at) > now()) return false;
+  const campaignKey = `${campaign.cadence}:${campaign.starts_at}`;
+  const alreadySettled = await env.DB.prepare("SELECT campaign_key FROM leaderboard_settlements WHERE campaign_key = ?").bind(campaignKey).first();
+  if (alreadySettled) {
+    await env.DB.prepare("UPDATE leaderboard_campaigns SET status = 'waiting', updated_at = ? WHERE cadence = ? AND starts_at = ?")
+      .bind(now(), campaign.cadence, campaign.starts_at).run();
+    return false;
+  }
+  const places = Math.max(1, Math.min(50, Number(campaign.prize_places || 10)));
+  const result = await leaderboardStandings(env, campaign, places, null, { includeUid: true });
+  const winners = (result.standings || []).filter((entry) => entry.uid && entry.wagerUsdCents > 0);
+  const settledAt = now();
+  const currency = DEFAULT_WALLET_ASSET;
+  const statements = [];
+  let paidUsdCents = 0;
+  statements.push(env.DB.prepare(`
+    INSERT INTO leaderboard_settlements(
+      campaign_key, cadence, starts_at, ends_at, prize_usd_cents, paid_usd_cents, winner_count, settled_at
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(campaignKey, campaign.cadence, campaign.starts_at, campaign.ends_at, campaign.prize_usd_cents, 0, winners.length, settledAt));
+  winners.forEach((winner) => {
+    const prizeUsdCents = leaderboardPrizeUsdCents(campaign.prize_usd_cents, places, winner.position);
+    const amountUnits = prizeUsdCents * 1_000_000;
+    if (!prizeUsdCents || !Number.isSafeInteger(amountUnits)) return;
+    paidUsdCents += prizeUsdCents;
+    const payoutId = `leaderboard_${campaign.cadence}_${campaign.starts_at}_${winner.position}`;
+    statements.push(env.DB.prepare(`
+      INSERT INTO crypto_balances(
+        uid, currency, available_units, held_units, lifetime_deposited_units, lifetime_withdrawn_units, created_at, updated_at
+      ) VALUES(?, ?, ?, 0, 0, 0, ?, ?)
+      ON CONFLICT(uid, currency) DO UPDATE SET available_units = available_units + excluded.available_units, updated_at = excluded.updated_at
+    `).bind(winner.uid, currency, amountUnits, settledAt, settledAt));
+    statements.push(env.DB.prepare(`
+      INSERT INTO crypto_ledger(id, uid, currency, type, amount_units, provider_reference, created_at)
+      VALUES(?, ?, ?, 'leaderboard_payout', ?, ?, ?)
+    `).bind(payoutId, winner.uid, currency, amountUnits, campaignKey, settledAt));
+    statements.push(env.DB.prepare(`
+      INSERT INTO leaderboard_payouts(
+        id, campaign_key, cadence, uid, position, wager_usd_cents, prize_usd_cents, currency, amount_units, created_at
+      ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(payoutId, campaignKey, campaign.cadence, winner.uid, winner.position, winner.wagerUsdCents, prizeUsdCents, currency, amountUnits, settledAt));
+  });
+  statements.push(env.DB.prepare("UPDATE leaderboard_settlements SET paid_usd_cents = ? WHERE campaign_key = ?").bind(paidUsdCents, campaignKey));
+  statements.push(env.DB.prepare("UPDATE leaderboard_campaigns SET status = 'waiting', updated_at = ? WHERE cadence = ? AND starts_at = ? AND status = 'active'")
+    .bind(settledAt, campaign.cadence, campaign.starts_at));
+  try {
+    await env.DB.batch(statements);
+    return true;
+  } catch (error) {
+    const settled = await env.DB.prepare("SELECT campaign_key FROM leaderboard_settlements WHERE campaign_key = ?").bind(campaignKey).first();
+    if (settled) return false;
+    throw error;
+  }
+}
+
+async function settleEndedLeaderboards(env) {
+  const due = await env.DB.prepare(`
+    SELECT cadence, prize_usd_cents, prize_places, status, duration_seconds, starts_at, ends_at, updated_at, updated_by
+    FROM leaderboard_campaigns WHERE status = 'active' AND ends_at <= ?
+  `).bind(now()).all();
+  for (const campaign of due.results || []) await settleLeaderboardCampaign(env, campaign);
 }
 
 async function readLeaderboards(env, viewer = null) {
@@ -4585,6 +4662,7 @@ async function readLeaderboards(env, viewer = null) {
 }
 
 async function handleLeaderboards(request, env, viewer = null) {
+  await settleEndedLeaderboards(env);
   return json(request, env, 200, { leaderboards: await readLeaderboards(env, viewer), generatedAt: new Date(now()).toISOString() });
 }
 
@@ -4612,6 +4690,100 @@ function playerRankIndex(totalWagered) {
     if (Number(totalWagered || 0) >= threshold) index = stageIndex * 3 + tierIndex;
   }));
   return index;
+}
+
+const CHAT_MINIMUM_WAGER_SETTING = "chat_minimum_wager_usd_cents";
+
+async function readChatMinimumWagerUsdCents(env) {
+  const row = await env.DB.prepare("SELECT value_text FROM site_settings WHERE setting_key = ?")
+    .bind(CHAT_MINIMUM_WAGER_SETTING).first();
+  const value = Number(row?.value_text ?? 10_000);
+  return Number.isSafeInteger(value) && value >= 0 ? value : 10_000;
+}
+
+function chatMessageResponse(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    rankLabel: row.rank_label,
+    badgePath: row.badge_path,
+    message: row.message,
+    createdAt: Number(row.created_at),
+  };
+}
+
+async function handleChatMessages(request, env) {
+  const url = new URL(request.url);
+  const after = Math.max(0, Number(url.searchParams.get("after") || 0));
+  const result = after
+    ? await env.DB.prepare(`
+        SELECT id, username, rank_label, badge_path, message, created_at
+        FROM chat_messages WHERE deleted_at IS NULL AND created_at > ? ORDER BY created_at ASC LIMIT 100
+      `).bind(after).all()
+    : await env.DB.prepare(`
+        SELECT id, username, rank_label, badge_path, message, created_at
+        FROM (SELECT id, username, rank_label, badge_path, message, created_at
+          FROM chat_messages WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100)
+        ORDER BY created_at ASC
+      `).all();
+  return json(request, env, 200, { messages: (result.results || []).map(chatMessageResponse), generatedAt: now() });
+}
+
+async function chatAccessSnapshot(env, user) {
+  const [minimumWagerUsdCents, account] = await Promise.all([
+    readChatMinimumWagerUsdCents(env),
+    liveAccountSnapshot(env, user.sub, { includeActivity: false }),
+  ]);
+  const wagerUsdCents = Math.max(0, Math.round(Number(account.summary.totalWagered || 0) * 100));
+  return {
+    minimumWagerUsdCents,
+    wagerUsdCents,
+    canSend: wagerUsdCents >= minimumWagerUsdCents,
+    remainingUsdCents: Math.max(0, minimumWagerUsdCents - wagerUsdCents),
+  };
+}
+
+async function handleChatStatus(request, env, user) {
+  return json(request, env, 200, { access: await chatAccessSnapshot(env, user) });
+}
+
+async function handleSendChatMessage(request, env, user) {
+  const access = await chatAccessSnapshot(env, user);
+  if (!access.canSend) throw httpError(403, `Wager $${(access.remainingUsdCents / 100).toFixed(2)} more to unlock chat`, "CHAT_WAGER_REQUIRED");
+  const body = await requestJson(request);
+  const message = String(body.message || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!message || message.length > 240) throw httpError(400, "Chat messages must be between 1 and 240 characters");
+  const recent = await env.DB.prepare("SELECT created_at FROM chat_messages WHERE uid = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1")
+    .bind(user.sub).first();
+  const timestamp = now();
+  if (recent && timestamp - Number(recent.created_at) < 1_500) throw httpError(429, "Wait a moment before sending another message");
+  const profile = await env.DB.prepare("SELECT username, show_username FROM player_profiles WHERE uid = ?").bind(user.sub).first();
+  const rank = leaderboardRank(access.wagerUsdCents / 100);
+  const username = Boolean(profile?.show_username ?? 1) ? String(profile?.username || user.name || "Racer") : "Hidden Racer";
+  const id = `chat_${crypto.randomUUID()}`;
+  await env.DB.prepare(`
+    INSERT INTO chat_messages(id, uid, username, rank_label, badge_path, message, created_at)
+    VALUES(?, ?, ?, ?, ?, ?, ?)
+  `).bind(id, user.sub, username, rank.label, rank.badgePath, message, timestamp).run();
+  return json(request, env, 201, { message: chatMessageResponse({ id, username, rank_label: rank.label, badge_path: rank.badgePath, message, created_at: timestamp }) });
+}
+
+async function handleAdminChatSettings(request, env, user) {
+  await requireAdminSession(request, env, user);
+  return json(request, env, 200, { minimumWagerUsdCents: await readChatMinimumWagerUsdCents(env) });
+}
+
+async function handleAdminUpdateChatSettings(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const body = await requestJson(request);
+  const minimumWagerUsdCents = parseUsdCents(body.minimumWagerUsd, "Minimum wager");
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO site_settings(setting_key, value_text, updated_at, updated_by) VALUES(?, ?, ?, ?)
+    ON CONFLICT(setting_key) DO UPDATE SET value_text = excluded.value_text, updated_at = excluded.updated_at, updated_by = excluded.updated_by
+  `).bind(CHAT_MINIMUM_WAGER_SETTING, String(minimumWagerUsdCents), timestamp, user.sub).run();
+  await writeAdminAudit(env, user, "chat.minimum_wager.updated", CHAT_MINIMUM_WAGER_SETTING, JSON.stringify({ minimumWagerUsdCents }));
+  return json(request, env, 200, { minimumWagerUsdCents });
 }
 
 function promotionResponse(row) {
@@ -5342,6 +5514,7 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
   if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env, await optionalUser(request, env));
+  if (request.method === "GET" && path === "/chat/messages") return handleChatMessages(request, env);
   if (request.method === "GET" && path === "/games/settings") return handleGameSettings(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
@@ -5360,6 +5533,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/system") return handleAdminSystem(request, env, user);
   if (request.method === "GET" && path === "/admin/country-access") return handleAdminCountryAccess(request, env, user);
   if (request.method === "GET" && path === "/admin/leaderboards") return handleAdminLeaderboards(request, env, user);
+  if (request.method === "GET" && path === "/admin/chat/settings") return handleAdminChatSettings(request, env, user);
+  if (request.method === "POST" && path === "/admin/chat/settings") return handleAdminUpdateChatSettings(request, env, user);
   if (request.method === "GET" && path === "/admin/promotions") return handleAdminPromotions(request, env, user);
   if (request.method === "POST" && path === "/admin/promotions") return handleAdminCreatePromotion(request, env, user);
   const removePromotionMatch = path.match(/^\/admin\/promotions\/([A-Za-z0-9-]+)\/remove$/);
@@ -5379,6 +5554,8 @@ async function route(request, env) {
     catch (error) { console.error("Session activity write failed", { message: error?.message }); }
   }
   if (request.method === "GET" && path === "/sessions") return handleSessions(request, env, user);
+  if (request.method === "GET" && path === "/chat/status") return handleChatStatus(request, env, user);
+  if (request.method === "POST" && path === "/chat/messages") return handleSendChatMessage(request, env, user);
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
   if (request.method === "GET" && path === "/account") return handleAccountSnapshot(request, env, user);
   if (request.method === "GET" && path === "/account/activity") return handleAccountActivity(request, env, user);
@@ -5497,6 +5674,6 @@ export default {
     }
   },
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(maintainLiveGameTimelines(env, now()));
+    ctx.waitUntil(Promise.all([maintainLiveGameTimelines(env, now()), settleEndedLeaderboards(env)]));
   },
 };

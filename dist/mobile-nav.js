@@ -8,6 +8,7 @@
   const lobbyRail = document.querySelector(".lobby-rail");
   const destination = document.querySelector("#mobile-destination");
   const isLobby = Boolean(lobbyRail);
+  let actionBeforeChat = actions.find((button) => button.classList.contains("active"))?.dataset.mobileAction || "";
 
   function setActive(action) {
     actions.forEach((button) => {
@@ -87,6 +88,13 @@
     button.addEventListener("click", () => {
       const action = button.dataset.mobileAction;
 
+      if (action === "chat") {
+        if (!window.GamRaceChat) return;
+        if (!window.GamRaceChat.isOpen()) actionBeforeChat = actions.find((item) => item.classList.contains("active") && item.dataset.mobileAction !== "chat")?.dataset.mobileAction || "";
+        window.GamRaceChat.toggle();
+        return;
+      }
+
       if (action === "menu") {
         const open = !document.body.classList.contains("mobile-menu-open");
         document.body.classList.toggle("mobile-menu-open", open);
@@ -143,5 +151,6 @@
   }
 
   window.addEventListener("popstate", () => routeFromAddress({ focusSearch: false }));
+  window.addEventListener("gamrace:chat-state", (event) => setActive(event.detail?.open ? "chat" : actionBeforeChat));
   routeFromAddress();
 })();

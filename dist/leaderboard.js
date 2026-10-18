@@ -72,14 +72,15 @@
 
   function countdownText(campaign) {
     if (!campaign?.endsAt || campaign.status === "scheduled") return "Race opens soon";
+    if (campaign.status === "waiting") return "Waiting for the next race";
     const remaining = new Date(campaign.endsAt).getTime() - Date.now();
-    if (remaining <= 0 || campaign.status === "ended") return "Race finished";
+    if (remaining <= 0 || campaign.status === "ended") return "Settling race payouts…";
     const seconds = Math.floor(remaining / 1000);
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${days ? `${days}d ` : ""}${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
+    return `Ends in ${days ? `${days}d ` : ""}${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
   }
 
   function podiumEntry(position, entry, campaign) {

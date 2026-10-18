@@ -2501,6 +2501,55 @@ body,
   .security-list article,.session-row{align-items:flex-start!important;flex-direction:column!important;gap:9px!important}.security-list article b,.session-row>b{align-self:flex-start}
 }
 
+/* Leaderboard v7: contained badges, calm placement hierarchy and settled-race state. */
+.leaderboard-page .floating-podium-card .podium-badge,
+.leaderboard-page .floating-podium-card.first .podium-badge,
+.leaderboard-page .floating-podium-card.third .podium-badge{
+  overflow:hidden;
+  box-shadow:0 12px 26px rgba(0,0,0,.56);
+}
+.leaderboard-page .floating-podium-card.first .podium-badge{box-shadow:0 14px 30px rgba(0,0,0,.62)}
+.leaderboard-page .podium-badge img,
+.leaderboard-page .race-player-badge img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  box-sizing:border-box;
+  padding:4px;
+}
+.leaderboard-page .race-player-badge{overflow:hidden;border:1px solid #2c3946;box-shadow:none}
+.leaderboard-page .floating-podium-card{gap:6px}
+.leaderboard-page .race-leaderboard-timer b{font-weight:850}
+
+/* Shared live chat. */
+.chat-launcher{position:fixed;z-index:86;right:22px;bottom:22px;min-width:104px;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid #2b73a8;border-radius:10px;background:#168bff;color:#fff;box-shadow:0 12px 34px rgba(0,0,0,.36);font:inherit;font-size:.72rem;font-weight:900;cursor:pointer}
+.chat-launcher img{width:24px;height:24px;object-fit:contain;filter:brightness(0) invert(1)}
+.live-chat-panel{position:fixed;z-index:90;right:18px;bottom:76px;width:min(370px,calc(100vw - 28px));height:min(610px,calc(100dvh - 110px));display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:hidden;border:1px solid #303944;border-radius:14px;background:#11151a;box-shadow:0 24px 70px rgba(0,0,0,.62);color:#e9eff4}
+.live-chat-panel[hidden]{display:none}
+.live-chat-panel>header{min-height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 15px;border-bottom:1px solid #282f38;background:#171b21}
+.live-chat-panel>header>div{display:flex;align-items:center;gap:10px}.live-chat-panel>header i{width:9px;height:9px;border-radius:50%;background:#42dc98}.live-chat-panel>header span{display:grid;gap:2px}.live-chat-panel>header strong{font-size:.82rem}.live-chat-panel>header small{color:#7e8995;font-size:.58rem}.live-chat-panel>header button{width:32px;height:32px;border:0;border-radius:8px;background:#242a31;color:#abb5bf;font:inherit;font-size:1.25rem;cursor:pointer}
+.live-chat-messages{min-height:0;overflow-y:auto;padding:14px;scrollbar-color:#38424d transparent}
+.live-chat-message{display:grid;grid-template-columns:35px minmax(0,1fr);gap:9px;margin-bottom:15px}.live-chat-badge{width:35px;height:35px;display:grid;place-items:center;overflow:hidden;border:1px solid #303945;border-radius:50%;background:#0d1116}.live-chat-badge img{width:100%;height:100%;box-sizing:border-box;padding:2px;object-fit:contain}.live-chat-message>span:last-child{min-width:0}.live-chat-message>span:last-child>span{display:flex;align-items:center;justify-content:space-between;gap:8px}.live-chat-message strong{overflow:hidden;color:#f1f5f8;font-size:.68rem;text-overflow:ellipsis;white-space:nowrap}.live-chat-message time{flex:0 0 auto;color:#626d78;font-size:.52rem}.live-chat-message p{margin:3px 0 0;color:#aeb8c2;font-size:.68rem;line-height:1.45;overflow-wrap:anywhere}
+.live-chat-empty{height:100%;display:grid;place-content:center;justify-items:center;gap:7px;text-align:center}.live-chat-empty img{width:44px;height:44px;object-fit:contain;opacity:.45}.live-chat-empty strong{font-size:.76rem}.live-chat-empty span{max-width:220px;color:#707b86;font-size:.62rem;line-height:1.45}
+.live-chat-gate{min-height:34px;padding:9px 14px;border-top:1px solid #282f38;color:#83909c;background:#14181d;font-size:.58rem;line-height:1.35}.live-chat-gate[data-state="error"]{color:#ff8692}.live-chat-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px;border-top:1px solid #282f38;background:#171b21}.live-chat-form[hidden]{display:none}.live-chat-form input{min-width:0;height:42px;border:1px solid #343d47;border-radius:9px;padding:0 12px;background:#20252c;color:#f4f7fa;font:inherit;font-size:.68rem;outline:0}.live-chat-form input:focus{border-color:#168bff;box-shadow:0 0 0 2px rgba(22,139,255,.12)}.live-chat-form button{min-width:68px;border:0;border-radius:9px;background:#168bff;color:#fff;font:inherit;font-size:.65rem;font-weight:900;cursor:pointer}.live-chat-form button:disabled{opacity:.5}
+
+@media(max-width:700px){
+  .chat-launcher{display:none}
+  .live-chat-panel{left:0;right:0;top:var(--topbar-h,64px);bottom:calc(67px + env(safe-area-inset-bottom));width:100%;height:auto;border-width:1px 0 0;border-radius:0;box-shadow:none}
+  body.live-chat-open{overflow:hidden}
+  .live-chat-panel>header{min-height:56px}
+  .live-chat-message{grid-template-columns:32px minmax(0,1fr)}.live-chat-badge{width:32px;height:32px}
+  .account-workspace,.account-workspace .profile-shell,.account-workspace .profile-content,.account-workspace .profile-section{max-width:100%!important;min-width:0!important;overflow-x:hidden!important}
+  .account-workspace .account-subtabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible!important}
+  .account-workspace .account-subtab{min-width:0!important;padding-inline:4px!important;white-space:normal!important;text-align:center}
+  .account-workspace .account-table-body{width:100%;min-width:0!important}
+  .account-workspace .account-table-row{width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr)!important}
+  .account-workspace .account-table-row>*{overflow-wrap:anywhere}
+  .account-workspace .account-pagination{width:100%;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:6px}
+  .account-workspace .account-pagination button{min-width:0;padding-inline:8px}
+  .account-workspace .account-pagination label{min-width:0;justify-content:center}.account-workspace .account-pagination select{max-width:72px}
+}
+
 @keyframes stack-miss{
   0%{transform:translateX(-42%) rotate(0)}
   35%{transform:translateX(var(--landing-x)) rotate(0)}
@@ -3211,3 +3260,11 @@ body,
   .leaderboard-page .floating-grid .race-wager-value,.leaderboard-page .floating-grid .race-prize-value{font-size:.48rem}
   .leaderboard-page .floating-grid .current-player-row small{font-size:.38rem}
 }
+
+/* Final badge containment deliberately follows every older leaderboard layer. */
+.leaderboard-page .floating-podium-card .podium-badge,
+.leaderboard-page .floating-podium-card.first .podium-badge,
+.leaderboard-page .floating-podium-card.third .podium-badge{overflow:hidden;box-shadow:0 12px 26px rgba(0,0,0,.56)}
+.leaderboard-page .floating-podium-card.first .podium-badge{box-shadow:0 14px 30px rgba(0,0,0,.62)}
+.leaderboard-page .podium-badge img,.leaderboard-page .race-player-badge img{width:100%;height:100%;box-sizing:border-box;padding:4px;object-fit:contain}
+.leaderboard-page .race-player-badge{overflow:hidden;border:1px solid #2c3946;box-shadow:none}
