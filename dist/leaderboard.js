@@ -8,9 +8,11 @@
   const emptyState = document.querySelector("[data-leaderboard-empty]");
   const prize = document.querySelector("[data-leaderboard-page-prize]");
   const countdown = document.querySelector("[data-leaderboard-page-countdown]");
+  const cadenceLabel = document.querySelector("[data-leaderboard-page-cadence]");
   const status = document.querySelector("[data-leaderboard-status]");
   const campaigns = new Map();
   let activeCadence = "daily";
+  const prizeShares = [0.35, 0.2, 0.14, 0.09, 0.065, 0.05, 0.04, 0.035, 0.02, 0.01];
 
   function moneyFromCents(value) {
     const cents = Math.max(0, Number(value || 0));
@@ -26,6 +28,12 @@
     }).format(Math.max(0, Number(value || 0)) / 100);
   }
 
+  function prizeForPosition(campaign, position) {
+    const total = Math.max(0, Number(campaign?.prizeUsdCents || 0));
+    const share = prizeShares[position - 1] || 0;
+    return total && share ? moneyFromCents(Math.round(total * share)) : "Prize TBA";
+  }
+
   function countdownText(campaign) {
     if (!campaign?.endsAt || campaign.status === "scheduled") return "Race opens soon";
     const remaining = new Date(campaign.endsAt).getTime() - Date.now();
@@ -38,12 +46,14 @@
     return `${days ? `${days}d ` : ""}${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
   }
 
-  function podiumEntry(position, entry) {
+  function podiumEntry(position, entry, campaign) {
     const card = podiumCards.find((item) => Number(item.dataset.podiumPosition) === position);
     if (!card) return;
     const image = card.querySelector("[data-racer-badge]");
     card.querySelector("[data-racer-name]").textContent = entry?.username || "Grid position open";
-    card.querySelector("[data-racer-wager]").textContent = entry ? `${wagerFromCents(entry.wagerUsdCents)} wagered` : "—";
+    card.querySelector("[data-racer-rank]").textContent = entry?.playerRank?.label || "Qualify to take the seat";
+    card.querySelector("[data-racer-wager]").textContent = entry ? wagerFromCents(entry.wagerUsdCents) : "—";
+    card.querySelector("[data-racer-prize]").textContent = prizeForPosition(campaign, position);
     card.classList.toggle("occupied", Boolean(entry));
     if (entry?.playerRank?.badgePath) {
       image.src = entry.playerRank.badgePath;
@@ -56,14 +66,14 @@
     }
   }
 
-  function makeRow(entry) {
+  function makeRow(entry, campaign) {
     const row = document.createElement("div");
-    row.className = "race-grid-row";
+    row.className = `race-grid-row${entry.position <= 3 ? ` top-${entry.position}` : ""}`;
     row.setAttribute("role", "row");
 
     const position = document.createElement("span");
     position.className = "race-position";
-    position.textContent = String(entry.position).padStart(2, "0");
+    position.textContent = entry.position === 1 ? "♛" : String(entry.position);
 
     const racer = document.createElement("span");
     racer.className = "race-player";
@@ -80,14 +90,13 @@
     username.textContent = entry.username || "Hidden Racer";
     racer.append(badge, username);
 
-    const rank = document.createElement("span");
-    rank.className = "race-rank-label";
-    rank.textContent = entry.playerRank?.label || "Private";
-
     const wager = document.createElement("strong");
     wager.className = "race-wager-value";
     wager.textContent = wagerFromCents(entry.wagerUsdCents);
-    row.append(position, racer, rank, wager);
+    const rowPrize = document.createElement("strong");
+    rowPrize.className = "race-prize-value";
+    rowPrize.textContent = prizeForPosition(campaign, entry.position);
+    row.append(position, racer, wager, rowPrize);
     return row;
   }
 
@@ -96,13 +105,14 @@
     const standings = Array.isArray(campaign?.standings) ? campaign.standings : [];
     prize.textContent = moneyFromCents(campaign?.prizeUsdCents);
     countdown.textContent = countdownText(campaign);
+    cadenceLabel.textContent = activeCadence === "biweekly" ? "BiWeekly" : "Daily";
     tabs.forEach((tab) => {
       const active = tab.dataset.leaderboardTab === activeCadence;
       tab.classList.toggle("active", active);
       tab.setAttribute("aria-selected", String(active));
     });
-    [1, 2, 3].forEach((position) => podiumEntry(position, standings[position - 1]));
-    rowsRoot.replaceChildren(...standings.slice(3).map(makeRow));
+    [1, 2, 3].forEach((position) => podiumEntry(position, standings[position - 1], campaign));
+    rowsRoot.replaceChildren(...standings.slice(0, 10).map((entry) => makeRow(entry, campaign)));
     emptyState.hidden = standings.length > 0;
     document.querySelector(".race-podium")?.classList.remove("race-podium-refreshed");
     requestAnimationFrame(() => document.querySelector(".race-podium")?.classList.add("race-podium-refreshed"));

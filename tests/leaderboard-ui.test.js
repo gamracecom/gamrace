@@ -15,8 +15,23 @@ test("leaderboard page has live Daily and BiWeekly podium views", () => {
   assert.match(html, /data-leaderboard-rows/);
   assert.match(script, /fetch\(`\$\{API_BASE\}\/leaderboards`/);
   assert.match(script, /campaign\.standings/);
-  assert.match(styles, /@keyframes podium-arrive/);
-  assert.match(styles, /@media\(max-width:620px\)/);
+  assert.match(html, /leaderboard-circuit-v3\.webp/);
+  assert.match(html, /leaderboard-race-cars-v1\.webp/);
+  assert.equal((html.match(/class="podium-flag"/g) || []).length, 3);
+  assert.equal((html.match(/data-racer-prize/g) || []).length, 3);
+  assert.doesNotMatch(html, /View Podium/i);
+  assert.match(script, /prizeShares/);
+  assert.match(script, /standings\.slice\(0, 10\)/);
+  assert.match(styles, /@keyframes leaderboard-cars-zoom/);
+  assert.match(styles, /@keyframes leaderboard-flag-sway/);
+  assert.match(styles, /@media\(max-width:720px\)/);
+});
+
+test("leaderboard artwork is compressed for live loading", async () => {
+  const circuit = await stat(new URL("../dist/assets/banners/leaderboard-circuit-v3.webp", import.meta.url));
+  const cars = await stat(new URL("../dist/assets/banners/leaderboard-race-cars-v1.webp", import.meta.url));
+  assert.ok(circuit.size < 350_000);
+  assert.ok(cars.size < 500_000);
 });
 
 test("lobby assets are compressed and Stack no longer narrates a missed level", async () => {
