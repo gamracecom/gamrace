@@ -370,6 +370,7 @@ function broadcastWalletSelection() {
   const detail = walletSelectionDetail();
   if (!detail) return;
   window.gamraceWalletSelection = detail;
+  window.GamRaceShellState?.cacheWalletSelection(detail);
   window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed", { detail }));
 }
 

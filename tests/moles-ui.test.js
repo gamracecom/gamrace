@@ -12,7 +12,7 @@ const [html, index, script, styles, worker, migration, history, tools, artwork] 
   readFile(new URL("../worker/migrations/0026_moles_rounds.sql", import.meta.url), "utf8"),
   readFile(new URL("../dist/game-history.js", import.meta.url), "utf8"),
   readFile(new URL("../dist/game-tools.js", import.meta.url), "utf8"),
-  stat(new URL("../dist/assets/games/originals/moles.png", import.meta.url)),
+  stat(new URL("../dist/assets/games/originals/moles.webp", import.meta.url)),
 ]);
 
 test("Moles has a complete seven-hole animated interface and homepage artwork", () => {
@@ -21,7 +21,7 @@ test("Moles has a complete seven-hole animated interface and homepage artwork", 
   assert.match(html, /id="moles-holes"/);
   assert.match(html, /data-shared-game-tools="moles"/);
   assert.match(html, /data-game-rtp="moles"/);
-  assert.match(index, /assets\/games\/originals\/moles\.png/);
+  assert.match(index, /assets\/games\/originals\/moles\.webp/);
   assert.ok(artwork.size > 100_000);
   assert.match(styles, /@keyframes moles-pop/);
   assert.match(styles, /@keyframes moles-hammer/);

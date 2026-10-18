@@ -216,8 +216,7 @@ function renderRank(source) {
   const fallback = rankDefinition.name === "Hall of Fame" ? "HF" : rankDefinition.name.charAt(0);
   const progressValues = nextRank ? `${formatMoney(stats.lifetimeWeightedWager)} / ${formatMoney(nextRank.threshold)}` : `${formatMoney(stats.lifetimeWeightedWager)} lifetime`;
   const nextLabel = nextRank ? `Next: ${nextRank.label}` : "MAX RANK";
-  profileDialog.rankBadge.classList.remove("has-image");
-  profileDialog.rankBadgeImage.src = rankDefinition.badgePath;
+  loadRankBadge(profileDialog.rankBadge, profileDialog.rankBadgeImage, rankDefinition.badgePath);
   profileDialog.rankBadgeFallback.textContent = fallback;
   profileDialog.rankBadgeTier.textContent = rankDefinition.tier;
   profileDialog.rankName.textContent = rankDefinition.label;
@@ -229,8 +228,7 @@ function renderRank(source) {
   profileDialog.rankProgressFill.style.width = `${stats.percentage}%`;
   profileDialog.rankProgressTrack.setAttribute("aria-valuenow", String(Math.round(stats.percentage)));
   profileDialog.rankTierIndicators.forEach((indicator) => indicator.classList.toggle("active", indicator.dataset.rankTier === rankDefinition.tier));
-  accountMenu.rankBadge.classList.remove("has-image");
-  accountMenu.rankImage.src = rankDefinition.badgePath;
+  loadRankBadge(accountMenu.rankBadge, accountMenu.rankImage, rankDefinition.badgePath);
   accountMenu.rankFallback.textContent = fallback;
   accountMenu.rankTier.textContent = rankDefinition.tier;
   accountMenu.rankName.textContent = rankDefinition.label;
@@ -241,13 +239,28 @@ function renderRank(source) {
   const headerMark = profileButton?.querySelector(".profile-rank-mark");
   const headerImage = profileButton?.querySelector(".profile-rank-image");
   const headerFallback = profileButton?.querySelector(".profile-rank-fallback");
-  const sameLoadedBadge = headerImage?.getAttribute("src") === rankDefinition.badgePath && headerImage.complete && headerImage.naturalWidth;
-  if (!sameLoadedBadge) headerMark?.classList.remove("has-image");
-  if (headerImage && headerImage.getAttribute("src") !== rankDefinition.badgePath) headerImage.src = rankDefinition.badgePath;
-  if (sameLoadedBadge) headerMark?.classList.add("has-image");
+  loadRankBadge(headerMark, headerImage, rankDefinition.badgePath);
   if (headerFallback) headerFallback.textContent = fallback;
   window.GamRaceShellState?.write({ signedIn: true, rankBadgePath: rankDefinition.badgePath, rankFallback: fallback });
   profileDialog.inlineRank.textContent = rankDefinition.label;
+}
+
+function loadRankBadge(container, image, path) {
+  if (!container || !image || !path) return;
+  if (image.getAttribute("src") === path && image.complete && image.naturalWidth) {
+    container.classList.add("has-image");
+    return;
+  }
+  const preloader = new Image();
+  preloader.decoding = "async";
+  preloader.addEventListener("load", () => {
+    image.src = path;
+    container.classList.add("has-image");
+    container.classList.remove("rank-loading");
+  }, { once: true });
+  preloader.addEventListener("error", () => container.classList.remove("rank-loading"), { once: true });
+  container.classList.add("rank-loading");
+  preloader.src = path;
 }
 
 function profileCreatedDate(profile) {

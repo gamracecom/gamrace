@@ -4388,7 +4388,7 @@ function parseUsdCents(value, label = "Amount", { allowZero = true } = {}) {
 }
 
 function leaderboardResponse(row, cadence) {
-  if (!row) return { cadence, prizeUsdCents: 0, status: "scheduled", startsAt: null, endsAt: null, durationSeconds: 0 };
+  if (!row) return { cadence, prizeUsdCents: 0, status: "scheduled", startsAt: null, endsAt: null, durationSeconds: 0, standings: [] };
   const ended = Number(row.ends_at) <= now();
   return {
     cadence,
@@ -4401,13 +4401,83 @@ function leaderboardResponse(row, cadence) {
   };
 }
 
+function leaderboardRank(totalWagered) {
+  const index = playerRankIndex(totalWagered);
+  const [stageId] = PROMOTION_RANKS[Math.floor(index / 3)] || PROMOTION_RANKS[0];
+  const tierIndex = index % 3;
+  const stageName = stageId.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  const tier = ["I", "II", "III"][tierIndex];
+  return {
+    id: `${stageId}-${tierIndex + 1}`,
+    label: `${stageName} ${tier}`,
+    badgePath: `/ranks/${stageId}-${tierIndex + 1}.png`,
+  };
+}
+
+async function leaderboardStandings(env, campaign) {
+  if (!campaign) return [];
+  const startsAt = Number(campaign.starts_at);
+  const endsAt = Math.min(Number(campaign.ends_at), now());
+  const rows = await env.DB.prepare(`
+    SELECT uid, currency,
+      SUM(CASE WHEN created_at >= ? AND created_at <= ? THEN -amount_units ELSE 0 END) AS campaign_units,
+      SUM(-amount_units) AS lifetime_units
+    FROM crypto_ledger
+    WHERE type IN ('game_wager', 'game_bet') AND created_at <= ?
+    GROUP BY uid, currency
+    HAVING campaign_units > 0
+  `).bind(startsAt, endsAt, endsAt).all();
+  let prices = {};
+  try { prices = await providerPrices(env); } catch { prices = {}; }
+  const racers = new Map();
+  for (const row of rows.results || []) {
+    const asset = getWalletAsset(row.currency);
+    if (!asset) continue;
+    const price = Number(prices?.[asset.providerCurrency] || stablecoinPrice(asset));
+    if (!Number.isFinite(price) || price <= 0) continue;
+    const campaignUsdCents = Math.max(0, Math.round(Number(assetUnitsToString(Number(row.campaign_units || 0), false)) * price * 100));
+    const lifetimeUsd = Math.max(0, Number(assetUnitsToString(Number(row.lifetime_units || 0), false)) * price);
+    const current = racers.get(row.uid) || { uid: row.uid, wagerUsdCents: 0, lifetimeWagered: 0 };
+    current.wagerUsdCents += campaignUsdCents;
+    current.lifetimeWagered += lifetimeUsd;
+    racers.set(row.uid, current);
+  }
+  const leaders = [...racers.values()]
+    .filter((racer) => racer.wagerUsdCents > 0)
+    .sort((left, right) => right.wagerUsdCents - left.wagerUsdCents || left.uid.localeCompare(right.uid))
+    .slice(0, 50);
+  if (!leaders.length) return [];
+  const placeholders = leaders.map(() => "?").join(", ");
+  const profiles = await env.DB.prepare(`
+    SELECT uid, username, profile_public, show_username, show_rank
+    FROM player_profiles WHERE uid IN (${placeholders})
+  `).bind(...leaders.map((racer) => racer.uid)).all();
+  const profilesByUid = new Map((profiles.results || []).map((profile) => [profile.uid, profile]));
+  return leaders.map((racer, index) => {
+    const profile = profilesByUid.get(racer.uid) || {};
+    const profileVisible = Boolean(profile.profile_public ?? 1);
+    const usernameVisible = profileVisible && Boolean(profile.show_username ?? 1);
+    const rankVisible = profileVisible && Boolean(profile.show_rank ?? 1);
+    return {
+      position: index + 1,
+      username: usernameVisible ? String(profile.username || "Racer") : "Hidden Racer",
+      profileVisible: usernameVisible,
+      wagerUsdCents: racer.wagerUsdCents,
+      playerRank: rankVisible ? leaderboardRank(racer.lifetimeWagered) : null,
+    };
+  });
+}
+
 async function readLeaderboards(env) {
   const result = await env.DB.prepare(`
     SELECT cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at
     FROM leaderboard_campaigns WHERE cadence IN ('daily', 'biweekly')
   `).all();
   const rows = new Map((result.results || []).map((row) => [row.cadence, row]));
-  return LEADERBOARD_CADENCES.map((cadence) => leaderboardResponse(rows.get(cadence), cadence));
+  return Promise.all(LEADERBOARD_CADENCES.map(async (cadence) => {
+    const row = rows.get(cadence);
+    return { ...leaderboardResponse(row, cadence), standings: await leaderboardStandings(env, row) };
+  }));
 }
 
 async function handleLeaderboards(request, env) {

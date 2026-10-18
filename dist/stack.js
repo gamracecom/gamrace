@@ -157,7 +157,7 @@
       const wager = Number(round.wager || 0);
       const payout = Number(round.payout || 0);
       if (round.outcome === "win") setMessage(`${formatMultiplier(round.multiplier)} · ${formatAmount(payout)}`, "win");
-      else setMessage(`Missed on level ${completed + 1}`, "loss");
+      else setMessage();
       if (!recordedRounds.has(round.id)) {
         recordedRounds.add(round.id);
         window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "stack", wager, payout } }));

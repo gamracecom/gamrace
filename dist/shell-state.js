@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "gamrace-shell-state-v1";
+  const WALLET_SELECTION_KEY = "gamrace-wallet-selection-v1";
   const DEFAULT_RANK_BADGE = "ranks/rookie-i.png";
   const PRELOAD_ASSETS = [
     "assets/brand/gamrace-icon.png",
@@ -36,7 +37,33 @@
 
   function clear() {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* Private browsing can disable storage. */ }
+    try { sessionStorage.removeItem(WALLET_SELECTION_KEY); } catch { /* Private browsing can disable storage. */ }
+    delete window.gamraceWalletSelection;
     document.documentElement.dataset.sessionState = "signed-out";
+  }
+
+  function readWalletSelection() {
+    try {
+      const value = JSON.parse(sessionStorage.getItem(WALLET_SELECTION_KEY) || "null");
+      if (!value || typeof value !== "object" || !value.currency || !value.asset || !value.balance) return null;
+      return value;
+    } catch {
+      return null;
+    }
+  }
+
+  function cacheWalletSelection(selection) {
+    if (!selection || typeof selection !== "object") return;
+    const safeSelection = {
+      currency: String(selection.currency || ""),
+      asset: { ...(selection.asset || {}) },
+      balance: { ...(selection.balance || {}) },
+      displayFiat: selection.displayFiat !== false,
+      cachedAt: Date.now(),
+    };
+    if (!safeSelection.currency) return;
+    window.gamraceWalletSelection = safeSelection;
+    try { sessionStorage.setItem(WALLET_SELECTION_KEY, JSON.stringify(safeSelection)); } catch { /* Storage can be unavailable. */ }
   }
 
   function apply(snapshot = read()) {
@@ -51,7 +78,7 @@
     document.querySelectorAll(".profile-rank-mark").forEach((mark) => {
       const fallback = mark.querySelector(".profile-rank-fallback");
       const image = mark.querySelector(".profile-rank-image");
-      if (fallback) fallback.textContent = snapshot.rankFallback || "R";
+      if (fallback) fallback.textContent = "";
       if (!image) return;
       const badgePath = snapshot.rankBadgePath || DEFAULT_RANK_BADGE;
       if (image.getAttribute("src") !== badgePath) {
@@ -64,10 +91,12 @@
   }
 
   const initial = read();
+  const initialWalletSelection = readWalletSelection();
+  if (initialWalletSelection) window.gamraceWalletSelection = initialWalletSelection;
   document.documentElement.dataset.sessionState = initial?.signedIn ? "signed-in" : "unknown";
   PRELOAD_ASSETS.forEach((source) => { const image = new Image(); image.src = source; });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => apply(initial), { once: true });
   else apply(initial);
 
-  window.GamRaceShellState = { read, write, clear, apply };
+  window.GamRaceShellState = { read, write, clear, apply, readWalletSelection, cacheWalletSelection };
 })();

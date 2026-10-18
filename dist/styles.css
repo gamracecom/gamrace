@@ -310,6 +310,8 @@ body.modal-open { overflow: hidden; }
 .profile-rank-image, .menu-rank-image { position: absolute; width: 112%; height: 112%; object-fit: contain; opacity: 0; }
 .profile-rank-mark.has-image .profile-rank-image, .menu-rank-badge.has-image .menu-rank-image { opacity: 1; }
 .profile-rank-mark.has-image .profile-rank-fallback, .menu-rank-badge.has-image .menu-rank-fallback { opacity: 0; }
+.profile-rank-fallback, .menu-rank-fallback { width: 72%; height: 72%; font-size: 0; background: url("assets/brand/gamrace-icon.png") center / contain no-repeat; opacity: .72; }
+.profile-rank-image, .menu-rank-image { transition: opacity .14s ease; }
 .profile-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-menu { position: fixed; z-index: 215; width: min(286px, calc(100vw - 20px)); overflow: hidden; border: 1px solid #173447; border-radius: 10px; background: #07151f; box-shadow: 0 18px 46px rgba(0, 0, 0, .58); }
 .account-menu[hidden] { display: none; }
@@ -2688,6 +2690,81 @@ body,
   .stack-moving-platform{top:28px;height:26px}
   .stack-moving-platform i,.stack-moving-platform.dropping.miss i b{border-radius:4px;box-shadow:inset 0 2px 0 rgba(255,255,255,.18),inset 0 -3px 0 rgba(3,38,68,.28)}
 }
+
+/* Live King of the Track page. */
+.leaderboard-page{background:#05080c}
+.leaderboard-main{min-width:0}
+.leaderboard-page-content{width:min(1240px,calc(100% - 40px));margin:24px auto 72px;color:#eef5fb}
+.race-leaderboard-hero{position:relative;min-height:310px;display:grid;grid-template-columns:minmax(0,.88fr) minmax(440px,1.12fr);overflow:hidden;border:1px solid #1a5139;border-radius:22px;background:linear-gradient(115deg,#07100d 0%,#08261a 54%,#073421 100%)}
+.race-leaderboard-hero::before{position:absolute;inset:0;background:linear-gradient(112deg,transparent 0 55%,rgba(75,255,150,.08) 55.2% 55.7%,transparent 55.9%),linear-gradient(112deg,transparent 0 68%,rgba(75,255,150,.06) 68.2% 68.7%,transparent 68.9%);content:"";pointer-events:none}
+.race-hero-copy{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;padding:42px 0 42px 46px}
+.race-eyebrow{width:max-content;display:inline-flex;align-items:center;gap:9px;padding:8px 11px;border:1px solid #1c6640;border-radius:9px;background:#0b2c1d;color:#9cdbb6;font-size:.72rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+.race-eyebrow i,.race-live-chip i{width:7px;height:7px;border-radius:50%;background:#38ea83;animation:race-live-pulse 1.8s ease-in-out infinite}
+.race-hero-copy h1{margin:19px 0 5px;font-size:clamp(2.3rem,4.2vw,4.25rem);line-height:.96;letter-spacing:-.055em}
+.race-hero-copy>p{max-width:560px;margin:10px 0 25px;color:#98a9b4;font-size:.94rem;line-height:1.6}
+.race-campaign-meta{display:flex;gap:12px;flex-wrap:wrap}
+.race-campaign-meta>div{min-width:168px;padding:12px 15px;border:1px solid #244034;border-radius:12px;background:#0d1714}
+.race-campaign-meta span{display:block;margin-bottom:5px;color:#7f948a;font-size:.65rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.race-campaign-meta strong{color:#49ed8b;font-size:1rem;font-variant-numeric:tabular-nums}
+.race-hero-scene{position:relative;min-width:0}
+.race-hero-scene::after{position:absolute;inset:0;background:linear-gradient(90deg,#082419 0%,transparent 27%);content:"";pointer-events:none}
+.race-hero-scene img{position:absolute;z-index:1;right:-2%;bottom:-12%;width:108%;height:116%;object-fit:contain;object-position:right bottom;filter:saturate(1.08) contrast(1.04);animation:race-monument-enter .75s cubic-bezier(.2,.85,.2,1) both}
+.race-speed-line{position:absolute;z-index:2;right:-15%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#68ffab,transparent);opacity:.5;transform:rotate(-16deg);animation:race-speed 4.4s linear infinite}
+.race-speed-line.line-one{top:24%;width:55%;animation-delay:-1.1s}.race-speed-line.line-two{top:48%;width:72%;animation-delay:-2.7s}.race-speed-line.line-three{top:70%;width:46%;animation-delay:-3.6s}
+.race-cadence-tabs{width:min(480px,100%);display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:18px auto 10px;padding:6px;border:1px solid #242b34;border-radius:15px;background:#11161c}
+.race-cadence-tabs button{display:flex;align-items:center;justify-content:center;gap:9px;min-height:54px;border:0;border-radius:10px;background:transparent;color:#84909d;cursor:pointer;font:inherit;transition:background .16s ease,color .16s ease}
+.race-cadence-tabs button span{font-size:.9rem;font-weight:900}.race-cadence-tabs button small{font-size:.65rem;color:#66717d}
+.race-cadence-tabs button.active{background:#168bff;color:#fff}.race-cadence-tabs button.active small{color:#d9ecff}
+.race-podium-section{position:relative;overflow:hidden;margin-top:18px;padding:52px 28px 0;border:1px solid #202833;border-radius:22px 22px 0 0;background:linear-gradient(180deg,#0d1218,#080b0f)}
+.race-podium-section::before{position:absolute;left:50%;bottom:0;width:760px;height:210px;background:radial-gradient(ellipse at bottom,rgba(22,139,255,.15),transparent 66%);content:"";transform:translateX(-50%);pointer-events:none}
+.race-start-lights{position:absolute;top:18px;left:50%;display:flex;gap:8px;transform:translateX(-50%)}
+.race-start-lights i{width:8px;height:8px;border-radius:50%;background:#27313d;animation:race-light 3s infinite}.race-start-lights i:nth-child(2){animation-delay:.18s}.race-start-lights i:nth-child(3){animation-delay:.36s}
+.race-podium{position:relative;z-index:1;max-width:760px;min-height:330px;display:grid;grid-template-columns:1fr 1.12fr 1fr;align-items:end;gap:12px;margin:0 auto}
+.podium-racer{position:relative;display:flex;flex-direction:column;align-items:center;min-width:0;text-align:center;animation:podium-arrive .55s cubic-bezier(.2,.8,.2,1) both}.podium-racer.first{animation-delay:.1s}.podium-racer.second{animation-delay:.2s}.podium-racer.third{animation-delay:.3s}
+.race-podium-refreshed .podium-racer{animation-name:podium-arrive}
+.podium-place{position:absolute;z-index:2;top:-7px;right:calc(50% - 42px);width:25px;height:25px;display:grid;place-items:center;border:2px solid #080b0f;border-radius:50%;background:#303a47;color:#e9f0f7;font-size:.68rem;font-weight:950}
+.podium-racer.first .podium-place{background:#f5b942;color:#171207}.podium-racer.second .podium-place{background:#bcc7d3;color:#111820}.podium-racer.third .podium-place{background:#a96d47;color:#160d08}
+.podium-crown{position:absolute;top:-44px;color:#f5b942;font-size:1.65rem;animation:race-crown 2.5s ease-in-out infinite}
+.podium-badge{width:72px;height:72px;display:grid;place-items:center;border:1px solid #303a47;border-radius:50%;background:#111820 url("assets/brand/gamrace-icon.png") center / 38% no-repeat}
+.podium-racer.first .podium-badge{width:88px;height:88px;border-color:#8a6a28}.podium-badge img{width:116%;height:116%;object-fit:contain}.podium-badge img[hidden]{display:none}
+.podium-racer>strong{max-width:100%;margin-top:10px;overflow:hidden;color:#f2f6fa;font-size:.85rem;text-overflow:ellipsis;white-space:nowrap}.podium-racer>span:not(.podium-place):not(.podium-crown){margin:4px 0 12px;color:#71808d;font-size:.65rem}
+.podium-block{width:100%;height:124px;display:grid;place-items:center;border:1px solid #2a333e;border-bottom:0;border-radius:12px 12px 0 0;background:linear-gradient(180deg,#18202a,#0d1218)}
+.podium-racer.first .podium-block{height:166px;border-color:#3c4d5e;background:linear-gradient(180deg,#1d2d3e,#0d141c)}.podium-racer.third .podium-block{height:98px}
+.podium-block b{color:#344251;font-size:1.25rem;letter-spacing:.12em}.podium-racer.occupied .podium-block b{color:#168bff}
+.race-grid-card{overflow:hidden;border:1px solid #202833;border-top:0;border-radius:0 0 22px 22px;background:#0b0f14}
+.race-grid-heading{display:flex;align-items:center;justify-content:space-between;padding:22px 24px;border-bottom:1px solid #202833}
+.race-grid-heading>div{display:flex;align-items:center;gap:13px}.race-grid-icon{width:38px;height:38px;display:grid;place-items:center;border:1px solid #263442;border-radius:10px;background:#121a23;color:#40a7ff;font-size:1.2rem}
+.race-grid-heading h2{margin:0;color:#f2f6fa;font-size:1rem}.race-grid-heading p{margin:3px 0 0;color:#687581;font-size:.7rem}
+.race-live-chip{display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #234333;border-radius:999px;background:#102219;color:#58db8e;font-size:.65rem;font-weight:850;text-transform:uppercase}
+.race-grid-row{min-height:61px;display:grid;grid-template-columns:110px minmax(220px,1.4fr) minmax(140px,.8fr) minmax(140px,.7fr);align-items:center;gap:18px;padding:0 24px;border-bottom:1px solid #171e26;color:#95a2ad;font-size:.78rem}
+.race-grid-labels{min-height:42px;background:#0d1319;color:#5f6c77;font-size:.63rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
+.race-grid-row:last-child{border-bottom:0}.race-position{color:#168bff;font-size:.78rem;font-weight:950;font-variant-numeric:tabular-nums}.race-player{min-width:0;display:flex;align-items:center;gap:11px}.race-player strong{overflow:hidden;color:#dfe7ee;text-overflow:ellipsis;white-space:nowrap}.race-player-badge{width:34px;height:34px;display:grid;place-items:center;flex:0 0 34px;border-radius:50%;background:#141c25 url("assets/brand/gamrace-icon.png") center / 38% no-repeat}.race-player-badge img{width:112%;height:112%;object-fit:contain}.race-wager-value{color:#f1f6fa;text-align:right;font-variant-numeric:tabular-nums}.race-grid-empty{display:flex;flex-direction:column;align-items:center;gap:5px;padding:34px 20px;text-align:center}.race-grid-empty strong{font-size:.9rem}.race-grid-empty span{color:#6d7984;font-size:.72rem}.race-leaderboard-status{min-height:18px;margin:10px 0 0;color:#e16969;font-size:.72rem;text-align:center}
+@keyframes race-live-pulse{50%{opacity:.35;transform:scale(.72)}}
+@keyframes race-monument-enter{from{opacity:0;transform:translate3d(55px,12px,0) scale(.96)}to{opacity:1;transform:none}}
+@keyframes race-speed{0%{transform:translateX(45%) rotate(-16deg);opacity:0}18%{opacity:.52}75%{opacity:.25}100%{transform:translateX(-155%) rotate(-16deg);opacity:0}}
+@keyframes race-light{0%,58%,100%{background:#27313d}66%,82%{background:#37ed83}}
+@keyframes podium-arrive{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes race-crown{50%{transform:translateY(-4px) rotate(3deg)}}
+
+@media(max-width:900px){
+  .leaderboard-page-content{width:min(calc(100% - 24px),760px);margin-top:14px}
+  .race-leaderboard-hero{min-height:410px;grid-template-columns:1fr}
+  .race-hero-copy{z-index:3;justify-content:flex-start;padding:26px 24px}
+  .race-hero-copy h1{font-size:2.6rem}.race-hero-copy>p{max-width:430px}
+  .race-hero-scene{position:absolute;z-index:1;right:0;bottom:0;width:78%;height:64%;opacity:.7}
+  .race-hero-scene::after{background:linear-gradient(90deg,#082419 0%,transparent 52%),linear-gradient(0deg,transparent 55%,#082419 100%)}
+}
+@media(max-width:620px){
+  .leaderboard-page-content{width:calc(100% - 18px);margin:9px auto 92px}
+  .race-leaderboard-hero{min-height:380px;border-radius:17px}
+  .race-hero-copy{padding:21px 18px}.race-eyebrow{font-size:.6rem}.race-hero-copy h1{margin-top:15px;font-size:2.25rem}.race-hero-copy>p{margin:7px 0 16px;font-size:.78rem;line-height:1.5}
+  .race-campaign-meta{gap:7px}.race-campaign-meta>div{min-width:0;flex:1;padding:10px}.race-campaign-meta span{font-size:.54rem}.race-campaign-meta strong{font-size:.78rem}
+  .race-hero-scene{width:100%;height:58%;opacity:.68}.race-hero-scene img{right:-20%;width:122%}
+  .race-cadence-tabs{margin-top:10px}.race-cadence-tabs button{min-height:48px;flex-direction:column;gap:1px}.race-cadence-tabs button span{font-size:.78rem}.race-cadence-tabs button small{font-size:.55rem}
+  .race-podium-section{padding:49px 8px 0;border-radius:17px 17px 0 0}.race-podium{min-height:270px;gap:5px}.podium-badge{width:54px;height:54px}.podium-racer.first .podium-badge{width:65px;height:65px}.podium-place{right:calc(50% - 32px);width:22px;height:22px}.podium-crown{top:-35px;font-size:1.3rem}.podium-racer>strong{font-size:.65rem}.podium-racer>span:not(.podium-place):not(.podium-crown){font-size:.51rem}.podium-block{height:91px}.podium-racer.first .podium-block{height:126px}.podium-racer.third .podium-block{height:72px}.podium-block b{font-size:.86rem}
+  .race-grid-card{border-radius:0 0 17px 17px}.race-grid-heading{padding:16px}.race-grid-labels{display:none}.race-grid-row{position:relative;min-height:68px;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;padding:0 13px}.race-rank-label{display:none}.race-player-badge{width:30px;height:30px;flex-basis:30px}.race-wager-value{font-size:.7rem}.race-grid-heading p{display:none}
+}
+@media(prefers-reduced-motion:reduce){.race-speed-line,.race-eyebrow i,.race-live-chip i,.podium-crown,.podium-racer,.race-hero-scene img,.race-start-lights i{animation:none!important}}
 
 @media(max-width:420px){
   .stack-play{height:min(560px,calc(100dvh - 150px));min-height:490px}

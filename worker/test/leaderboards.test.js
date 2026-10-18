@@ -33,4 +33,8 @@ test("leaderboard routes separate public display from owner-only race control", 
   assert.match(worker, /requireAdminSession\(request, env, user\)/);
   assert.match(worker, /durationSeconds > 7_776_000/);
   assert.match(worker, /leaderboard\.started/);
+  assert.match(worker, /async function leaderboardStandings/);
+  assert.match(worker, /type IN \('game_wager', 'game_bet'\)/);
+  assert.match(worker, /wagerUsdCents/);
+  assert.match(worker, /playerRank: rankVisible \? leaderboardRank/);
 });
