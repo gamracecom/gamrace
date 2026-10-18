@@ -991,6 +991,81 @@ async function pagedAccountActivity(env, uid, pageValue = 1, pageSizeValue = 20)
   };
 }
 
+const REWARD_LEDGER_TYPES = Object.freeze([
+  "promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim",
+  "vip_reward", "bonus_reward", "reward",
+]);
+
+function fundingActivityResponse(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    amount: String(row.amount || "0"),
+    payout: "0",
+    multiplier: 0,
+    currency: row.currency,
+    reference: row.reference || null,
+    createdAt: Number(row.created_at),
+  };
+}
+
+function rewardActivityResponse(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    status: "credited",
+    amount: assetUnitsToString(Math.max(0, Number(row.amount_units || 0)), false),
+    payout: "0",
+    multiplier: 0,
+    currency: row.currency,
+    reference: row.provider_reference || null,
+    createdAt: Number(row.created_at),
+  };
+}
+
+async function pagedAccountTransactions(env, uid, pageValue = 1, pageSizeValue = 20) {
+  const page = Math.max(1, Math.floor(Number(pageValue) || 1));
+  const pageSize = Math.min(50, Math.max(10, Math.floor(Number(pageSizeValue) || 20)));
+  const maximumRows = 5000;
+  const required = Math.min(maximumRows, page * pageSize);
+  const rewardPlaceholders = REWARD_LEDGER_TYPES.map(() => "?").join(", ");
+  const groups = [
+    ...PLAYER_BET_UNION_GROUPS.map(({ sql, count }) => ({
+      countSql: `SELECT COUNT(*) AS total FROM (${sql})`,
+      rowsSql: `SELECT game, id, currency, wager_units, payout_units, multiplier_micros, status, created_at FROM (${sql}) ORDER BY created_at DESC LIMIT ?`,
+      bindings: playerBetBindings(uid, count),
+      map: accountActivityResponse,
+    })),
+    {
+      countSql: "SELECT COUNT(*) AS total FROM crypto_deposits WHERE uid = ? AND status <> 'address_ready'",
+      rowsSql: "SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount, pay_currency AS currency, order_id AS reference, created_at FROM crypto_deposits WHERE uid = ? AND status <> 'address_ready' ORDER BY created_at DESC LIMIT ?",
+      bindings: [uid], map: fundingActivityResponse,
+    },
+    {
+      countSql: "SELECT COUNT(*) AS total FROM crypto_withdrawals WHERE uid = ?",
+      rowsSql: "SELECT id, 'withdrawal' AS type, status, payout_amount AS amount, payout_currency AS currency, provider_reference AS reference, created_at FROM crypto_withdrawals WHERE uid = ? ORDER BY created_at DESC LIMIT ?",
+      bindings: [uid], map: fundingActivityResponse,
+    },
+    {
+      countSql: `SELECT COUNT(*) AS total FROM crypto_ledger WHERE uid = ? AND type IN (${rewardPlaceholders})`,
+      rowsSql: `SELECT id, type, amount_units, currency, provider_reference, created_at FROM crypto_ledger WHERE uid = ? AND type IN (${rewardPlaceholders}) ORDER BY created_at DESC LIMIT ?`,
+      bindings: [uid, ...REWARD_LEDGER_TYPES], map: rewardActivityResponse,
+    },
+  ];
+  const results = await env.DB.batch([
+    ...groups.map((group) => env.DB.prepare(group.countSql).bind(...group.bindings)),
+    ...groups.map((group) => env.DB.prepare(group.rowsSql).bind(...group.bindings, required)),
+  ]);
+  const total = results.slice(0, groups.length).reduce((sum, result) => sum + Number(result.results?.[0]?.total || 0), 0);
+  const offset = (page - 1) * pageSize;
+  const items = results.slice(groups.length).flatMap((result, index) =>
+    (result.results || []).map(groups[index].map))
+    .sort((left, right) => Number(right.createdAt) - Number(left.createdAt))
+    .slice(offset, offset + pageSize);
+  return { items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(Math.min(total, maximumRows) / pageSize)) };
+}
+
 function cleanAccountText(value, maximum, label, { required = false } = {}) {
   const text = String(value || "").trim().replace(/\s+/g, " ");
   if (required && !text) throw httpError(400, `${label} is required`);
@@ -1068,7 +1143,7 @@ async function handleAccountDetails(request, env, user) {
 
 async function handleAccountActivity(request, env, user) {
   const url = new URL(request.url);
-  return json(request, env, 200, { pagination: await pagedAccountActivity(env, user.sub, url.searchParams.get("page"), url.searchParams.get("pageSize")) });
+  return json(request, env, 200, { pagination: await pagedAccountTransactions(env, user.sub, url.searchParams.get("page"), url.searchParams.get("pageSize")) });
 }
 
 const ACCOUNT_PREFERENCE_KEYS = new Set([
@@ -1130,9 +1205,12 @@ async function walletFundingActivity(env, uid) {
     SELECT id, 'withdrawal' AS type, status, payout_amount AS amount,
       payout_currency AS currency, created_at FROM crypto_withdrawals WHERE uid = ?
     UNION ALL
-    SELECT id, 'promotion' AS type, 'credited' AS status,
+    SELECT id, type, 'credited' AS status,
       printf('%.8f', amount_units / 100000000.0) AS amount,
-      currency, created_at FROM crypto_ledger WHERE uid = ? AND type = 'promo_reward'
+      currency, created_at FROM crypto_ledger WHERE uid = ? AND type IN (
+        'promo_reward', 'leaderboard_payout', 'leaderboard_reward', 'rakeback_claim',
+        'vip_reward', 'bonus_reward', 'reward'
+      )
     ORDER BY created_at DESC LIMIT 50
   `).bind(uid, uid, uid).all();
   return (result.results || []).map((row) => ({
@@ -4811,6 +4889,7 @@ async function handleAdminTransactions(request, env, user) {
     deposits: "l.type = 'deposit'",
     withdrawals: "l.type LIKE 'withdrawal%'",
     adjustments: "l.type = 'admin_balance_set'",
+    rewards: "l.type IN ('promo_reward', 'leaderboard_payout', 'leaderboard_reward', 'rakeback_claim', 'vip_reward', 'bonus_reward', 'reward')",
   };
   const gamePrefixes = new Set(ADMIN_LEDGER_GAME_PREFIXES.map(([prefix]) => prefix));
   const clauses = [];
@@ -4842,6 +4921,7 @@ async function handleAdminTransactions(request, env, user) {
         SUM(CASE WHEN type = 'game_payout' THEN 1 ELSE 0 END) AS payouts,
         SUM(CASE WHEN type = 'deposit' THEN 1 ELSE 0 END) AS deposits,
         SUM(CASE WHEN type LIKE 'withdrawal%' THEN 1 ELSE 0 END) AS withdrawals
+        ,SUM(CASE WHEN type IN ('promo_reward', 'leaderboard_payout', 'leaderboard_reward', 'rakeback_claim', 'vip_reward', 'bonus_reward', 'reward') THEN 1 ELSE 0 END) AS rewards
       FROM crypto_ledger WHERE created_at >= ?
     `).bind(now() - 24 * 60 * 60 * 1000).first(),
   ]);
@@ -4851,6 +4931,7 @@ async function handleAdminTransactions(request, env, user) {
       total24h: Number(summary?.total || 0), wagers24h: Number(summary?.wagers || 0),
       payouts24h: Number(summary?.payouts || 0), deposits24h: Number(summary?.deposits || 0),
       withdrawals24h: Number(summary?.withdrawals || 0),
+      rewards24h: Number(summary?.rewards || 0),
     },
     transactions: (rows.results || []).map((row) => ({
       id: row.id,

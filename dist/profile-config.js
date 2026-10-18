@@ -70,7 +70,7 @@ export const RESPONSIBLE_PLAY_CONTROLS = Object.freeze([
 
 export const TRANSACTION_FILTERS = Object.freeze(["All", "Deposits", "Withdrawals", "Tips", "Purchases", "Bonuses"]);
 export const ACTIVITY_TABS = Object.freeze([
-  Object.freeze({ id: "bets", label: "My Bets" }),
+  Object.freeze({ id: "bets", label: "Activity" }),
   Object.freeze({ id: "pvp", label: "PvP History" }),
   Object.freeze({ id: "statistics", label: "Statistics" }),
 ]);

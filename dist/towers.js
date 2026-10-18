@@ -132,7 +132,7 @@
     if (round && round.status !== "active") {
       const wager = Number(round.wager || 0);
       const payout = Number(round.payout || 0);
-      setMessage(round.outcome === "win" ? `${Number(round.multiplier).toFixed(2)}× · ${payout.toFixed(8)} ${selectedSymbol}` : "Round lost", round.outcome);
+      setMessage();
       if (!recordedRounds.has(round.id)) {
         recordedRounds.add(round.id);
         window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "towers", wager, payout } }));

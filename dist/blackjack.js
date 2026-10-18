@@ -172,7 +172,7 @@
     if (round.status === "settled") {
       const payout = Number(round.payout || 0);
       const wager = Number(round.wager || 0);
-      setMessage(round.outcome === "win" ? `${round.multiplier.toFixed(2)}× · ${payout.toFixed(8)} ${selectedSymbol}` : round.outcome === "push" ? "Your wager was returned." : "Round complete.", round.outcome || "loss");
+      setMessage();
       if (!recordedRounds.has(round.id)) {
         recordedRounds.add(round.id);
         window.dispatchEvent(new CustomEvent("gamrace:session-result", { detail: { game: "blackjack", wager, payout } }));

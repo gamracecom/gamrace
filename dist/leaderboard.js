@@ -10,8 +10,25 @@
   const cadenceLabel = document.querySelector("[data-leaderboard-page-cadence]");
   const status = document.querySelector("[data-leaderboard-status]");
   const currentPlayerRow = document.querySelector("[data-current-player-row]");
+  const tabList = document.querySelector(".leaderboard-period-tabs");
   const campaigns = new Map();
-  let activeCadence = "weekly";
+  let activeCadence = null;
+
+  function isConfigured(campaign) {
+    return Boolean(campaign?.startsAt && campaign?.endsAt);
+  }
+
+  function syncAvailableTabs() {
+    const available = tabs.filter((tab) => isConfigured(campaigns.get(tab.dataset.leaderboardTab)));
+    tabs.forEach((tab) => { tab.hidden = !available.includes(tab); });
+    if (tabList) {
+      tabList.hidden = available.length === 0;
+      tabList.style.setProperty("--leaderboard-tab-count", String(Math.max(1, available.length)));
+    }
+    if (!available.some((tab) => tab.dataset.leaderboardTab === activeCadence)) {
+      activeCadence = available[0]?.dataset.leaderboardTab || null;
+    }
+  }
 
   function moneyFromCents(value) {
     const cents = Math.max(0, Number(value || 0));
@@ -143,7 +160,7 @@
     prize.textContent = moneyFromCents(campaign?.prizeUsdCents);
     countdown.textContent = countdownText(campaign);
     const cadenceNames = { daily: "Daily", weekly: "Weekly", biweekly: "BiWeekly", monthly: "Monthly" };
-    cadenceLabel.textContent = `${cadenceNames[activeCadence] || "Weekly"} race`;
+    cadenceLabel.textContent = activeCadence ? `${cadenceNames[activeCadence] || "Leaderboard"} race` : "No race configured";
     tabs.forEach((tab) => {
       const active = tab.dataset.leaderboardTab === activeCadence;
       tab.classList.toggle("active", active);
@@ -165,7 +182,9 @@
       });
       if (!response.ok) throw new Error("Leaderboard data is temporarily unavailable");
       const body = await response.json();
+      campaigns.clear();
       (body.leaderboards || []).forEach((campaign) => campaigns.set(campaign.cadence, campaign));
+      syncAvailableTabs();
       status.textContent = "";
       render();
     } catch (error) {
@@ -175,16 +194,15 @@
   }
 
   tabs.forEach((tab) => tab.addEventListener("click", () => {
-    activeCadence = tab.dataset.leaderboardTab || "weekly";
+    activeCadence = tab.dataset.leaderboardTab || null;
     render();
   }));
   window.addEventListener("gamrace:auth-state", () => {
     refresh();
   });
-  render();
   refresh();
   window.setInterval(() => {
-    countdown.textContent = countdownText(campaigns.get(activeCadence));
+    if (activeCadence) countdown.textContent = countdownText(campaigns.get(activeCadence));
   }, 1000);
   window.setInterval(refresh, 15000);
 })();

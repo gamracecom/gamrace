@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { browserLocalPersistence, getAuth, GoogleAuthProvider, onAuthStateChanged, setPersistence, signInWithPopup, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getPlayerRankStats } from "./player-rank-service.js?v=rank-badges-2";
 import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS } from "./profile-config.js";
@@ -16,6 +16,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+try { await setPersistence(auth, browserLocalPersistence); } catch (error) { console.warn("GamRace auth persistence fallback", error); }
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 window.GamRaceAuth = {
@@ -159,7 +160,7 @@ function createProfileDialog() {
           <section class="profile-section" data-profile-panel="transactions" hidden>
             <span class="profile-section-label">TRANSACTIONS</span><h3>Play history</h3><p class="settings-copy">Review bets, player matches, and performance statistics.</p>
             <div class="account-subtabs" role="tablist">${ACTIVITY_TABS.map((tab, index) => `<button class="account-subtab ${index === 0 ? "active" : ""}" type="button" data-activity-tab="${tab.id}" aria-selected="${index === 0}">${tab.label}</button>`).join("")}</div>
-            <div data-activity-panel="bets"><div class="account-table"><div class="account-table-head"><span>Game</span><span>Bet</span><span>Multiplier</span><span>Payout</span><span>Result</span><span>Date</span></div><div class="account-table-body"></div></div><nav class="account-pagination" aria-label="Transaction pages"><button class="account-page-previous" type="button">Previous</button><label>Page <select class="account-page-select" aria-label="Transaction page"></select></label><span class="account-page-total"></span><button class="account-page-next" type="button">Next</button></nav></div>
+            <div data-activity-panel="bets"><div class="account-table"><div class="account-table-head"><span>Activity</span><span>Amount</span><span>Details</span><span>Asset</span><span>Status</span><span>Date</span></div><div class="account-table-body"></div></div><nav class="account-pagination" aria-label="Transaction pages"><button class="account-page-previous" type="button">Previous</button><label>Page <select class="account-page-select" aria-label="Transaction page"></select></label><span class="account-page-total"></span><button class="account-page-next" type="button">Next</button></nav></div>
             <div data-activity-panel="pvp" hidden><div class="account-table"><div class="account-table-head pvp"><span>Opponent</span><span>Game</span><span>Stake</span><span>Result</span><span>Profit / loss</span><span>Date</span></div><div class="account-empty"><strong>No PvP matches yet</strong><span>Player-versus-player results will appear here.</span></div></div></div>
             <div data-activity-panel="statistics" hidden><div class="statistics-grid"></div></div>
           </section>
@@ -294,13 +295,24 @@ function accountCurrencyLabel(currency) {
 function renderBetActivity(activity = [], pagination = accountSnapshot.pagination || {}) {
   profileDialog.betsTableBody.replaceChildren();
   if (!activity.length) {
-    profileDialog.betsTableBody.innerHTML = '<div class="account-empty"><strong>No bets yet</strong><span>Your settled and open bets will appear here as soon as they are placed.</span></div>';
+    profileDialog.betsTableBody.innerHTML = '<div class="account-empty"><strong>No transactions yet</strong><span>Bets, deposits, withdrawals and reward claims will appear here.</span></div>';
   } else {
-    for (const bet of activity) {
+    const labels = {
+      deposit: "Deposit", withdrawal: "Withdrawal", promo_reward: "Promo claim",
+      leaderboard_payout: "Leaderboard payout", leaderboard_reward: "Leaderboard payout",
+      rakeback_claim: "Rakeback claim", vip_reward: "VIP reward", bonus_reward: "Bonus reward", reward: "Reward",
+    };
+    const creditTypes = new Set(["deposit", "promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim", "vip_reward", "bonus_reward", "reward"]);
+    for (const item of activity) {
       const row = document.createElement("div");
-      const status = ["win", "loss", "push", "open"].includes(bet.status) ? bet.status : "open";
+      const status = String(item.status || "pending").toLowerCase();
+      const isBet = item.type === "bet";
+      const title = isBet ? `${item.game || "Game"} bet` : labels[item.type] || "Account activity";
+      const prefix = item.type === "withdrawal" || isBet ? "−" : creditTypes.has(item.type) ? "+" : "";
+      const detail = isBet ? `${Number(item.multiplier || 0).toFixed(2)}× · ${item.payout || "0"} ${accountCurrencyLabel(item.currency)} payout` : item.reference ? `Ref ${String(item.reference).slice(0, 18)}` : "Wallet credit";
+      const tone = ["win", "loss", "push", "open"].includes(status) ? status : "open";
       row.className = "account-table-row";
-      row.innerHTML = `<strong data-label="Game">${escapeMarkup(bet.game)}</strong><span data-label="Bet">${escapeMarkup(bet.amount)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><span data-label="Multiplier">${Number(bet.multiplier || 0).toFixed(2)}×</span><span data-label="Payout">${escapeMarkup(bet.payout)} ${escapeMarkup(accountCurrencyLabel(bet.currency))}</span><b data-label="Result" data-result="${status}">${status.toUpperCase()}</b><time data-label="Date">${new Date(Number(bet.createdAt)).toLocaleString()}</time>`;
+      row.innerHTML = `<strong data-label="Activity">${escapeMarkup(title)}</strong><span data-label="Amount">${prefix}${escapeMarkup(item.amount)} ${escapeMarkup(accountCurrencyLabel(item.currency))}</span><span data-label="Details">${escapeMarkup(detail)}</span><span data-label="Asset">${escapeMarkup(accountCurrencyLabel(item.currency))}</span><b data-label="Status" data-result="${tone}">${escapeMarkup(status.replaceAll("_", " ").toUpperCase())}</b><time data-label="Date">${new Date(Number(item.createdAt)).toLocaleString()}</time>`;
       profileDialog.betsTableBody.append(row);
     }
   }
@@ -309,7 +321,7 @@ function renderBetActivity(activity = [], pagination = accountSnapshot.paginatio
   profileDialog.pageSelect.innerHTML = Array.from({ length: totalPages }, (_, index) => `<option value="${index + 1}" ${index + 1 === page ? "selected" : ""}>${index + 1}</option>`).join("");
   profileDialog.pagePrevious.disabled = page <= 1;
   profileDialog.pageNext.disabled = page >= totalPages;
-  profileDialog.pageTotal.textContent = `${Number(pagination.total || activity.length).toLocaleString()} bets`;
+  profileDialog.pageTotal.textContent = `${Number(pagination.total || activity.length).toLocaleString()} transactions`;
 }
 
 function renderAccountDetails(snapshot = {}) {
@@ -401,7 +413,8 @@ function refreshProfileDialog() {
 }
 
 function openProfileDialog({ welcome = false, section = "profile", settingsSection = "account" } = {}) {
-  if (!auth.currentUser || !currentProfile) return;
+  if (!auth.currentUser) return;
+  if (!currentProfile) currentProfile = provisionalProfile(auth.currentUser);
   closeAccountMenu();
   setProfileStatus(welcome ? "A random username was created for you. Choose carefully—you can change it once." : "");
   refreshProfileDialog();
@@ -425,7 +438,7 @@ function positionAccountMenu() {
 }
 
 function openAccountMenu() {
-  if (!auth.currentUser || !currentProfile) return;
+  if (!auth.currentUser) return;
   accountMenu.element.hidden = false;
   positionAccountMenu();
   profileButton?.setAttribute("aria-expanded", "true");
@@ -491,6 +504,11 @@ async function changeUsername(user, requestedUsername) {
 }
 
 function signedInLabel(user) { return currentProfile?.username || user?.displayName?.trim()?.split(/\s+/)[0] || "Account"; }
+
+function provisionalProfile(user) {
+  const username = user?.displayName?.trim()?.split(/\s+/)[0] || "Account";
+  return { username, usernameChanged: true, createdAt: null, updatedAt: null };
+}
 
 function renderUser(user) {
   const signedIn = Boolean(user);
@@ -690,6 +708,11 @@ onAuthStateChanged(auth, async (user) => {
     }
   } catch (error) {
     console.error("GamRace profile setup failed", error);
-    setStatus("Your account signed in, but its username could not be loaded. Please refresh and try again.", "error");
+    if (auth.currentUser?.uid !== user.uid) return;
+    currentProfile = provisionalProfile(user);
+    renderUser(user);
+    refreshProfileDialog();
+    checkOwnerAccess(user);
+    setStatus("Your account is connected. Profile details are still syncing.", "error");
   }
 });

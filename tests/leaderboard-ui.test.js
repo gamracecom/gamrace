@@ -21,6 +21,9 @@ test("leaderboard page has four live cadences, exact prize rows and an authentic
   assert.match(script, /campaign\?\.prizePlaces/);
   assert.match(script, /Array\.from\(\{ length: places \}/);
   assert.match(script, /GamRaceAuth\?\.getToken/);
+  assert.match(script, /function syncAvailableTabs\(\)/);
+  assert.match(script, /tab\.hidden = !available\.includes\(tab\)/);
+  assert.match(styles, /--leaderboard-tab-count/);
   assert.doesNotMatch(html, /race-leaderboard-hero|leaderboard-circuit-v3|leaderboard-race-cars-v1/);
   assert.equal((html.match(/leaderboard-checkered-flag-v1\.webp/g) || []).length, 3);
   assert.equal((html.match(/class="podium-aura"/g) || []).length, 3);

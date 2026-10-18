@@ -177,7 +177,7 @@ function createWalletDialog() {
         </section>
         <section class="wallet-panel" data-wallet-panel="transactions" hidden>
           <div class="wallet-transaction-filters" aria-label="Transaction filters">
-            <button class="active" type="button" data-wallet-transaction-filter="all">All</button><button type="button" data-wallet-transaction-filter="bet">Bets</button><button type="button" data-wallet-transaction-filter="deposit">Deposits</button><button type="button" data-wallet-transaction-filter="withdrawal">Withdrawals</button><button type="button" data-wallet-transaction-filter="tip">Tips</button><button type="button" data-wallet-transaction-filter="purchase">Purchases</button><button type="button" data-wallet-transaction-filter="bonus">Bonuses</button>
+            <button class="active" type="button" data-wallet-transaction-filter="all">All</button><button type="button" data-wallet-transaction-filter="bet">Games</button><button type="button" data-wallet-transaction-filter="deposit">Deposits</button><button type="button" data-wallet-transaction-filter="withdrawal">Withdrawals</button><button type="button" data-wallet-transaction-filter="reward">Rewards</button>
           </div>
           <div class="wallet-transaction-list" data-wallet-transaction-list></div>
         </section>
@@ -584,7 +584,8 @@ async function loadWallet() {
 
 function renderWalletTransactions(filter = "all") {
   dialog.transactionFilters.forEach((button) => button.classList.toggle("active", button.dataset.walletTransactionFilter === filter));
-  const rows = walletActivity.filter((item) => filter === "all" || item.type === filter);
+  const rewardTypes = new Set(["promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim", "vip_reward", "bonus_reward", "reward"]);
+  const rows = walletActivity.filter((item) => filter === "all" || item.type === filter || (filter === "reward" && rewardTypes.has(item.type)));
   dialog.transactionList.replaceChildren();
   if (!rows.length) {
     const empty = document.createElement("div");
@@ -597,7 +598,8 @@ function renderWalletTransactions(filter = "all") {
     const row = document.createElement("article");
     row.className = "wallet-activity-row";
     const asset = assetFor(item.currency);
-    const title = item.type === "withdrawal" ? "Withdrawal" : item.type === "deposit" ? "Deposit" : item.type === "bet" ? `${item.game || "Game"} bet` : "Wallet activity";
+    const rewardLabels = { promo_reward: "Promo claim", leaderboard_payout: "Leaderboard payout", leaderboard_reward: "Leaderboard payout", rakeback_claim: "Rakeback claim", vip_reward: "VIP reward", bonus_reward: "Bonus reward", reward: "Reward" };
+    const title = item.type === "withdrawal" ? "Withdrawal" : item.type === "deposit" ? "Deposit" : item.type === "bet" ? `${item.game || "Game"} bet` : rewardLabels[item.type] || "Wallet activity";
     const amount = item.type === "bet" ? `${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}` : `${item.type === "withdrawal" ? "−" : "+"}${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}`;
     const detail = item.type === "bet" && item.multiplier ? `${Number(item.multiplier).toFixed(2)}× · ${String(item.status || "open")}` : String(item.status || "Pending").replaceAll("_", " ");
     row.innerHTML = `<img class="wallet-activity-icon" src="${iconUrl(asset || item.currency)}" alt="" /><div><strong>${title}</strong><span>${asset?.symbol || String(item.currency || "").toUpperCase()} · ${detail}</span></div><strong>${amount}</strong>`;

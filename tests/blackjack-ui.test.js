@@ -34,6 +34,8 @@ test("Blackjack has a responsive table and complete game tools", () => {
   assert.match(script, /totalHands \* 2 \+ 1/);
   assert.match(styles, /@keyframes blackjack-sweep-deal/);
   assert.match(styles, /\.blackjack-hand\.active\{border-color:transparent/);
+  assert.match(styles, /\.blackjack-hand\.active \.blackjack-card\{border-color:#168bff/);
+  assert.doesNotMatch(script, /Your wager was returned|Round complete/);
   assert.match(html, /data-blackjack-view="side-bets"/);
   assert.equal((html.match(/data-blackjack-hand-count=/g) || []).length, 3);
   assert.match(html, /id="blackjack-perfect-pairs"/);

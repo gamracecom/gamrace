@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [worker, auth, services, migration] = await Promise.all([
+const [worker, auth, services, migration, wallet] = await Promise.all([
   readFile(new URL("../worker/src/index.js", import.meta.url), "utf8"),
   readFile(new URL("../dist/firebase-auth.js", import.meta.url), "utf8"),
   readFile(new URL("../dist/profile-services.js", import.meta.url), "utf8"),
   readFile(new URL("../worker/migrations/0027_live_account_data.sql", import.meta.url), "utf8"),
+  readFile(new URL("../dist/wallet.js", import.meta.url), "utf8"),
 ]);
 
 test("rank and account statistics use the authoritative live game records", () => {
@@ -28,6 +29,15 @@ test("transactions render live bets and wallet history uses the same account sou
   assert.match(auth, /account-table-row/);
   assert.match(auth, /renderBetActivity\(accountSnapshot\.activity, accountSnapshot\.pagination\)/);
   assert.match(services, /\/account\?compact=1/);
+});
+
+test("account history includes live funding and reward transactions", () => {
+  assert.match(worker, /function pagedAccountTransactions/);
+  assert.match(worker, /leaderboard_payout/);
+  assert.match(worker, /rakeback_claim/);
+  assert.match(auth, /Leaderboard payout/);
+  assert.match(auth, /Rakeback claim/);
+  assert.match(wallet, /data-wallet-transaction-filter="reward"/);
 });
 
 test("live account aggregation stays within D1 compound limits and accepts signed profit", () => {

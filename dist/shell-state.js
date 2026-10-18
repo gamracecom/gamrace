@@ -40,6 +40,12 @@
     try { sessionStorage.removeItem(WALLET_SELECTION_KEY); } catch { /* Private browsing can disable storage. */ }
     delete window.gamraceWalletSelection;
     document.documentElement.dataset.sessionState = "signed-out";
+    document.querySelectorAll(".profile-label").forEach((label) => { label.textContent = "Account"; });
+    document.querySelectorAll(".profile-rank-mark").forEach((mark) => {
+      mark.classList.remove("has-image", "rank-loading");
+      const image = mark.querySelector(".profile-rank-image");
+      if (image) image.removeAttribute("src");
+    });
   }
 
   function readWalletSelection() {
@@ -67,7 +73,10 @@
   }
 
   function apply(snapshot = read()) {
-    if (!snapshot?.signedIn) return;
+    if (!snapshot?.signedIn) {
+      document.querySelectorAll(".profile-rank-mark").forEach((mark) => mark.classList.remove("has-image", "rank-loading"));
+      return;
+    }
     document.documentElement.dataset.sessionState = "signed-in";
     document.querySelectorAll(".profile-label").forEach((label) => { label.textContent = snapshot.username || "Account"; });
     document.querySelectorAll(".balance-value").forEach((value) => { value.textContent = snapshot.balanceText || "$0.00"; });
@@ -97,6 +106,11 @@
   PRELOAD_ASSETS.forEach((source) => { const image = new Image(); image.src = source; });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => apply(initial), { once: true });
   else apply(initial);
+  window.setTimeout(() => {
+    if (document.body?.dataset.authenticated !== "pending") return;
+    document.body.dataset.authenticated = "false";
+    clear();
+  }, 8000);
 
   window.GamRaceShellState = { read, write, clear, apply, readWalletSelection, cacheWalletSelection };
 })();

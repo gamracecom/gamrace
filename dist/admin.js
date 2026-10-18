@@ -507,6 +507,10 @@ function transactionLabel(item) {
   if (item.type === "withdrawal_hold") return "Withdrawal reserved";
   if (item.type === "withdrawal_release") return "Withdrawal released";
   if (item.type === "withdrawal") return "Withdrawal";
+  if (item.type === "promo_reward") return "Promo claim";
+  if (item.type === "leaderboard_payout" || item.type === "leaderboard_reward") return "Leaderboard payout";
+  if (item.type === "rakeback_claim") return "Rakeback claim";
+  if (["vip_reward", "bonus_reward", "reward"].includes(item.type)) return "Player reward";
   return String(item.type || "Wallet activity").replaceAll("_", " ");
 }
 
@@ -514,6 +518,7 @@ function transactionIcon(item) {
   if (item.type === "game_wager" || item.type === "game_bet") return "−";
   if (item.type === "game_payout") return "+";
   if (item.type === "deposit") return "↓";
+  if (["promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim", "vip_reward", "bonus_reward", "reward"].includes(item.type)) return "★";
   if (String(item.type || "").startsWith("withdrawal")) return "↑";
   return "±";
 }
