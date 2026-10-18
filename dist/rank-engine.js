@@ -1,4 +1,4 @@
-import { MAX_RANK, RANK_LEVELS } from "./rank-config.js?v=rank-badges-1";
+import { MAX_RANK, RANK_LEVELS } from "./rank-config.js?v=rank-badges-2";
 
 function asNonNegativeNumber(value) {
   const number = Number(value);

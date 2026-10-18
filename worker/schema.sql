@@ -422,8 +422,9 @@ CREATE TABLE IF NOT EXISTS country_access (
 -- Owner-controlled homepage races. The authoritative end timestamp keeps the
 -- public countdown consistent across devices and page refreshes.
 CREATE TABLE IF NOT EXISTS leaderboard_campaigns (
-  cadence TEXT PRIMARY KEY CHECK(cadence IN ('weekly', 'biweekly')),
+  cadence TEXT PRIMARY KEY CHECK(cadence IN ('daily', 'weekly', 'biweekly', 'monthly')),
   prize_usd_cents INTEGER NOT NULL CHECK(prize_usd_cents > 0),
+  prize_places INTEGER NOT NULL DEFAULT 10 CHECK(prize_places BETWEEN 1 AND 50),
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'ended')),
   duration_seconds INTEGER NOT NULL CHECK(duration_seconds BETWEEN 60 AND 7776000),
   starts_at INTEGER NOT NULL,

@@ -3154,3 +3154,57 @@ body,
   .leaderboard-page .floating-grid .race-grid-labels>span{padding:0 4px}.leaderboard-page .floating-grid .race-player{gap:5px}.leaderboard-page .floating-grid .race-player-badge{width:22px;height:22px;flex-basis:22px}.leaderboard-page .floating-grid .race-player strong{font-size:.54rem}.leaderboard-page .floating-grid .race-wager-value,.leaderboard-page .floating-grid .race-prize-value{font-size:.5rem}
 }
 @media(prefers-reduced-motion:reduce){.real-race-flag,.leaderboard-page .floating-podium-card{animation:none!important}}
+
+/* Leaderboard v5: one compact dark row per prize place. */
+.leaderboard-page .leaderboard-period-tabs{width:min(600px,100%);grid-template-columns:repeat(4,minmax(0,1fr))}
+.leaderboard-page .floating-grid .race-grid-table{display:block}
+.leaderboard-page .floating-grid [data-leaderboard-rows]{display:grid;gap:7px}
+.leaderboard-page .floating-grid .race-grid-labels,
+.leaderboard-page .floating-grid .race-grid-row{
+  grid-template-columns:54px minmax(220px,1.35fr) minmax(150px,.8fr) minmax(150px,.6fr);
+}
+.leaderboard-page .floating-grid .race-grid-labels{margin-bottom:7px;padding:0 16px}
+.leaderboard-page .floating-grid .race-grid-labels>span{padding:0;white-space:nowrap}
+.leaderboard-page .floating-grid .race-grid-row:not(.race-grid-labels){
+  min-height:54px;
+  padding:0 16px;
+  border:1px solid #1a2732;
+  border-radius:12px;
+  background:#0c1219;
+  box-shadow:0 8px 20px rgba(0,0,0,.2);
+}
+.leaderboard-page .floating-grid .race-grid-row:not(.race-grid-labels)>span,
+.leaderboard-page .floating-grid .race-grid-row:not(.race-grid-labels)>strong{
+  min-height:0;
+  padding:0;
+  border:0!important;
+  border-radius:0;
+  background:transparent!important;
+  box-shadow:none;
+}
+.leaderboard-page .floating-grid .race-position{justify-content:flex-start!important;color:#5ccfff;font-size:.75rem}
+.leaderboard-page .floating-grid .race-grid-row.top-1 .race-position{color:#ffd35a}
+.leaderboard-page .floating-grid .race-grid-row.top-2 .race-position{color:#dce5ed}
+.leaderboard-page .floating-grid .race-grid-row.top-3 .race-position{color:#ffa67e}
+.leaderboard-page .floating-grid .race-wager-value,
+.leaderboard-page .floating-grid .race-prize-value{justify-content:flex-start;color:#e8f3fa}
+.leaderboard-page .floating-grid .race-prize-value{color:#31e6a0}
+.leaderboard-page .floating-grid .current-player-row{margin-top:14px;border-color:#1676b7;background:#0a1823;box-shadow:0 0 0 1px rgba(22,139,255,.08),0 10px 24px rgba(0,0,0,.24)}
+.leaderboard-page .floating-grid .current-player-row[hidden]{display:none}
+.leaderboard-page .floating-grid .current-player-row .race-player>span:last-child{min-width:0;display:flex;flex-direction:column;gap:2px}
+.leaderboard-page .floating-grid .current-player-row small{color:#718291;font-size:.5rem;text-transform:uppercase;letter-spacing:.06em}
+.leaderboard-page .badge-fallback{background:#111c26 url("assets/brand/gamrace-icon.png") center/42% no-repeat}
+
+@media(max-width:720px){
+  .leaderboard-page .leaderboard-period-tabs{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+  .leaderboard-page .leaderboard-period-tabs button{min-height:39px;padding:0 3px;font-size:.58rem}
+  .leaderboard-page .floating-grid .race-grid-labels,
+  .leaderboard-page .floating-grid .race-grid-row{grid-template-columns:24px minmax(100px,1fr) 82px 70px;gap:5px}
+  .leaderboard-page .floating-grid .race-grid-labels{padding:0 9px;font-size:.42rem;letter-spacing:.02em}
+  .leaderboard-page .floating-grid .race-grid-row:not(.race-grid-labels){min-height:48px;padding:0 9px;border-radius:10px}
+  .leaderboard-page .floating-grid .race-grid-row:not(.race-grid-labels)>span,
+  .leaderboard-page .floating-grid .race-grid-row:not(.race-grid-labels)>strong{min-height:0;padding:0;border-radius:0}
+  .leaderboard-page .floating-grid .race-player strong{font-size:.51rem}
+  .leaderboard-page .floating-grid .race-wager-value,.leaderboard-page .floating-grid .race-prize-value{font-size:.48rem}
+  .leaderboard-page .floating-grid .current-player-row small{font-size:.38rem}
+}

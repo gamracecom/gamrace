@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getPlayerRankStats } from "./player-rank-service.js?v=rank-badges-1";
+import { getPlayerRankStats } from "./player-rank-service.js?v=rank-badges-2";
 import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS } from "./profile-config.js";
 import { profileServices } from "./profile-services.js?v=account-live-2";
 
@@ -18,6 +18,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+window.GamRaceAuth = {
+  getToken: async () => auth.currentUser ? auth.currentUser.getIdToken() : null,
+  getUser: () => auth.currentUser,
+};
 const googleButtons = [...document.querySelectorAll(".google-auth")];
 const authStatus = document.querySelector("#auth-status");
 const authModal = document.querySelector("#auth-modal");
@@ -661,15 +665,22 @@ window.addEventListener("gamrace:session-result", () => {
   accountRefreshTimer = window.setTimeout(() => refreshLiveAccountData({ compact: true }).catch(() => {}), 650);
 });
 onAuthStateChanged(auth, async (user) => {
-  if (!user) { renderUser(null); return; }
+  if (!user) {
+    renderUser(null);
+    window.dispatchEvent(new CustomEvent("gamrace:auth-state", { detail: { signedIn: false } }));
+    return;
+  }
   renderUser(user);
+  window.dispatchEvent(new CustomEvent("gamrace:auth-state", { detail: { signedIn: true } }));
   try {
     const result = await ensureUserProfile(user);
     if (auth.currentUser?.uid !== user.uid) return;
     currentProfile = result.profile;
     renderUser(user);
     refreshProfileDialog();
-    syncPlayerUsername(user).catch((error) => console.warn("GamRace username sync deferred", error));
+    syncPlayerUsername(user)
+      .then(() => window.dispatchEvent(new CustomEvent("gamrace:auth-state", { detail: { signedIn: true, profileReady: true } })))
+      .catch((error) => console.warn("GamRace username sync deferred", error));
     refreshLiveAccountData({ compact: false }).catch((error) => console.warn("GamRace live account sync deferred", error));
     checkOwnerAccess(user);
     if (location.hash === "#promotions") { history.replaceState(null, "", location.pathname + location.search); openProfileDialog({ section: "vip" }); }

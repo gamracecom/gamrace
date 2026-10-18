@@ -242,6 +242,11 @@ async function requireUser(request, env) {
   return verifyFirebaseToken(match[1], env.FIREBASE_PROJECT_ID || "gamrace");
 }
 
+async function optionalUser(request, env) {
+  const match = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/i);
+  return match ? verifyFirebaseToken(match[1], env.FIREBASE_PROJECT_ID || "gamrace") : null;
+}
+
 function requestGeo(request) {
   const cf = request.cf || {};
   return {
@@ -2759,7 +2764,7 @@ async function handleGameHistory(request, env, user) {
       usernameHidden: !usernameVisible,
       profileVisible: profileVisible && usernameVisible,
       isYou,
-      playerRank: rankVisible ? { id: "rookie-i", label: "Rookie I", badgePath: "/ranks/rookie-i.png" } : null,
+      playerRank: rankVisible ? { id: "rookie-i", label: "Rookie I", badgePath: "/ranks/rookie-i.webp" } : null,
       currency: row.currency,
       wager: assetUnitsToString(Number(row.wager_units), false),
       payout: assetUnitsToString(Number(row.payout_units), false),
@@ -4369,7 +4374,7 @@ function adminAssetAmount(row, field = "amount_units") {
   }
 }
 
-const LEADERBOARD_CADENCES = ["weekly", "biweekly"];
+const LEADERBOARD_CADENCES = ["daily", "weekly", "biweekly", "monthly"];
 
 function parsePrizeUsdCents(value) {
   return parseUsdCents(value, "Prize amount", { allowZero: false });
@@ -4388,11 +4393,12 @@ function parseUsdCents(value, label = "Amount", { allowZero = true } = {}) {
 }
 
 function leaderboardResponse(row, cadence) {
-  if (!row) return { cadence, prizeUsdCents: 0, status: "scheduled", startsAt: null, endsAt: null, durationSeconds: 0, standings: [] };
+  if (!row) return { cadence, prizeUsdCents: 0, prizePlaces: 10, status: "scheduled", startsAt: null, endsAt: null, durationSeconds: 0, standings: [] };
   const ended = Number(row.ends_at) <= now();
   return {
     cadence,
     prizeUsdCents: Number(row.prize_usd_cents),
+    prizePlaces: Math.max(1, Math.min(50, Number(row.prize_places || 10))),
     status: ended ? "ended" : row.status,
     startsAt: new Date(Number(row.starts_at)).toISOString(),
     endsAt: new Date(Number(row.ends_at)).toISOString(),
@@ -4407,15 +4413,28 @@ function leaderboardRank(totalWagered) {
   const tierIndex = index % 3;
   const stageName = stageId.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
   const tier = ["I", "II", "III"][tierIndex];
+  const badgeTier = ["i", "ii", "iii"][tierIndex];
   return {
     id: `${stageId}-${tierIndex + 1}`,
     label: `${stageName} ${tier}`,
-    badgePath: `/ranks/${stageId}-${tierIndex + 1}.png`,
+    badgePath: `/ranks/${stageId}-${badgeTier}.webp`,
   };
 }
 
-async function leaderboardStandings(env, campaign) {
-  if (!campaign) return [];
+async function leaderboardStandings(env, campaign, prizePlaces, viewer) {
+  if (!campaign) {
+    if (!viewer) return { standings: [], currentPlayer: null };
+    const profile = await env.DB.prepare("SELECT username FROM player_profiles WHERE uid = ?").bind(viewer.sub).first();
+    return {
+      standings: [],
+      currentPlayer: {
+        position: null,
+        username: String(profile?.username || viewer.name || "You"),
+        wagerUsdCents: 0,
+        playerRank: leaderboardRank(0),
+      },
+    };
+  }
   const startsAt = Number(campaign.starts_at);
   const endsAt = Math.min(Number(campaign.ends_at), now());
   const rows = await env.DB.prepare(`
@@ -4425,7 +4444,6 @@ async function leaderboardStandings(env, campaign) {
     FROM crypto_ledger
     WHERE type IN ('game_wager', 'game_bet') AND created_at <= ?
     GROUP BY uid, currency
-    HAVING campaign_units > 0
   `).bind(startsAt, endsAt, endsAt).all();
   let prices = {};
   try { prices = await providerPrices(env); } catch { prices = {}; }
@@ -4442,51 +4460,59 @@ async function leaderboardStandings(env, campaign) {
     current.lifetimeWagered += lifetimeUsd;
     racers.set(row.uid, current);
   }
-  const leaders = [...racers.values()]
-    .filter((racer) => racer.wagerUsdCents > 0)
-    .sort((left, right) => right.wagerUsdCents - left.wagerUsdCents || left.uid.localeCompare(right.uid))
-    .slice(0, 50);
-  if (!leaders.length) return [];
-  const placeholders = leaders.map(() => "?").join(", ");
+  const allRacers = [...racers.values()].sort((left, right) => right.wagerUsdCents - left.wagerUsdCents || left.uid.localeCompare(right.uid));
+  const qualifyingRacers = allRacers.filter((racer) => racer.wagerUsdCents > 0);
+  const leaders = qualifyingRacers.slice(0, prizePlaces);
+  const viewerRacer = viewer ? allRacers.find((racer) => racer.uid === viewer.sub) || { uid: viewer.sub, wagerUsdCents: 0, lifetimeWagered: 0 } : null;
+  const profileUids = [...new Set([...leaders.map((racer) => racer.uid), ...(viewerRacer ? [viewerRacer.uid] : [])])];
+  if (!profileUids.length) return { standings: [], currentPlayer: null };
+  const placeholders = profileUids.map(() => "?").join(", ");
   const profiles = await env.DB.prepare(`
     SELECT uid, username, profile_public, show_username, show_rank
     FROM player_profiles WHERE uid IN (${placeholders})
-  `).bind(...leaders.map((racer) => racer.uid)).all();
+  `).bind(...profileUids).all();
   const profilesByUid = new Map((profiles.results || []).map((profile) => [profile.uid, profile]));
-  return leaders.map((racer, index) => {
+  const entryFor = (racer, position, isViewer = false) => {
     const profile = profilesByUid.get(racer.uid) || {};
-    const profileVisible = Boolean(profile.profile_public ?? 1);
-    const usernameVisible = profileVisible && Boolean(profile.show_username ?? 1);
-    const rankVisible = profileVisible && Boolean(profile.show_rank ?? 1);
+    const profileVisible = isViewer || Boolean(profile.profile_public ?? 1);
+    const usernameVisible = isViewer || (profileVisible && Boolean(profile.show_username ?? 1));
+    const rankVisible = isViewer || (profileVisible && Boolean(profile.show_rank ?? 1));
     return {
-      position: index + 1,
-      username: usernameVisible ? String(profile.username || "Racer") : "Hidden Racer",
+      position,
+      username: usernameVisible ? String(profile.username || (isViewer ? viewer?.name : "Racer") || "Racer") : "Hidden Racer",
       profileVisible: usernameVisible,
       wagerUsdCents: racer.wagerUsdCents,
       playerRank: rankVisible ? leaderboardRank(racer.lifetimeWagered) : null,
     };
-  });
+  };
+  const viewerIndex = viewerRacer ? qualifyingRacers.findIndex((racer) => racer.uid === viewerRacer.uid) : -1;
+  return {
+    standings: leaders.map((racer, index) => entryFor(racer, index + 1, racer.uid === viewer?.sub)),
+    currentPlayer: viewerRacer ? entryFor(viewerRacer, viewerIndex >= 0 ? viewerIndex + 1 : null, true) : null,
+  };
 }
 
-async function readLeaderboards(env) {
+async function readLeaderboards(env, viewer = null) {
   const result = await env.DB.prepare(`
-    SELECT cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at
-    FROM leaderboard_campaigns WHERE cadence IN ('weekly', 'biweekly')
+    SELECT cadence, prize_usd_cents, prize_places, status, duration_seconds, starts_at, ends_at, updated_at
+    FROM leaderboard_campaigns WHERE cadence IN ('daily', 'weekly', 'biweekly', 'monthly')
   `).all();
   const rows = new Map((result.results || []).map((row) => [row.cadence, row]));
   return Promise.all(LEADERBOARD_CADENCES.map(async (cadence) => {
     const row = rows.get(cadence);
-    return { ...leaderboardResponse(row, cadence), standings: await leaderboardStandings(env, row) };
+    const campaign = leaderboardResponse(row, cadence);
+    const result = await leaderboardStandings(env, row, campaign.prizePlaces, viewer);
+    return { ...campaign, ...result };
   }));
 }
 
-async function handleLeaderboards(request, env) {
-  return json(request, env, 200, { leaderboards: await readLeaderboards(env), generatedAt: new Date(now()).toISOString() });
+async function handleLeaderboards(request, env, viewer = null) {
+  return json(request, env, 200, { leaderboards: await readLeaderboards(env, viewer), generatedAt: new Date(now()).toISOString() });
 }
 
 async function handleAdminLeaderboards(request, env, user) {
   await requireAdminSession(request, env, user);
-  return handleLeaderboards(request, env);
+  return handleLeaderboards(request, env, user);
 }
 
 const PROMOTION_RANKS = Object.freeze([
@@ -4723,6 +4749,8 @@ async function handleAdminStartLeaderboard(request, env, user, cadence) {
   if (!LEADERBOARD_CADENCES.includes(normalizedCadence)) throw httpError(400, "Choose a valid leaderboard");
   const body = await requestJson(request);
   const prizeUsdCents = parsePrizeUsdCents(body.prizeUsd);
+  const prizePlaces = Number(body.prizePlaces);
+  if (!Number.isInteger(prizePlaces) || prizePlaces < 1 || prizePlaces > 50) throw httpError(400, "Prize places must be between 1 and 50");
   const durationSeconds = Number(body.durationSeconds);
   if (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 7_776_000) {
     throw httpError(400, "Countdown must be between one minute and 90 days");
@@ -4731,20 +4759,21 @@ async function handleAdminStartLeaderboard(request, env, user, cadence) {
   const endsAt = startsAt + durationSeconds * 1000;
   await env.DB.prepare(`
     INSERT INTO leaderboard_campaigns(
-      cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at, updated_by
-    ) VALUES(?, ?, 'active', ?, ?, ?, ?, ?)
+      cadence, prize_usd_cents, prize_places, status, duration_seconds, starts_at, ends_at, updated_at, updated_by
+    ) VALUES(?, ?, ?, 'active', ?, ?, ?, ?, ?)
     ON CONFLICT(cadence) DO UPDATE SET
       prize_usd_cents = excluded.prize_usd_cents,
+      prize_places = excluded.prize_places,
       status = 'active',
       duration_seconds = excluded.duration_seconds,
       starts_at = excluded.starts_at,
       ends_at = excluded.ends_at,
       updated_at = excluded.updated_at,
       updated_by = excluded.updated_by
-  `).bind(normalizedCadence, prizeUsdCents, durationSeconds, startsAt, endsAt, startsAt, user.sub).run();
-  await writeAdminAudit(env, user, "leaderboard.started", normalizedCadence, JSON.stringify({ prizeUsdCents, durationSeconds, endsAt }));
+  `).bind(normalizedCadence, prizeUsdCents, prizePlaces, durationSeconds, startsAt, endsAt, startsAt, user.sub).run();
+  await writeAdminAudit(env, user, "leaderboard.started", normalizedCadence, JSON.stringify({ prizeUsdCents, prizePlaces, durationSeconds, endsAt }));
   const row = await env.DB.prepare(`
-    SELECT cadence, prize_usd_cents, status, duration_seconds, starts_at, ends_at, updated_at
+    SELECT cadence, prize_usd_cents, prize_places, status, duration_seconds, starts_at, ends_at, updated_at
     FROM leaderboard_campaigns WHERE cadence = ?
   `).bind(normalizedCadence).first();
   return json(request, env, 201, { leaderboard: leaderboardResponse(row, normalizedCadence) });
@@ -5231,7 +5260,7 @@ async function route(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
   if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
-  if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env);
+  if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env, await optionalUser(request, env));
   if (request.method === "GET" && path === "/games/settings") return handleGameSettings(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
@@ -5259,7 +5288,7 @@ async function route(request, env) {
   if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
   const gameMaintenanceMatch = path.match(/^\/admin\/games\/([a-z0-9-]+)\/maintenance$/);
   if (request.method === "POST" && gameMaintenanceMatch) return handleAdminSetGameMaintenance(request, env, user, gameMaintenanceMatch[1]);
-  const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(weekly|biweekly)\/start$/);
+  const leaderboardStartMatch = path.match(/^\/admin\/leaderboards\/(daily|weekly|biweekly|monthly)\/start$/);
   if (request.method === "POST" && leaderboardStartMatch) return handleAdminStartLeaderboard(request, env, user, leaderboardStartMatch[1]);
   const countryAccessMatch = path.match(/^\/admin\/country-access\/([A-Za-z]{2})$/);
   if (request.method === "POST" && countryAccessMatch) return handleAdminSetCountryAccess(request, env, user, countryAccessMatch[1]);

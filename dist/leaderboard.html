@@ -8,10 +8,10 @@
     <title>King of the Track | GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
-    <link rel="preload" as="image" href="ranks/rookie-i.png" />
-    <script src="shell-state.js?v=shell-stability-2"></script>
+    <link rel="preload" as="image" href="ranks/rookie-i.webp" />
+    <script src="shell-state.js?v=shell-stability-3"></script>
     <link rel="preload" as="image" href="assets/banners/leaderboard-checkered-flag-v1.webp" />
-    <link rel="stylesheet" href="styles.css?v=leaderboard-page-4&amp;wallet=4&amp;account=3" />
+    <link rel="stylesheet" href="styles.css?v=leaderboard-page-5&amp;wallet=4&amp;account=3" />
   </head>
   <body class="leaderboard-page" data-authenticated="pending">
     <div class="app-shell">
@@ -57,11 +57,6 @@
           </div>
         </header>
         <div class="leaderboard-page-content">
-          <header class="leaderboard-intro">
-            <div><h1 id="leaderboard-title">Leaderboard</h1><p>Compete, climb the grid and win exclusive rewards.</p></div>
-            <span><i aria-hidden="true">i</i> Every eligible wager moves you up the grid</span>
-          </header>
-
           <section class="leaderboard-flag-stage" aria-labelledby="leaderboard-race-title">
             <img class="real-race-flag flag-left" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" fetchpriority="high" decoding="async" />
             <img class="real-race-flag flag-right" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" fetchpriority="high" decoding="async" />
@@ -75,8 +70,10 @@
           </section>
 
           <div class="race-cadence-tabs leaderboard-period-tabs" role="tablist" aria-label="Leaderboard period">
+            <button type="button" role="tab" aria-selected="false" data-leaderboard-tab="daily"><span>Daily</span></button>
             <button class="active" type="button" role="tab" aria-selected="true" data-leaderboard-tab="weekly"><span>Weekly</span></button>
             <button type="button" role="tab" aria-selected="false" data-leaderboard-tab="biweekly"><span>BiWeekly</span></button>
+            <button type="button" role="tab" aria-selected="false" data-leaderboard-tab="monthly"><span>Monthly</span></button>
           </div>
 
           <section class="race-podium-section floating-podium-section" aria-label="Top three racers">
@@ -108,14 +105,16 @@
           <section class="race-grid-card floating-grid" aria-labelledby="starting-grid-title">
             <div class="race-grid-heading">
               <div><div><h2 id="starting-grid-title">Starting Grid</h2><p>Live weighted wagers for this race</p></div></div>
-              <span class="race-live-chip"><i aria-hidden="true"></i> Live</span>
             </div>
             <div class="race-grid-table" role="table" aria-label="Leaderboard standings">
               <div class="race-grid-row race-grid-labels" role="row"><span>#</span><span>Player</span><span>Weighted wager</span><span>Prize</span></div>
               <div data-leaderboard-rows></div>
             </div>
-            <div class="race-grid-empty" data-leaderboard-empty hidden>
-              <strong>The starting grid is open</strong><span>Be the first racer to record a qualifying wager.</span>
+            <div class="race-grid-row current-player-row" data-current-player-row hidden>
+              <strong class="race-position" data-current-player-position>—</strong>
+              <span class="race-player"><span class="race-player-badge"><img alt="" data-current-player-badge /></span><span><strong data-current-player-name>You</strong><small>Your position</small></span></span>
+              <strong class="race-wager-value" data-current-player-wager>$0.00</strong>
+              <strong class="race-prize-value" data-current-player-needed>—</strong>
             </div>
           </section>
           <p class="race-leaderboard-status" data-leaderboard-status role="status" aria-live="polite"></p>
@@ -134,9 +133,9 @@
 
     <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="mobile-nav.js?v=navigation-icons-1" defer></script>
-    <script type="module" src="firebase-auth.js?v=account-live-3"></script>
+    <script type="module" src="firebase-auth.js?v=account-live-4"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
     <script type="module" src="wallet.js?v=balance-stability-1"></script>
-    <script src="leaderboard.js?v=live-grid-3" defer></script>
+    <script src="leaderboard.js?v=live-grid-4" defer></script>
   </body>
 </html>

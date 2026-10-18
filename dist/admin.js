@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { RANK_STAGES } from "./rank-config.js?v=rank-badges-1";
+import { RANK_STAGES } from "./rank-config.js?v=rank-badges-2";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBS3pib3PsHnSJGaQqBc--S99qI7sqhDuU",
@@ -749,8 +749,9 @@ function renderLeaderboards() {
   container.innerHTML = leaderboardCache.map((leaderboard) => {
     const active = leaderboard.status === "active" && leaderboard.endsAt && Date.parse(leaderboard.endsAt) > Date.now();
     const status = active ? "live" : leaderboard.endsAt ? "ended" : "scheduled";
-    const label = leaderboard.cadence === "biweekly" ? "BiWeekly" : "Weekly";
-    return `<article class="panel-card leaderboard-status-card" data-leaderboard-admin-cadence="${leaderboard.cadence}"><div class="leaderboard-status-head"><span>${label.toUpperCase()} RACE</span><span class="status-pill ${status}">${active ? "LIVE" : leaderboard.endsAt ? "ENDED" : "NOT STARTED"}</span></div><h3>King of the Track</h3><strong class="leaderboard-status-prize">${escapeHtml(adminPrize(leaderboard.prizeUsdCents))}</strong><b class="leaderboard-status-countdown">${escapeHtml(adminLeaderboardCountdown(leaderboard))}</b><small>${leaderboard.endsAt ? `Ends ${escapeHtml(formatDate(leaderboard.endsAt))}` : "Set the prize and duration to put this race live."}</small></article>`;
+    const labels = { daily: "Daily", weekly: "Weekly", biweekly: "BiWeekly", monthly: "Monthly" };
+    const label = labels[leaderboard.cadence] || leaderboard.cadence;
+    return `<article class="panel-card leaderboard-status-card" data-leaderboard-admin-cadence="${leaderboard.cadence}"><div class="leaderboard-status-head"><span>${label.toUpperCase()} RACE</span><span class="status-pill ${status}">${active ? "LIVE" : leaderboard.endsAt ? "ENDED" : "NOT STARTED"}</span></div><h3>King of the Track</h3><strong class="leaderboard-status-prize">${escapeHtml(adminPrize(leaderboard.prizeUsdCents))}</strong><b class="leaderboard-status-countdown">${escapeHtml(adminLeaderboardCountdown(leaderboard))}</b><small>${Number(leaderboard.prizePlaces || 10)} paid places · ${leaderboard.endsAt ? `Ends ${escapeHtml(formatDate(leaderboard.endsAt))}` : "Set the prize and duration to put this race live."}</small></article>`;
   }).join("");
 }
 
@@ -854,6 +855,7 @@ document.querySelector("#leaderboard-form")?.addEventListener("submit", async (e
   event.preventDefault();
   const cadence = document.querySelector("#leaderboard-cadence").value;
   const prizeUsd = document.querySelector("#leaderboard-prize").value.trim();
+  const prizePlaces = Number(document.querySelector("#leaderboard-places").value || 0);
   const days = Number(document.querySelector("#leaderboard-days").value || 0);
   const hours = Number(document.querySelector("#leaderboard-hours").value || 0);
   const minutes = Number(document.querySelector("#leaderboard-minutes").value || 0);
@@ -861,6 +863,7 @@ document.querySelector("#leaderboard-form")?.addEventListener("submit", async (e
   const status = document.querySelector("#leaderboard-form-status");
   const button = document.querySelector("#start-leaderboard");
   if (!/^\d+(?:\.\d{1,2})?$/.test(prizeUsd) || Number(prizeUsd) <= 0) { status.textContent = "Enter a valid prize amount."; return; }
+  if (!Number.isInteger(prizePlaces) || prizePlaces < 1 || prizePlaces > 50) { status.textContent = "Choose between 1 and 50 prize places."; return; }
   if (!Number.isInteger(durationSeconds) || durationSeconds < 60) { status.textContent = "Set a countdown of at least one minute."; return; }
   button.disabled = true;
   button.textContent = "Starting race…";
@@ -868,17 +871,25 @@ document.querySelector("#leaderboard-form")?.addEventListener("submit", async (e
   try {
     const result = await api(`/admin/leaderboards/${cadence}/start`, {
       method: "POST",
-      body: JSON.stringify({ prizeUsd, durationSeconds }),
+      body: JSON.stringify({ prizeUsd, prizePlaces, durationSeconds }),
     });
     leaderboardCache = (leaderboardCache || []).map((item) => item.cadence === result.leaderboard.cadence ? result.leaderboard : item);
     renderLeaderboards();
-    showToast(`${cadence === "biweekly" ? "BiWeekly" : "Weekly"} King of the Track is live`);
+    const labels = { daily: "Daily", weekly: "Weekly", biweekly: "BiWeekly", monthly: "Monthly" };
+    showToast(`${labels[cadence] || cadence} King of the Track is live`);
   } catch (error) {
     status.textContent = error.message;
   } finally {
     button.disabled = false;
     button.textContent = "Start leaderboard";
   }
+});
+
+document.querySelector("#leaderboard-cadence")?.addEventListener("change", (event) => {
+  const suggestedDays = { daily: 1, weekly: 7, biweekly: 14, monthly: 30 };
+  document.querySelector("#leaderboard-days").value = String(suggestedDays[event.currentTarget.value] || 7);
+  document.querySelector("#leaderboard-hours").value = "0";
+  document.querySelector("#leaderboard-minutes").value = "0";
 });
 
 setInterval(() => {

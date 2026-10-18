@@ -164,8 +164,9 @@
               <article class="panel-card leaderboard-control-card">
                 <div class="panel-heading"><div><p class="section-kicker">START A LEADERBOARD</p><h3>Race setup</h3><p>Starting a cadence again safely replaces its current timer.</p></div></div>
                 <form id="leaderboard-form" class="leaderboard-admin-form">
-                  <label><span>Leaderboard</span><select id="leaderboard-cadence" required><option value="weekly">Weekly</option><option value="biweekly">BiWeekly</option></select></label>
+                  <label><span>Leaderboard</span><select id="leaderboard-cadence" required><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="biweekly">BiWeekly</option><option value="monthly">Monthly</option></select></label>
                   <label><span>Prize amount (USD)</span><div class="leaderboard-money-input"><b>$</b><input id="leaderboard-prize" type="number" inputmode="decimal" min="0.01" max="100000000" step="0.01" placeholder="30000" required /></div></label>
+                  <label><span>Prize places</span><input id="leaderboard-places" type="number" inputmode="numeric" min="1" max="50" step="1" value="10" required /></label>
                   <fieldset><legend>Countdown starts from</legend><div class="leaderboard-duration-grid"><label><span>Days</span><input id="leaderboard-days" type="number" min="0" max="90" step="1" value="7" required /></label><label><span>Hours</span><input id="leaderboard-hours" type="number" min="0" max="23" step="1" value="0" required /></label><label><span>Minutes</span><input id="leaderboard-minutes" type="number" min="0" max="59" step="1" value="0" required /></label></div></fieldset>
                   <p class="leaderboard-form-note">The server records the exact start and end time. The public countdown stays accurate after refreshes and on every device.</p>
                   <p class="dialog-status" id="leaderboard-form-status" role="status" aria-live="polite"></p>
@@ -248,6 +249,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=promo-remove-1"></script>
+    <script type="module" src="admin.js?v=leaderboard-places-1"></script>
   </body>
 </html>

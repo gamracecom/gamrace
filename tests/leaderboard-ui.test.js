@@ -8,22 +8,30 @@ const [html, script, styles, index, stack, shell, wallet] = await Promise.all([
   read("../dist/index.html"), read("../dist/stack.js"), read("../dist/shell-state.js"), read("../dist/wallet.js"),
 ]);
 
-test("leaderboard page has live Weekly and BiWeekly floating views", () => {
+test("leaderboard page has four live cadences, exact prize rows and an authenticated player row", () => {
+  assert.match(html, /data-leaderboard-tab="daily"/);
   assert.match(html, /data-leaderboard-tab="weekly"/);
   assert.match(html, /data-leaderboard-tab="biweekly"/);
+  assert.match(html, /data-leaderboard-tab="monthly"/);
   assert.equal((html.match(/data-podium-position="[1-3]"/g) || []).length, 3);
   assert.match(html, /data-leaderboard-rows/);
+  assert.match(html, /data-current-player-row/);
   assert.match(script, /fetch\(`\$\{API_BASE\}\/leaderboards`/);
   assert.match(script, /campaign\.standings/);
+  assert.match(script, /campaign\?\.prizePlaces/);
+  assert.match(script, /Array\.from\(\{ length: places \}/);
+  assert.match(script, /GamRaceAuth\?\.getToken/);
   assert.doesNotMatch(html, /race-leaderboard-hero|leaderboard-circuit-v3|leaderboard-race-cars-v1/);
   assert.equal((html.match(/leaderboard-checkered-flag-v1\.webp/g) || []).length, 3);
   assert.equal((html.match(/class="podium-aura"/g) || []).length, 3);
   assert.equal((html.match(/data-racer-prize/g) || []).length, 3);
   assert.doesNotMatch(html, /View Podium/i);
-  assert.match(script, /prizeShares/);
-  assert.match(script, /standings\.slice\(0, 10\)/);
+  assert.doesNotMatch(html, /Compete, climb the grid|starting grid is open|race-live-chip/i);
+  assert.doesNotMatch(script, /position === 1 \? "♛"/);
+  assert.doesNotMatch(script, /prizeShares/);
   assert.match(styles, /@keyframes realistic-flag-wave-left/);
   assert.match(styles, /@keyframes realistic-flag-wave-right/);
+  assert.match(styles, /Leaderboard v5: one compact dark row per prize place/);
   assert.match(styles, /@media\(max-width:720px\)/);
 });
 

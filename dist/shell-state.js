@@ -3,7 +3,7 @@
 
   const STORAGE_KEY = "gamrace-shell-state-v1";
   const WALLET_SELECTION_KEY = "gamrace-wallet-selection-v1";
-  const DEFAULT_RANK_BADGE = "ranks/rookie-i.png";
+  const DEFAULT_RANK_BADGE = "ranks/rookie-i.webp";
   const PRELOAD_ASSETS = [
     "assets/brand/gamrace-icon.png",
     DEFAULT_RANK_BADGE,
