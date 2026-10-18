@@ -26,7 +26,7 @@ test("rank and account statistics use the authoritative live game records", () =
 test("transactions render live bets and wallet history uses the same account source", () => {
   assert.match(worker, /liveAccountSnapshot\(env, user\.sub\)/);
   assert.match(auth, /account-table-row/);
-  assert.match(auth, /renderBetActivity\(accountSnapshot\.activity\)/);
+  assert.match(auth, /renderBetActivity\(accountSnapshot\.activity, accountSnapshot\.pagination\)/);
   assert.match(services, /\/account\?compact=1/);
 });
 

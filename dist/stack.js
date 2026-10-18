@@ -86,6 +86,18 @@
     return { step, platformHeight, startTop, baseBottom, cameraShift };
   }
 
+  function currentMovingX() {
+    const face = moving?.querySelector("i");
+    if (!face) return 0;
+    const transform = getComputedStyle(face).transform;
+    if (!transform || transform === "none") return 0;
+    try { return new DOMMatrixReadOnly(transform).m41; }
+    catch {
+      const values = transform.match(/matrix(?:3d)?\(([^)]+)\)/)?.[1]?.split(",").map(Number) || [];
+      return Number.isFinite(values.length === 16 ? values[12] : values[4]) ? (values.length === 16 ? values[12] : values[4]) : 0;
+    }
+  }
+
   function renderProgress() {
     const completed = Number(round?.completedLevels || 0);
     progress.replaceChildren(...Array.from({ length: MAX_LEVELS }, (_, index) => {
@@ -116,7 +128,7 @@
     moving.style.setProperty("--next-width", `${platformWidth(nextLevel)}%`);
     moving.classList.toggle("hidden", !active || nextLevel > MAX_LEVELS);
     moving.classList.toggle("ready", active && nextLevel <= MAX_LEVELS);
-    moving.classList.remove("dropping", "miss");
+    moving.classList.remove("dropping", "miss", "locked");
   }
 
   function selectDifficulty(value, update = true) {
@@ -230,20 +242,19 @@
     finally { busy = false; updateAvailability(); }
   }
 
-  async function animateDrop(previousRound, nextRound) {
+  async function animateDrop(previousRound, nextRound, startX = 0) {
     const drop = nextRound?.lastDrop;
     if (!drop || !moving) return;
     const level = Number(previousRound?.completedLevels || 0) + 1;
     const { step, startTop, baseBottom, platformHeight, cameraShift } = stackLayout(level);
     const targetY = Math.max(58, scene.clientHeight - startTop - (baseBottom + level * step) - platformHeight + cameraShift);
-    const landingX = drop.landed ? Math.max(-5, Math.min(5, Number(drop.offset || 0) * 0.15)) : (Number(drop.offset || 1) < 0 ? -118 : 118);
+    const landingX = drop.landed ? `${Math.max(-5, Math.min(5, Number(drop.offset || 0) * 0.15))}%` : `${startX}px`;
     moving.style.setProperty("--drop-y", `${targetY}px`);
-    moving.style.setProperty("--landing-x", `${landingX}%`);
+    moving.style.setProperty("--drop-start-x", `${startX}px`);
+    moving.style.setProperty("--landing-x", landingX);
     moving.style.setProperty("--next-width", `${platformWidth(level)}%`);
-    moving.classList.remove("hidden", "dropping", "miss");
-    void moving.offsetWidth;
-    moving.classList.add("dropping");
-    if (!drop.landed) moving.classList.add("miss");
+    moving.classList.remove("hidden", "ready", "dropping", "miss", "locked");
+    moving.classList.add("dropping", ...(drop.landed ? [] : ["miss"]));
     const turbo = Boolean(settings().stackTurbo);
     await delay(turbo ? 300 : drop.landed ? 860 : 1280);
     sound(drop.landed);
@@ -253,15 +264,21 @@
     if (busy || round?.status !== "active") return;
     busy = true;
     const previousRound = round;
+    const startX = currentMovingX();
+    moving.style.setProperty("--drop-start-x", `${startX}px`);
+    moving.classList.add("locked");
     updateAvailability();
     try {
       const response = await window.gamraceWallet.request(`/games/stack/rounds/${encodeURIComponent(round.id)}/drop`, {
         method: "POST", body: JSON.stringify({ actionId: requestId() }),
       });
       window.gamraceWallet.applyGameResult(response);
-      await animateDrop(previousRound, response.round);
+      await animateDrop(previousRound, response.round, startX);
       renderRound(response.round);
-    } catch (error) { setMessage(error.message || "That platform could not be dropped."); }
+    } catch (error) {
+      renderTower();
+      setMessage(error.message || "That platform could not be dropped.");
+    }
     finally { busy = false; updateAvailability(); }
   }
 

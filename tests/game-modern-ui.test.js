@@ -16,7 +16,7 @@ test("site surfaces use the neutral palette with blue primary actions and no gam
   assert.match(modern, /\.mines-board-panel,[\s\S]*background: #0f1115/);
   assert.match(modern, /\.mines-primary-button,[\s\S]*background: #168cf2/);
   assert.match(gameHtml, /styles\.css\?v=game-tools-2/);
-  assert.match(indexHtml, /styles\.css\?v=compact-results-1/);
+  assert.match(indexHtml, /styles\.css\?v=lobby-proportions-1/);
 });
 
 test("risk choices are separate colour-coded controls", () => {
