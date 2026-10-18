@@ -2914,7 +2914,7 @@ body,
 .leaderboard-page .race-hero-copy h2{margin:0;color:#3dc2ff;font-size:clamp(1.65rem,2.7vw,2.72rem);font-weight:950;line-height:1.02;letter-spacing:-.055em;white-space:nowrap}
 .leaderboard-page .race-hero-copy h2 strong{font:inherit}.leaderboard-page .race-hero-copy h2 span{color:#f1f8fd}
 .race-car-lane{position:absolute;z-index:3;right:0;bottom:-2px;left:36%;height:72%;overflow:visible;pointer-events:none}
-.race-car-pack{position:absolute;right:-48%;bottom:-7%;width:67%;max-height:100%;object-fit:contain;filter:drop-shadow(0 16px 13px rgba(0,0,0,.55)) saturate(1.14) brightness(1.06);animation:leaderboard-cars-zoom 7.4s cubic-bezier(.19,.68,.3,1) infinite}
+.race-car-pack{position:absolute;right:-4%;bottom:-7%;width:67%;max-height:100%;object-fit:contain;filter:drop-shadow(0 16px 13px rgba(0,0,0,.55)) saturate(1.14) brightness(1.06);animation:leaderboard-cars-zoom 7.4s cubic-bezier(.19,.68,.3,1) infinite}
 .leaderboard-page .race-speed-line{z-index:2;right:-4%;height:2px;background:linear-gradient(90deg,transparent,#47c8ff 35%,#b8edff 62%,transparent);opacity:.72;transform:rotate(-7deg);animation:leaderboard-speed-streak 2.8s linear infinite}
 .leaderboard-page .race-speed-line.line-one{top:42%;width:47%;animation-delay:-.4s}.leaderboard-page .race-speed-line.line-two{top:61%;width:63%;animation-delay:-1.35s}.leaderboard-page .race-speed-line.line-three{top:79%;width:38%;animation-delay:-2.1s}
 
@@ -2953,7 +2953,7 @@ body,
 .leaderboard-page .race-wager-value{color:#d7e1e9;text-align:left}.leaderboard-page .race-prize-value{color:#42c7ff;text-align:left;font-variant-numeric:tabular-nums}
 .leaderboard-page .race-grid-empty{padding:28px 20px}.leaderboard-page .race-grid-empty strong{font-size:.82rem}.leaderboard-page .race-grid-empty span{font-size:.65rem}
 
-@keyframes leaderboard-cars-zoom{0%{opacity:0;transform:translate3d(42%,14px,0) scale(.7)}8%{opacity:1}48%{opacity:1;transform:translate3d(-40%,0,0) scale(.9)}78%{opacity:1}100%{opacity:0;transform:translate3d(-135%,-4px,0) scale(1.02)}}
+@keyframes leaderboard-cars-zoom{0%{opacity:0;transform:translate3d(105%,14px,0) scale(.7)}8%{opacity:1}48%{opacity:1;transform:translate3d(-14%,0,0) scale(.9)}78%{opacity:1}100%{opacity:0;transform:translate3d(-165%,-4px,0) scale(1.02)}}
 @keyframes leaderboard-speed-streak{0%{opacity:0;transform:translateX(45%) rotate(-7deg)}25%{opacity:.75}100%{opacity:0;transform:translateX(-175%) rotate(-7deg)}}
 @keyframes leaderboard-flag-sway{0%,100%{transform:translateX(-50%) perspective(260px) rotateY(-8deg) skewY(-1deg)}50%{transform:translateX(-50%) perspective(260px) rotateY(9deg) skewY(2deg)}}
 @keyframes leaderboard-card-arrive{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
@@ -2965,7 +2965,7 @@ body,
   .leaderboard-page .race-leaderboard-hero::before{background:linear-gradient(180deg,rgba(3,10,17,.92) 0%,rgba(4,13,23,.55) 58%,rgba(4,13,23,.05) 100%)}
   .leaderboard-page .race-cadence-tabs{top:9px;left:9px;width:calc(100% - 18px)}
   .leaderboard-page .race-hero-copy{top:60px;left:16px}.leaderboard-page .race-hero-copy>p{margin-top:13px;font-size:.84rem}.leaderboard-page .race-hero-copy h2{font-size:1.53rem}.race-leaderboard-timer{font-size:.56rem}
-  .race-track-art{object-position:62% center}.race-car-lane{left:4%;height:55%}.race-car-pack{width:96%;right:-82%;bottom:-3%}
+  .race-track-art{object-position:62% center}.race-car-lane{left:4%;height:55%}.race-car-pack{width:88%;right:-4%;bottom:-3%}
   .leaderboard-page .race-podium{min-height:216px;gap:5px}.leaderboard-page .podium-racer{min-height:196px;padding:39px 6px 7px;border-radius:10px}.leaderboard-page .podium-racer.first{min-height:210px;padding-top:43px}
   .podium-medal{width:32px;height:36px;top:-10px;font-size:.77rem}.podium-racer.first .podium-medal{width:37px;height:42px;top:-14px}
   .podium-flag{top:13px;width:88%;height:71px;background-size:18px 18px;background-position:0 0,9px 9px}
