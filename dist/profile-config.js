@@ -1,7 +1,7 @@
 export const PROFILE_MENU = Object.freeze([
   Object.freeze({ id: "profile", label: "Profile", kind: "panel" }),
   Object.freeze({ id: "wallet", label: "Wallet", kind: "action" }),
-  Object.freeze({ id: "vip", label: "VIP & Rewards", kind: "panel" }),
+  Object.freeze({ id: "rewards", label: "Rewards", kind: "link" }),
   Object.freeze({ id: "transactions", label: "Transactions", kind: "panel" }),
   Object.freeze({ id: "affiliates", label: "Affiliates", kind: "panel" }),
   Object.freeze({ id: "settings", label: "Settings", kind: "panel" }),

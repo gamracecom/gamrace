@@ -4759,6 +4759,187 @@ function promotionRankIndex(stage, tier) {
   return Math.max(0, stageIndex) * 3 + Math.min(3, Math.max(1, Number(tier) || 1)) - 1;
 }
 
+const REWARD_POOLS = Object.freeze({
+  instant: Object.freeze({ rateBasisPoints: 10, minimumUsdCents: 10 }),
+  weekly: Object.freeze({ rateBasisPoints: 3, minimumUsdCents: 1 }),
+  monthly: Object.freeze({ rateBasisPoints: 2, minimumUsdCents: 1 }),
+});
+const REWARDS_LAUNCH_AT = Date.UTC(2026, 9, 19, 0, 0, 0);
+
+function utcWeekStart(timestamp) {
+  const date = new Date(timestamp);
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - mondayOffset);
+}
+
+function utcMonthStart(timestamp) {
+  const date = new Date(timestamp);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+}
+
+function rewardUsdCents(wagerUsdCents, rateBasisPoints) {
+  return Math.max(0, Math.floor(Math.max(0, Number(wagerUsdCents || 0)) * rateBasisPoints / 10_000));
+}
+
+async function rewardWagersByRange(env, uid, ranges, prices) {
+  const queries = ranges.flatMap((range) => PLAYER_BET_UNION_GROUPS.map(({ sql, count }) => env.DB.prepare(`
+    SELECT currency, COALESCE(SUM(wager_units), 0) AS wager_units
+    FROM (${sql}) WHERE created_at >= ? AND created_at < ? GROUP BY currency
+  `).bind(...playerBetBindings(uid, count), range.start, range.end)));
+  const results = queries.length ? await env.DB.batch(queries) : [];
+  const groupCount = PLAYER_BET_UNION_GROUPS.length;
+  return Object.fromEntries(ranges.map((range, rangeIndex) => {
+    const rows = results.slice(rangeIndex * groupCount, (rangeIndex + 1) * groupCount).flatMap((result) => result.results || []);
+    const cents = rows.reduce((total, row) => {
+      const asset = getWalletAsset(row.currency);
+      if (!asset) return total;
+      return total + Math.max(0, assetUnitsToUsdCents(row.wager_units, asset, prices) || 0);
+    }, 0);
+    return [range.id, cents];
+  }));
+}
+
+async function rewardHistory(env, uid) {
+  const result = await env.DB.prepare(`
+    SELECT id, pool AS type, reward_usd_cents, currency, amount_units, created_at
+    FROM reward_claims WHERE uid = ?
+    UNION ALL
+    SELECT id, 'promo' AS type, 0 AS reward_usd_cents, reward_currency AS currency, reward_units AS amount_units, created_at
+    FROM promotion_redemptions WHERE uid = ?
+    ORDER BY created_at DESC LIMIT 12
+  `).bind(uid, uid).all();
+  return (result.results || []).map((row) => ({
+    id: row.id,
+    type: row.type,
+    rewardUsdCents: Number(row.reward_usd_cents || 0),
+    currency: row.currency,
+    amount: assetUnitsToString(Number(row.amount_units || 0), true),
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  }));
+}
+
+async function playerRewardsStatus(env, uid) {
+  const timestamp = now();
+  const currentWeekStart = utcWeekStart(timestamp);
+  const eligibleCurrentWeekStart = Math.max(REWARDS_LAUNCH_AT, currentWeekStart);
+  const currentWeekEnd = currentWeekStart + 7 * 86_400_000;
+  const previousWeekStart = currentWeekStart - 7 * 86_400_000;
+  const eligiblePreviousWeekStart = Math.max(REWARDS_LAUNCH_AT, previousWeekStart);
+  const currentMonthStart = utcMonthStart(timestamp);
+  const eligibleCurrentMonthStart = Math.max(REWARDS_LAUNCH_AT, currentMonthStart);
+  const currentMonthEndDate = new Date(currentMonthStart);
+  const currentMonthEnd = Date.UTC(currentMonthEndDate.getUTCFullYear(), currentMonthEndDate.getUTCMonth() + 1, 1);
+  const previousMonthEnd = currentMonthStart;
+  const previousMonthDate = new Date(previousMonthEnd);
+  const previousMonthStart = Date.UTC(previousMonthDate.getUTCFullYear(), previousMonthDate.getUTCMonth() - 1, 1);
+  const eligiblePreviousMonthStart = Math.max(REWARDS_LAUNCH_AT, previousMonthStart);
+  const [latestInstant, weeklyClaim, monthlyClaim, prices, account, wallet, history] = await Promise.all([
+    env.DB.prepare("SELECT period_end FROM reward_claims WHERE uid = ? AND pool = 'instant' ORDER BY period_end DESC LIMIT 1").bind(uid).first(),
+    env.DB.prepare("SELECT id FROM reward_claims WHERE uid = ? AND pool = 'weekly' AND period_start = ?").bind(uid, eligiblePreviousWeekStart).first(),
+    env.DB.prepare("SELECT id FROM reward_claims WHERE uid = ? AND pool = 'monthly' AND period_start = ?").bind(uid, eligiblePreviousMonthStart).first(),
+    providerPrices(env).catch(() => ({})),
+    liveAccountSnapshot(env, uid, { includeActivity: false }),
+    walletResponse(env, uid),
+    rewardHistory(env, uid),
+  ]);
+  const instantStart = Math.max(REWARDS_LAUNCH_AT, Number(latestInstant?.period_end || REWARDS_LAUNCH_AT));
+  const ranges = [
+    { id: "instant", start: instantStart, end: timestamp },
+    { id: "weeklyPrevious", start: eligiblePreviousWeekStart, end: currentWeekStart },
+    { id: "weeklyCurrent", start: eligibleCurrentWeekStart, end: currentWeekEnd },
+    { id: "monthlyPrevious", start: eligiblePreviousMonthStart, end: previousMonthEnd },
+    { id: "monthlyCurrent", start: eligibleCurrentMonthStart, end: currentMonthEnd },
+  ];
+  const wagers = await rewardWagersByRange(env, uid, ranges, prices);
+  const instantAmount = rewardUsdCents(wagers.instant, REWARD_POOLS.instant.rateBasisPoints);
+  const weeklyAvailable = weeklyClaim ? 0 : rewardUsdCents(wagers.weeklyPrevious, REWARD_POOLS.weekly.rateBasisPoints);
+  const monthlyAvailable = monthlyClaim ? 0 : rewardUsdCents(wagers.monthlyPrevious, REWARD_POOLS.monthly.rateBasisPoints);
+  return {
+    serverNow: new Date(timestamp).toISOString(),
+    selectedCurrency: wallet.selectedCurrency,
+    summary: account.summary,
+    pools: {
+      instant: {
+        rateBasisPoints: REWARD_POOLS.instant.rateBasisPoints,
+        minimumUsdCents: REWARD_POOLS.instant.minimumUsdCents,
+        availableUsdCents: instantAmount,
+        accruingUsdCents: instantAmount,
+        canClaim: instantAmount >= REWARD_POOLS.instant.minimumUsdCents,
+        nextAvailableAt: null,
+      },
+      weekly: {
+        rateBasisPoints: REWARD_POOLS.weekly.rateBasisPoints,
+        minimumUsdCents: REWARD_POOLS.weekly.minimumUsdCents,
+        availableUsdCents: weeklyAvailable,
+        accruingUsdCents: rewardUsdCents(wagers.weeklyCurrent, REWARD_POOLS.weekly.rateBasisPoints),
+        canClaim: weeklyAvailable >= REWARD_POOLS.weekly.minimumUsdCents,
+        nextAvailableAt: new Date(currentWeekEnd).toISOString(),
+      },
+      monthly: {
+        rateBasisPoints: REWARD_POOLS.monthly.rateBasisPoints,
+        minimumUsdCents: REWARD_POOLS.monthly.minimumUsdCents,
+        availableUsdCents: monthlyAvailable,
+        accruingUsdCents: rewardUsdCents(wagers.monthlyCurrent, REWARD_POOLS.monthly.rateBasisPoints),
+        canClaim: monthlyAvailable >= REWARD_POOLS.monthly.minimumUsdCents,
+        nextAvailableAt: new Date(currentMonthEnd).toISOString(),
+      },
+    },
+    history,
+  };
+}
+
+async function handleRewards(request, env, user) {
+  return json(request, env, 200, { rewards: await playerRewardsStatus(env, user.sub) });
+}
+
+async function handleRewardClaim(request, env, user, poolValue) {
+  const pool = String(poolValue || "").toLowerCase();
+  const config = REWARD_POOLS[pool];
+  if (!config) throw httpError(404, "That reward pool does not exist");
+  const timestamp = now();
+  let periodStart;
+  let periodEnd;
+  if (pool === "instant") {
+    const latest = await env.DB.prepare("SELECT period_end FROM reward_claims WHERE uid = ? AND pool = 'instant' ORDER BY period_end DESC LIMIT 1").bind(user.sub).first();
+    periodStart = Math.max(REWARDS_LAUNCH_AT, Number(latest?.period_end || REWARDS_LAUNCH_AT));
+    periodEnd = timestamp;
+  } else if (pool === "weekly") {
+    periodEnd = utcWeekStart(timestamp);
+    periodStart = Math.max(REWARDS_LAUNCH_AT, periodEnd - 7 * 86_400_000);
+  } else {
+    periodEnd = utcMonthStart(timestamp);
+    const endDate = new Date(periodEnd);
+    periodStart = Math.max(REWARDS_LAUNCH_AT, Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() - 1, 1));
+  }
+  if (periodStart >= periodEnd) throw httpError(409, "That reward period has not completed yet");
+  const prices = await providerPrices(env).catch(() => ({}));
+  const wagers = await rewardWagersByRange(env, user.sub, [{ id: pool, start: periodStart, end: periodEnd }], prices);
+  const wagerUsdCents = wagers[pool] || 0;
+  const payoutUsdCents = rewardUsdCents(wagerUsdCents, config.rateBasisPoints);
+  if (payoutUsdCents < config.minimumUsdCents) {
+    const minimum = (config.minimumUsdCents / 100).toFixed(2);
+    throw httpError(409, pool === "instant" ? `Keep racing — instant rewards unlock at $${minimum}` : "No reward is available from the previous period");
+  }
+  const wallet = await walletResponse(env, user.sub);
+  const asset = requireWalletAsset(wallet.selectedCurrency);
+  const amountUnits = await usdCentsToAssetUnits(env, payoutUsdCents, asset);
+  const claimId = crypto.randomUUID();
+  try {
+    await env.DB.prepare(`
+      INSERT INTO reward_claims(id, uid, pool, period_start, period_end, wager_usd_cents, reward_usd_cents, currency, amount_units, created_at)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(claimId, user.sub, pool, periodStart, periodEnd, wagerUsdCents, payoutUsdCents, asset.code, amountUnits, timestamp).run();
+  } catch (error) {
+    if (/unique/i.test(String(error?.message || ""))) throw httpError(409, "That reward has already been claimed");
+    throw error;
+  }
+  return json(request, env, 200, {
+    claim: { id: claimId, pool, rewardUsdCents: payoutUsdCents, currency: asset.code, amount: assetUnitsToString(amountUnits, true) },
+    rewards: await playerRewardsStatus(env, user.sub),
+    wallet: await walletResponse(env, user.sub),
+  });
+}
+
 function playerRankIndex(totalWagered) {
   let index = 0;
   PROMOTION_RANKS.forEach(([, thresholds], stageIndex) => thresholds.forEach((threshold, tierIndex) => {
@@ -5652,6 +5833,9 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/wallet") return handleGetWallet(request, env, user);
   if (request.method === "GET" && path === "/account") return handleAccountSnapshot(request, env, user);
   if (request.method === "GET" && path === "/account/activity") return handleAccountActivity(request, env, user);
+  if (request.method === "GET" && path === "/rewards") return handleRewards(request, env, user);
+  const rewardClaimMatch = path.match(/^\/rewards\/(instant|weekly|monthly)\/claim$/);
+  if (request.method === "POST" && rewardClaimMatch) return handleRewardClaim(request, env, user, rewardClaimMatch[1]);
   if (request.method === "POST" && path === "/account/details") return handleAccountDetails(request, env, user);
   if (request.method === "POST" && path === "/account/preferences") return handleAccountPreferences(request, env, user);
   if (request.method === "POST" && path === "/promotions/claim") return handlePromotionClaim(request, env, user);

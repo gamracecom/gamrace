@@ -630,14 +630,14 @@ accountMenu.rankImage.addEventListener("error", () => accountMenu.rankBadge.clas
 googleButtons.forEach((button) => button.addEventListener("click", continueWithGoogle));
 document.querySelectorAll('a[href$="#promotions"]').forEach((link) => link.addEventListener("click", (event) => {
   event.preventDefault();
-  if (auth.currentUser && currentProfile) openProfileDialog({ section: "vip" });
-  else window.location.href = "index.html?auth=login";
+  window.location.href = "rewards.html#promo";
 }));
 profileButton?.addEventListener("click", () => accountMenu.element.hidden ? openAccountMenu() : closeAccountMenu());
 accountMenu.items.forEach((button) => button.addEventListener("click", () => {
   const item = PROFILE_MENU.find((entry) => entry.id === button.dataset.accountMenuItem);
   if (!item) return;
   if (item.id === "wallet") { closeAccountMenu(); document.querySelector(".utility.wallet")?.click(); }
+  else if (item.id === "rewards") window.location.href = "rewards.html";
   else if (item.id === "logout") { closeAccountMenu(); window.dispatchEvent(new CustomEvent("gamrace-auth-signout")); }
   else if (item.id === "control-panel") window.location.href = "admin.html";
   else if (item.kind === "panel") openProfileDialog({ section: item.id });
@@ -801,7 +801,7 @@ onAuthStateChanged(auth, async (user) => {
       .catch((error) => console.warn("GamRace username sync deferred", error));
     refreshLiveAccountData({ compact: false }).catch((error) => console.warn("GamRace live account sync deferred", error));
     checkOwnerAccess(user);
-    if (location.hash === "#promotions") { history.replaceState(null, "", location.pathname + location.search); openProfileDialog({ section: "vip" }); }
+    if (["#promotions", "#rewards", "#vip"].includes(location.hash)) window.location.href = `rewards.html${location.hash === "#promotions" ? "#promo" : location.hash === "#vip" ? "#rank" : ""}`;
     if (result.created) {
       try { await updateProfile(user, { displayName: currentProfile.username }); } catch { /* Firestore remains the source of truth. */ }
       openProfileDialog({ welcome: true, section: "settings", settingsSection: "account" });

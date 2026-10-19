@@ -75,6 +75,10 @@
   }
 
   function navigate(action) {
+    if (action === "rewards") {
+      window.location.href = "rewards.html";
+      return;
+    }
     if (!isLobby) {
       window.location.href = `index.html?tab=${encodeURIComponent(action)}`;
       return;
@@ -114,7 +118,7 @@
   menuCloseButton?.addEventListener("click", closeMenu);
 
   document.querySelector(".utility.rewards")?.addEventListener("click", () => {
-    if (window.matchMedia("(max-width: 560px)").matches) navigate("rewards");
+    window.location.href = "rewards.html";
   });
 
   document.querySelectorAll(".sidebar .nav-link").forEach((link) => link.addEventListener("click", (event) => {
@@ -147,6 +151,7 @@
     }
     const legacyMode = url.searchParams.get("mode");
     const requested = url.searchParams.get("tab") || (legacyMode === "player" ? "player" : legacyMode === "house" ? "house" : url.searchParams.has("focus") ? "search" : "house");
+    if (requested === "rewards") { window.location.replace("rewards.html"); return; }
     if (["house", "player", "search", "rewards", "chat"].includes(requested) && isLobby) renderRoute(requested, { focusSearch });
   }
 

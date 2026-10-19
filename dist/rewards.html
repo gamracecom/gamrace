@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050b12" />
+    <meta name="description" content="Claim GamRace rakeback, promo codes and track your racing rank." />
+    <title>Rewards | GamRace</title>
+    <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
+    <link rel="preload" as="image" href="assets/rewards/instant-rakeback.webp" />
+    <link rel="preload" as="image" href="assets/rewards/weekly-rakeback.webp" />
+    <link rel="preload" as="image" href="assets/rewards/monthly-rakeback.webp" />
+    <script src="shell-state.js?v=player-avatars-1"></script>
+    <link rel="stylesheet" href="styles.css?v=rewards-circuit-1&amp;wallet=5&amp;account=6&amp;chat=3" />
+  </head>
+  <body class="rewards-page" data-authenticated="pending">
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="mobile-menu-header"><strong>Menu</strong><button class="mobile-menu-close" type="button" aria-label="Close menu">×</button></div>
+        <nav class="primary-nav">
+          <a class="nav-link" href="/"><img class="nav-icon nav-icon-home" src="assets/icons/navigation/home.png" alt="" />Home</a>
+          <a class="nav-link" href="index.html?tab=house"><img class="nav-icon nav-icon-house" src="assets/icons/navigation/house-mode.png" alt="" />House</a>
+          <a class="nav-link" href="index.html?tab=player"><img class="nav-icon nav-icon-player" src="assets/icons/navigation/player-mode.png" alt="" />Player</a>
+          <a class="nav-link" href="index.html?filter=slot"><img class="nav-icon nav-icon-slots" src="assets/icons/navigation/slots.png" alt="" />Slots</a>
+          <a class="nav-link" href="index.html?filter=live"><img class="nav-icon nav-icon-live-games" src="assets/icons/navigation/live-games.png" alt="" />Live Games</a>
+          <a class="nav-link" href="index.html?filter=provider"><img class="nav-icon nav-icon-providers" src="assets/icons/navigation/providers.png" alt="" />Providers</a>
+          <a class="nav-link" href="#promo"><img class="nav-icon nav-icon-promotions" src="assets/icons/navigation/promotions.png" alt="" />Promotions</a>
+          <a class="nav-link active" href="rewards.html" aria-current="page"><img class="nav-icon nav-icon-rewards" src="assets/icons/navigation/rewards.png" alt="" />Rewards</a>
+          <a class="nav-link" href="index.html#affiliates"><img class="nav-icon nav-icon-affiliates" src="assets/icons/navigation/affiliates.png" alt="" />Affiliates</a>
+        </nav>
+      </aside>
+
+      <main class="main-content rewards-main" aria-label="GamRace rewards">
+        <header class="topbar">
+          <div class="topbar-inner">
+            <a class="topbar-brand" href="/" aria-label="GamRace home"><img class="brand-full" src="assets/brand/gamrace-logo-large.png" alt="GamRace" /><img class="brand-icon" src="assets/brand/gamrace-icon.png" alt="" /></a>
+            <div class="account-actions">
+              <button class="utility rewards" type="button" aria-label="Rewards"><img class="utility-icon" src="assets/icons/navigation/rewards.png" alt="" /></button>
+              <button class="utility balance" type="button" aria-label="Balance"><img class="balance-coin-icon" src="assets/icons/crypto/usdt.svg" alt="" /><span class="balance-value">$0.00</span></button>
+              <button class="utility wallet" type="button"><span class="utility-label">Wallet</span></button>
+            </div>
+            <div class="auth-actions"><button class="auth login" type="button">Sign In</button><button class="auth register" type="button">Sign Up</button></div>
+            <button class="profile-action" type="button" aria-label="Open account menu" aria-expanded="false"><span class="profile-rank-mark"><span class="profile-rank-fallback">R</span><img class="profile-rank-image" alt="" /></span><span class="profile-label">Account</span></button>
+          </div>
+        </header>
+
+        <div class="rewards-content">
+          <section class="promo-ribbon" id="promo" aria-labelledby="promo-title">
+            <div class="promo-ribbon-mark"><img src="assets/icons/navigation/promotions.png" alt="" /></div>
+            <div><span>HAVE A CODE?</span><h2 id="promo-title">Claim a promo</h2></div>
+            <form class="rewards-promo-form"><label class="sr-only" for="rewards-promo-code">Promo code</label><input id="rewards-promo-code" name="code" maxlength="32" autocomplete="off" placeholder="Enter your code" required /><button type="submit">Claim</button></form>
+            <p class="rewards-promo-status" role="status" aria-live="polite"></p>
+          </section>
+
+          <header class="rewards-intro">
+            <div><span class="rewards-kicker">YOUR REWARD CIRCUIT</span><h1>Rewards built for every lap.</h1><p>Claim instant returns as you play, then collect larger weekly and monthly drops.</p></div>
+            <span class="rewards-live-pill"><i></i>Live wallet credit</span>
+          </header>
+
+          <section class="reward-stations" aria-label="Rakeback rewards">
+            <article class="reward-station instant" data-reward-pool="instant">
+              <div class="station-heading"><span>ON DEMAND</span><h2>Instant Rakeback</h2><p>Builds from every eligible wager.</p></div>
+              <img class="station-art" src="assets/rewards/instant-rakeback.webp" alt="GamRace gold reward coins" />
+              <div class="station-claim"><small>AVAILABLE NOW</small><strong data-reward-amount>$0.00</strong><em data-reward-accrual>0.10% of eligible wager</em><button type="button" data-claim-reward="instant" disabled>Nothing to claim yet</button></div>
+            </article>
+            <article class="reward-station weekly" data-reward-pool="weekly">
+              <div class="station-heading"><span>WEEKLY DROP</span><h2>Weekly Rakeback</h2><p>Your previous race week, bundled.</p></div>
+              <img class="station-art" src="assets/rewards/weekly-rakeback.webp" alt="GamRace go-kart surrounded by gold reward coins" />
+              <div class="station-claim"><small data-reward-countdown>Calculating next drop…</small><strong data-reward-amount>$0.00</strong><em data-reward-accrual>$0.00 building this week</em><button type="button" data-claim-reward="weekly" disabled>Not available yet</button></div>
+            </article>
+            <article class="reward-station monthly" data-reward-pool="monthly">
+              <div class="station-heading"><span>MONTHLY DROP</span><h2>Monthly Rakeback</h2><p>A bigger finish-line reward.</p></div>
+              <img class="station-art" src="assets/rewards/monthly-rakeback.webp" alt="GamRace racing car surrounded by gold reward coins" />
+              <div class="station-claim"><small data-reward-countdown>Calculating next drop…</small><strong data-reward-amount>$0.00</strong><em data-reward-accrual>$0.00 building this month</em><button type="button" data-claim-reward="monthly" disabled>Not available yet</button></div>
+            </article>
+          </section>
+
+          <section class="rewards-rank" id="rank" aria-labelledby="rewards-rank-title">
+            <div class="rewards-rank-badge"><img data-rewards-rank-badge src="ranks/rookie-i.webp" alt="" /></div>
+            <div class="rewards-rank-copy"><span>RACING RANK</span><h2 id="rewards-rank-title" data-rewards-rank-name>Rookie I</h2><p data-rewards-rank-next>Next rank at $1,000 weighted wager</p><div class="rewards-rank-track"><i data-rewards-rank-fill></i></div></div>
+            <strong data-rewards-rank-percent>0%</strong>
+          </section>
+
+          <section class="rewards-history" aria-labelledby="reward-history-title"><div class="rewards-section-heading"><div><span>RECENT ACTIVITY</span><h2 id="reward-history-title">Reward history</h2></div><p>Successful claims appear here instantly.</p></div><div class="rewards-history-list" data-rewards-history><div class="rewards-empty">Sign in to load your rewards.</div></div></section>
+          <p class="rewards-page-status" data-rewards-status role="status" aria-live="polite"></p>
+        </div>
+      </main>
+    </div>
+    <nav class="mobile-tabbar" aria-label="Mobile navigation">
+      <button class="mobile-tab-action" type="button" data-mobile-action="menu" aria-expanded="false"><img class="mobile-tab-icon" src="assets/icons/navigation/menu.png" alt="" /><strong>Menu</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="search"><img class="mobile-tab-icon" src="assets/icons/navigation/search.png" alt="" /><strong>Search</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="house"><img class="mobile-tab-icon" src="assets/icons/navigation/house-mode.png" alt="" /><strong>House</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="player"><img class="mobile-tab-icon" src="assets/icons/navigation/player-mode.png" alt="" /><strong>Player</strong></button>
+      <button class="mobile-tab-action active" type="button" data-mobile-action="rewards"><img class="mobile-tab-icon" src="assets/icons/navigation/rewards.png" alt="" /><strong>Rewards</strong></button>
+      <button class="mobile-tab-action" type="button" data-mobile-action="chat"><img class="mobile-tab-icon" src="assets/icons/navigation/chat.png" alt="" /><strong>Chat</strong></button>
+    </nav>
+    <script type="module" src="region-access.js?v=region-access-1"></script>
+    <script src="mobile-nav.js?v=rewards-route-1" defer></script>
+    <script src="chat.js?v=live-chat-4" defer></script>
+    <script type="module" src="firebase-auth.js?v=rewards-page-1"></script>
+    <script src="vendor/qrcode.js?v=1.4.4"></script>
+    <script type="module" src="wallet.js?v=balance-stability-2"></script>
+    <script type="module" src="rewards.js?v=rewards-circuit-1"></script>
+  </body>
+</html>
