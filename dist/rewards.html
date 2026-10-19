@@ -11,7 +11,7 @@
     <link rel="preload" as="image" href="assets/rewards/weekly-rakeback.webp" />
     <link rel="preload" as="image" href="assets/rewards/monthly-rakeback.webp" />
     <script src="shell-state.js?v=player-avatars-1"></script>
-    <link rel="stylesheet" href="styles.css?v=rewards-circuit-1&amp;wallet=5&amp;account=6&amp;chat=3" />
+    <link rel="stylesheet" href="styles.css?v=rewards-minimal-2&amp;wallet=5&amp;account=6&amp;chat=3" />
   </head>
   <body class="rewards-page" data-authenticated="pending">
     <div class="app-shell">
@@ -52,36 +52,25 @@
             <p class="rewards-promo-status" role="status" aria-live="polite"></p>
           </section>
 
-          <header class="rewards-intro">
-            <div><span class="rewards-kicker">YOUR REWARD CIRCUIT</span><h1>Rewards built for every lap.</h1><p>Claim instant returns as you play, then collect larger weekly and monthly drops.</p></div>
-            <span class="rewards-live-pill"><i></i>Live wallet credit</span>
-          </header>
-
           <section class="reward-stations" aria-label="Rakeback rewards">
             <article class="reward-station instant" data-reward-pool="instant">
-              <div class="station-heading"><span>ON DEMAND</span><h2>Instant Rakeback</h2><p>Builds from every eligible wager.</p></div>
+              <div class="station-heading"><h2>Instant Rakeback</h2></div>
               <img class="station-art" src="assets/rewards/instant-rakeback.webp" alt="GamRace gold reward coins" />
-              <div class="station-claim"><small>AVAILABLE NOW</small><strong data-reward-amount>$0.00</strong><em data-reward-accrual>0.10% of eligible wager</em><button type="button" data-claim-reward="instant" disabled>Nothing to claim yet</button></div>
+              <button class="station-claim-button" type="button" data-claim-reward="instant" disabled>Nothing to claim yet</button>
             </article>
             <article class="reward-station weekly" data-reward-pool="weekly">
-              <div class="station-heading"><span>WEEKLY DROP</span><h2>Weekly Rakeback</h2><p>Your previous race week, bundled.</p></div>
+              <div class="station-heading"><h2>Weekly Rakeback</h2></div>
               <img class="station-art" src="assets/rewards/weekly-rakeback.webp" alt="GamRace go-kart surrounded by gold reward coins" />
-              <div class="station-claim"><small data-reward-countdown>Calculating next drop…</small><strong data-reward-amount>$0.00</strong><em data-reward-accrual>$0.00 building this week</em><button type="button" data-claim-reward="weekly" disabled>Not available yet</button></div>
+              <button class="station-claim-button" type="button" data-claim-reward="weekly" disabled>Not available yet</button>
             </article>
             <article class="reward-station monthly" data-reward-pool="monthly">
-              <div class="station-heading"><span>MONTHLY DROP</span><h2>Monthly Rakeback</h2><p>A bigger finish-line reward.</p></div>
+              <div class="station-heading"><h2>Monthly Rakeback</h2></div>
               <img class="station-art" src="assets/rewards/monthly-rakeback.webp" alt="GamRace racing car surrounded by gold reward coins" />
-              <div class="station-claim"><small data-reward-countdown>Calculating next drop…</small><strong data-reward-amount>$0.00</strong><em data-reward-accrual>$0.00 building this month</em><button type="button" data-claim-reward="monthly" disabled>Not available yet</button></div>
+              <button class="station-claim-button" type="button" data-claim-reward="monthly" disabled>Not available yet</button>
             </article>
           </section>
 
-          <section class="rewards-rank" id="rank" aria-labelledby="rewards-rank-title">
-            <div class="rewards-rank-badge"><img data-rewards-rank-badge src="ranks/rookie-i.webp" alt="" /></div>
-            <div class="rewards-rank-copy"><span>RACING RANK</span><h2 id="rewards-rank-title" data-rewards-rank-name>Rookie I</h2><p data-rewards-rank-next>Next rank at $1,000 weighted wager</p><div class="rewards-rank-track"><i data-rewards-rank-fill></i></div></div>
-            <strong data-rewards-rank-percent>0%</strong>
-          </section>
-
-          <section class="rewards-history" aria-labelledby="reward-history-title"><div class="rewards-section-heading"><div><span>RECENT ACTIVITY</span><h2 id="reward-history-title">Reward history</h2></div><p>Successful claims appear here instantly.</p></div><div class="rewards-history-list" data-rewards-history><div class="rewards-empty">Sign in to load your rewards.</div></div></section>
+          <section class="rank-reward-carousel" id="rank" aria-label="Rank rewards"><div class="rank-reward-rail" data-rank-reward-rail></div></section>
           <p class="rewards-page-status" data-rewards-status role="status" aria-live="polite"></p>
         </div>
       </main>
@@ -100,6 +89,6 @@
     <script type="module" src="firebase-auth.js?v=rewards-page-2"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
     <script type="module" src="wallet.js?v=balance-stability-2"></script>
-    <script type="module" src="rewards.js?v=rewards-circuit-1"></script>
+    <script type="module" src="rewards.js?v=rewards-minimal-2"></script>
   </body>
 </html>

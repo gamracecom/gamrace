@@ -4760,9 +4760,9 @@ function promotionRankIndex(stage, tier) {
 }
 
 const REWARD_POOLS = Object.freeze({
-  instant: Object.freeze({ rateBasisPoints: 10, minimumUsdCents: 10 }),
-  weekly: Object.freeze({ rateBasisPoints: 3, minimumUsdCents: 1 }),
-  monthly: Object.freeze({ rateBasisPoints: 2, minimumUsdCents: 1 }),
+  instant: Object.freeze({ rateBasisPoints: 10, lossBasisPoints: 0, minimumUsdCents: 10 }),
+  weekly: Object.freeze({ rateBasisPoints: 3, lossBasisPoints: 50, minimumUsdCents: 1 }),
+  monthly: Object.freeze({ rateBasisPoints: 2, lossBasisPoints: 25, minimumUsdCents: 1 }),
 });
 const REWARDS_LAUNCH_AT = Date.UTC(2026, 9, 19, 0, 0, 0);
 
@@ -4777,25 +4777,31 @@ function utcMonthStart(timestamp) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
 }
 
-function rewardUsdCents(wagerUsdCents, rateBasisPoints) {
-  return Math.max(0, Math.floor(Math.max(0, Number(wagerUsdCents || 0)) * rateBasisPoints / 10_000));
+function rewardUsdCents(activity, pool) {
+  const config = REWARD_POOLS[pool];
+  const wager = Math.max(0, Number(activity?.wagerUsdCents || 0));
+  const loss = Math.max(0, -Number(activity?.netUsdCents || 0));
+  return Math.max(0, Math.floor((wager * config.rateBasisPoints + loss * config.lossBasisPoints) / 10_000));
 }
 
 async function rewardWagersByRange(env, uid, ranges, prices) {
   const queries = ranges.flatMap((range) => PLAYER_BET_UNION_GROUPS.map(({ sql, count }) => env.DB.prepare(`
-    SELECT currency, COALESCE(SUM(wager_units), 0) AS wager_units
+    SELECT currency, COALESCE(SUM(wager_units), 0) AS wager_units,
+      COALESCE(SUM(payout_units - wager_units), 0) AS net_units
     FROM (${sql}) WHERE created_at >= ? AND created_at < ? GROUP BY currency
   `).bind(...playerBetBindings(uid, count), range.start, range.end)));
   const results = queries.length ? await env.DB.batch(queries) : [];
   const groupCount = PLAYER_BET_UNION_GROUPS.length;
   return Object.fromEntries(ranges.map((range, rangeIndex) => {
     const rows = results.slice(rangeIndex * groupCount, (rangeIndex + 1) * groupCount).flatMap((result) => result.results || []);
-    const cents = rows.reduce((total, row) => {
+    const totals = rows.reduce((total, row) => {
       const asset = getWalletAsset(row.currency);
       if (!asset) return total;
-      return total + Math.max(0, assetUnitsToUsdCents(row.wager_units, asset, prices) || 0);
-    }, 0);
-    return [range.id, cents];
+      const wagerUsdCents = Math.max(0, assetUnitsToUsdCents(row.wager_units, asset, prices) || 0);
+      const netMagnitude = assetUnitsToUsdCents(Math.abs(Number(row.net_units || 0)), asset, prices) || 0;
+      return { wagerUsdCents: total.wagerUsdCents + wagerUsdCents, netUsdCents: total.netUsdCents + (Number(row.net_units || 0) < 0 ? -netMagnitude : netMagnitude) };
+    }, { wagerUsdCents: 0, netUsdCents: 0 });
+    return [range.id, totals];
   }));
 }
 
@@ -4818,6 +4824,94 @@ async function rewardHistory(env, uid) {
   }));
 }
 
+const RANK_STAGE_NAMES = Object.freeze({
+  rookie: "Rookie", street: "Street", circuit: "Circuit", turbo: "Turbo", velocity: "Velocity",
+  hyper: "Hyper", apex: "Apex", pole: "Pole", champion: "Champion", "hall-of-fame": "Hall of Fame",
+});
+const RANK_TIER_NAMES = Object.freeze(["I", "II", "III"]);
+
+function rankRewardDefinitions() {
+  return PROMOTION_RANKS.flatMap(([stageId, thresholds]) => thresholds.map((threshold, tierIndex) => ({
+    id: `${stageId}-${tierIndex + 1}`,
+    stageId,
+    name: RANK_STAGE_NAMES[stageId] || stageId,
+    tier: RANK_TIER_NAMES[tierIndex],
+    thresholdUsdCents: threshold * 100,
+    badgePath: `/ranks/${stageId}-${tierIndex + 1}.webp`,
+  })));
+}
+
+async function playerRankRewards(env, uid, lifetimeWageredUsd) {
+  const [settingsResult, claimsResult] = await Promise.all([
+    env.DB.prepare("SELECT rank_id, reward_usd_cents, enabled FROM rank_reward_settings").all(),
+    env.DB.prepare("SELECT rank_id FROM rank_reward_claims WHERE uid = ?").bind(uid).all(),
+  ]);
+  const settings = new Map((settingsResult.results || []).map((row) => [row.rank_id, row]));
+  const claimed = new Set((claimsResult.results || []).map((row) => row.rank_id));
+  const lifetimeWageredUsdCents = Math.max(0, Math.round(Number(lifetimeWageredUsd || 0) * 100));
+  return rankRewardDefinitions().map((rank) => {
+    const setting = settings.get(rank.id);
+    const rewardUsdCents = Number(setting?.reward_usd_cents || 0);
+    const enabled = Boolean(setting?.enabled ?? 1);
+    const isClaimed = claimed.has(rank.id);
+    const unlocked = lifetimeWageredUsdCents >= rank.thresholdUsdCents;
+    return { ...rank, rewardUsdCents, enabled, claimed: isClaimed, unlocked, canClaim: enabled && unlocked && !isClaimed && rewardUsdCents > 0 };
+  });
+}
+
+async function handleAdminRankRewards(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const result = await env.DB.prepare("SELECT rank_id, reward_usd_cents, enabled, updated_at FROM rank_reward_settings").all();
+  const settings = new Map((result.results || []).map((row) => [row.rank_id, row]));
+  return json(request, env, 200, { ranks: rankRewardDefinitions().map((rank) => ({ ...rank, rewardUsdCents: Number(settings.get(rank.id)?.reward_usd_cents || 0), enabled: Boolean(settings.get(rank.id)?.enabled ?? 1) })) });
+}
+
+async function handleAdminUpdateRankReward(request, env, user, rankIdValue) {
+  await requireAdminSession(request, env, user);
+  const rank = rankRewardDefinitions().find((entry) => entry.id === String(rankIdValue || ""));
+  if (!rank) throw httpError(404, "That rank was not found");
+  const body = await requestJson(request);
+  const rewardUsdCents = parseUsdCents(body.rewardUsd, "Rank reward");
+  const enabled = body.enabled !== false;
+  const timestamp = now();
+  await env.DB.prepare(`
+    INSERT INTO rank_reward_settings(rank_id, reward_usd_cents, enabled, updated_at, updated_by)
+    VALUES(?, ?, ?, ?, ?)
+    ON CONFLICT(rank_id) DO UPDATE SET reward_usd_cents=excluded.reward_usd_cents, enabled=excluded.enabled,
+      updated_at=excluded.updated_at, updated_by=excluded.updated_by
+  `).bind(rank.id, rewardUsdCents, enabled ? 1 : 0, timestamp, user.sub).run();
+  await writeAdminAudit(env, user, "rank.reward.updated", rank.id, JSON.stringify({ rewardUsdCents, enabled }));
+  return json(request, env, 200, { rank: { ...rank, rewardUsdCents, enabled } });
+}
+
+async function handleRankRewardClaim(request, env, user, rankIdValue) {
+  const rank = rankRewardDefinitions().find((entry) => entry.id === String(rankIdValue || ""));
+  if (!rank) throw httpError(404, "That rank was not found");
+  const [setting, account, wallet] = await Promise.all([
+    env.DB.prepare("SELECT reward_usd_cents, enabled FROM rank_reward_settings WHERE rank_id = ?").bind(rank.id).first(),
+    liveAccountSnapshot(env, user.sub, { includeActivity: false }),
+    walletResponse(env, user.sub),
+  ]);
+  const rewardUsdCents = Number(setting?.reward_usd_cents || 0);
+  if (!setting?.enabled || rewardUsdCents <= 0) throw httpError(409, "That rank reward is not available");
+  if (Math.round(Number(account.summary.totalWagered || 0) * 100) < rank.thresholdUsdCents) throw httpError(403, "That rank is still locked");
+  const asset = requireWalletAsset(wallet.selectedCurrency);
+  const amountUnits = await usdCentsToAssetUnits(env, rewardUsdCents, asset);
+  const claimId = crypto.randomUUID();
+  try {
+    await env.DB.prepare(`INSERT INTO rank_reward_claims(id,uid,rank_id,threshold_usd_cents,reward_usd_cents,currency,amount_units,created_at)
+      VALUES(?,?,?,?,?,?,?,?)`).bind(claimId, user.sub, rank.id, rank.thresholdUsdCents, rewardUsdCents, asset.code, amountUnits, now()).run();
+  } catch (error) {
+    if (/unique/i.test(String(error?.message || ""))) throw httpError(409, "That rank reward has already been claimed");
+    throw error;
+  }
+  return json(request, env, 200, {
+    claim: { rankId: rank.id, rewardUsdCents, currency: asset.code, amount: assetUnitsToString(amountUnits, true) },
+    rankRewards: await playerRankRewards(env, user.sub, account.summary.totalWagered),
+    wallet: await walletResponse(env, user.sub),
+  });
+}
+
 async function playerRewardsStatus(env, uid) {
   const timestamp = now();
   const currentWeekStart = utcWeekStart(timestamp);
@@ -4833,14 +4927,13 @@ async function playerRewardsStatus(env, uid) {
   const previousMonthDate = new Date(previousMonthEnd);
   const previousMonthStart = Date.UTC(previousMonthDate.getUTCFullYear(), previousMonthDate.getUTCMonth() - 1, 1);
   const eligiblePreviousMonthStart = Math.max(REWARDS_LAUNCH_AT, previousMonthStart);
-  const [latestInstant, weeklyClaim, monthlyClaim, prices, account, wallet, history] = await Promise.all([
+  const [latestInstant, weeklyClaim, monthlyClaim, prices, account, wallet] = await Promise.all([
     env.DB.prepare("SELECT period_end FROM reward_claims WHERE uid = ? AND pool = 'instant' ORDER BY period_end DESC LIMIT 1").bind(uid).first(),
     env.DB.prepare("SELECT id FROM reward_claims WHERE uid = ? AND pool = 'weekly' AND period_start = ?").bind(uid, eligiblePreviousWeekStart).first(),
     env.DB.prepare("SELECT id FROM reward_claims WHERE uid = ? AND pool = 'monthly' AND period_start = ?").bind(uid, eligiblePreviousMonthStart).first(),
     providerPrices(env).catch(() => ({})),
     liveAccountSnapshot(env, uid, { includeActivity: false }),
     walletResponse(env, uid),
-    rewardHistory(env, uid),
   ]);
   const instantStart = Math.max(REWARDS_LAUNCH_AT, Number(latestInstant?.period_end || REWARDS_LAUNCH_AT));
   const ranges = [
@@ -4851,9 +4944,10 @@ async function playerRewardsStatus(env, uid) {
     { id: "monthlyCurrent", start: eligibleCurrentMonthStart, end: currentMonthEnd },
   ];
   const wagers = await rewardWagersByRange(env, uid, ranges, prices);
-  const instantAmount = rewardUsdCents(wagers.instant, REWARD_POOLS.instant.rateBasisPoints);
-  const weeklyAvailable = weeklyClaim ? 0 : rewardUsdCents(wagers.weeklyPrevious, REWARD_POOLS.weekly.rateBasisPoints);
-  const monthlyAvailable = monthlyClaim ? 0 : rewardUsdCents(wagers.monthlyPrevious, REWARD_POOLS.monthly.rateBasisPoints);
+  const instantAmount = rewardUsdCents(wagers.instant, "instant");
+  const weeklyAvailable = weeklyClaim ? 0 : rewardUsdCents(wagers.weeklyPrevious, "weekly");
+  const monthlyAvailable = monthlyClaim ? 0 : rewardUsdCents(wagers.monthlyPrevious, "monthly");
+  const rankRewards = await playerRankRewards(env, uid, Number(account.summary.totalWagered || 0));
   return {
     serverNow: new Date(timestamp).toISOString(),
     selectedCurrency: wallet.selectedCurrency,
@@ -4870,21 +4964,21 @@ async function playerRewardsStatus(env, uid) {
       weekly: {
         rateBasisPoints: REWARD_POOLS.weekly.rateBasisPoints,
         minimumUsdCents: REWARD_POOLS.weekly.minimumUsdCents,
-        availableUsdCents: weeklyAvailable,
-        accruingUsdCents: rewardUsdCents(wagers.weeklyCurrent, REWARD_POOLS.weekly.rateBasisPoints),
+        availableUsdCents: null,
+        accruingUsdCents: null,
         canClaim: weeklyAvailable >= REWARD_POOLS.weekly.minimumUsdCents,
         nextAvailableAt: new Date(currentWeekEnd).toISOString(),
       },
       monthly: {
         rateBasisPoints: REWARD_POOLS.monthly.rateBasisPoints,
         minimumUsdCents: REWARD_POOLS.monthly.minimumUsdCents,
-        availableUsdCents: monthlyAvailable,
-        accruingUsdCents: rewardUsdCents(wagers.monthlyCurrent, REWARD_POOLS.monthly.rateBasisPoints),
+        availableUsdCents: null,
+        accruingUsdCents: null,
         canClaim: monthlyAvailable >= REWARD_POOLS.monthly.minimumUsdCents,
         nextAvailableAt: new Date(currentMonthEnd).toISOString(),
       },
     },
-    history,
+    rankRewards,
   };
 }
 
@@ -4914,8 +5008,9 @@ async function handleRewardClaim(request, env, user, poolValue) {
   if (periodStart >= periodEnd) throw httpError(409, "That reward period has not completed yet");
   const prices = await providerPrices(env).catch(() => ({}));
   const wagers = await rewardWagersByRange(env, user.sub, [{ id: pool, start: periodStart, end: periodEnd }], prices);
-  const wagerUsdCents = wagers[pool] || 0;
-  const payoutUsdCents = rewardUsdCents(wagerUsdCents, config.rateBasisPoints);
+  const activity = wagers[pool] || { wagerUsdCents: 0, netUsdCents: 0 };
+  const wagerUsdCents = activity.wagerUsdCents;
+  const payoutUsdCents = rewardUsdCents(activity, pool);
   if (payoutUsdCents < config.minimumUsdCents) {
     const minimum = (config.minimumUsdCents / 100).toFixed(2);
     throw httpError(409, pool === "instant" ? `Keep racing — instant rewards unlock at $${minimum}` : "No reward is available from the previous period");
@@ -5814,6 +5909,9 @@ async function route(request, env) {
   const removePromotionMatch = path.match(/^\/admin\/promotions\/([A-Za-z0-9-]+)\/remove$/);
   if (request.method === "POST" && removePromotionMatch) return handleAdminRemovePromotion(request, env, user, removePromotionMatch[1]);
   if (request.method === "GET" && path === "/admin/game-edges") return handleAdminGameEdges(request, env, user);
+  if (request.method === "GET" && path === "/admin/rank-rewards") return handleAdminRankRewards(request, env, user);
+  const adminRankRewardMatch = path.match(/^\/admin\/rank-rewards\/([a-z0-9-]+)$/);
+  if (request.method === "POST" && adminRankRewardMatch) return handleAdminUpdateRankReward(request, env, user, adminRankRewardMatch[1]);
   const gameEdgeMatch = path.match(/^\/admin\/game-edges\/([a-z0-9-]+)$/);
   if (request.method === "POST" && gameEdgeMatch) return handleAdminSetGameEdge(request, env, user, gameEdgeMatch[1]);
   const gameMaintenanceMatch = path.match(/^\/admin\/games\/([a-z0-9-]+)\/maintenance$/);
@@ -5836,6 +5934,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/rewards") return handleRewards(request, env, user);
   const rewardClaimMatch = path.match(/^\/rewards\/(instant|weekly|monthly)\/claim$/);
   if (request.method === "POST" && rewardClaimMatch) return handleRewardClaim(request, env, user, rewardClaimMatch[1]);
+  const rankRewardClaimMatch = path.match(/^\/rewards\/ranks\/([a-z0-9-]+)\/claim$/);
+  if (request.method === "POST" && rankRewardClaimMatch) return handleRankRewardClaim(request, env, user, rankRewardClaimMatch[1]);
   if (request.method === "POST" && path === "/account/details") return handleAccountDetails(request, env, user);
   if (request.method === "POST" && path === "/account/preferences") return handleAccountPreferences(request, env, user);
   if (request.method === "POST" && path === "/promotions/claim") return handlePromotionClaim(request, env, user);

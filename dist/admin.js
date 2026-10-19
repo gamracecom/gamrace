@@ -53,6 +53,7 @@ let leaderboardCache = null;
 let promotionsCache = null;
 let gameEdgesCache = null;
 let chatSettingsCache = null;
+let rankRewardsCache = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -180,7 +181,6 @@ async function openAdmin() {
   accessScreen.hidden = true;
   adminApp.hidden = false;
   document.querySelector("#day-period").textContent = new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening";
-  renderRanks();
   selectView(location.hash.replace("#", "") || "overview", { updateHash: false });
 }
 
@@ -330,6 +330,7 @@ async function loadView(view, force = false) {
   if (view === "deposits") return loadDeposits();
   if (view === "withdrawals") return loadWithdrawals();
   if (view === "games") return loadGameEdges(force);
+  if (view === "ranks") return loadRankRewards(force);
   if (view === "promotions") return loadPromotionsWorkspace(force);
   if (view === "audit") return loadAudit();
   if (view === "risk") return loadCountryAccess(force);
@@ -721,10 +722,30 @@ document.querySelector("#confirm-review").addEventListener("click", async () => 
 
 function renderRanks() {
   const container = document.querySelector("#rank-admin-grid");
-  if (container.childElementCount) return;
-  container.innerHTML = RANK_STAGES.map((rank, index) => `
-    <article class="rank-admin-card"><span class="rank-number">STAGE ${String(index + 1).padStart(2, "0")}</span><h3>${rank.name}</h3><p>${rank.subtitle}</p><div class="rank-tiers"><span>I</span><span>II</span><span>III</span></div><small class="rank-threshold">Starts at $${rank.thresholds[0].toLocaleString()}</small></article>
-  `).join("");
+  if (!container || !rankRewardsCache) return;
+  container.innerHTML = rankRewardsCache.map((rank) => `<article class="rank-admin-card rank-reward-admin-card" data-admin-rank="${escapeHtml(rank.id)}"><img src="${escapeHtml(rank.badgePath)}" alt="" /><div><h3>${escapeHtml(rank.name)} <b>${escapeHtml(rank.tier)}</b></h3><small>$${(Number(rank.thresholdUsdCents || 0) / 100).toLocaleString()} wager</small></div><label><span>Reward (USD)</span><div class="leaderboard-money-input"><b>$</b><input data-rank-reward-value type="number" min="0" max="100000000" step="0.01" value="${(Number(rank.rewardUsdCents || 0) / 100).toFixed(2)}" /></div></label><label class="rank-reward-enabled"><input data-rank-reward-enabled type="checkbox" ${rank.enabled ? "checked" : ""} /> Enabled</label><button class="solid-button" data-save-rank-reward type="button">Save</button><p role="status"></p></article>`).join("");
+  container.querySelectorAll("[data-save-rank-reward]").forEach((button) => button.addEventListener("click", saveRankReward));
+}
+
+async function loadRankRewards(force = false) {
+  if (!rankRewardsCache || force) rankRewardsCache = (await api("/admin/rank-rewards")).ranks || [];
+  renderRanks();
+  setLastRefresh();
+}
+
+async function saveRankReward(event) {
+  const card = event.currentTarget.closest("[data-admin-rank]");
+  const button = event.currentTarget;
+  const message = card.querySelector("p");
+  button.disabled = true;
+  button.textContent = "Saving…";
+  message.textContent = "";
+  try {
+    const body = await api(`/admin/rank-rewards/${encodeURIComponent(card.dataset.adminRank)}`, { method: "POST", body: JSON.stringify({ rewardUsd: card.querySelector("[data-rank-reward-value]").value, enabled: card.querySelector("[data-rank-reward-enabled]").checked }) });
+    rankRewardsCache = rankRewardsCache.map((rank) => rank.id === body.rank.id ? body.rank : rank);
+    message.textContent = "Saved";
+  } catch (error) { message.textContent = error.message; }
+  finally { button.disabled = false; button.textContent = "Save"; }
 }
 
 function adminPrize(cents) {

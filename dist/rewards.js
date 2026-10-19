@@ -1,12 +1,8 @@
-import { getRankProgress } from "./rank-engine.js?v=rank-badges-2";
-
 const API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const poolNames = { instant: "Instant Rakeback", weekly: "Weekly Rakeback", monthly: "Monthly Rakeback", promo: "Promo code" };
 const status = document.querySelector("[data-rewards-status]");
-const history = document.querySelector("[data-rewards-history]");
 let snapshot = null;
-let serverOffset = 0;
 let loading = false;
 
 function escapeHtml(value) {
@@ -14,17 +10,6 @@ function escapeHtml(value) {
 }
 
 function usd(cents) { return money.format(Math.max(0, Number(cents || 0)) / 100); }
-
-function countdown(iso) {
-  if (!iso) return "Available as you play";
-  const remaining = Math.max(0, new Date(iso).getTime() - (Date.now() + serverOffset));
-  const days = Math.floor(remaining / 86_400_000);
-  const hours = Math.floor(remaining % 86_400_000 / 3_600_000);
-  const minutes = Math.floor(remaining % 3_600_000 / 60_000);
-  if (days) return `Next drop in ${days}d ${hours}h`;
-  if (hours) return `Next drop in ${hours}h ${minutes}m`;
-  return `Next drop in ${Math.max(1, minutes)}m`;
-}
 
 async function request(path, options = {}) {
   const token = await window.GamRaceAuth?.getToken?.();
@@ -42,58 +27,61 @@ async function request(path, options = {}) {
 function renderPool(id, pool) {
   const station = document.querySelector(`[data-reward-pool="${id}"]`);
   if (!station || !pool) return;
-  station.querySelector("[data-reward-amount]").textContent = usd(pool.availableUsdCents);
-  const accrual = station.querySelector("[data-reward-accrual]");
-  if (id === "instant") accrual.textContent = `${(pool.rateBasisPoints / 100).toFixed(2)}% of eligible wager`;
-  else accrual.textContent = `${usd(pool.accruingUsdCents)} building this ${id === "weekly" ? "week" : "month"}`;
-  const timer = station.querySelector("[data-reward-countdown]");
-  if (timer) timer.textContent = pool.canClaim ? "READY TO CLAIM" : countdown(pool.nextAvailableAt);
   const button = station.querySelector("[data-claim-reward]");
   button.disabled = !pool.canClaim;
-  button.textContent = pool.canClaim ? `Claim ${usd(pool.availableUsdCents)}` : id === "instant" ? "Nothing to claim yet" : "Not available yet";
+  button.textContent = pool.canClaim ? (id === "instant" ? `Claim ${usd(pool.availableUsdCents)}` : "Claim") : id === "instant" ? "Nothing to claim yet" : "Not available yet";
   station.classList.toggle("ready", Boolean(pool.canClaim));
 }
 
-function renderRank(summary = {}) {
-  const progress = getRankProgress(Number(summary.lifetimeWeightedWager ?? summary.totalWagered ?? 0));
-  document.querySelector("[data-rewards-rank-badge]").src = progress.currentRank.badgePath;
-  document.querySelector("[data-rewards-rank-name]").textContent = progress.currentRank.label;
-  document.querySelector("[data-rewards-rank-percent]").textContent = `${Math.round(progress.percentage)}%`;
-  document.querySelector("[data-rewards-rank-fill]").style.width = `${progress.percentage}%`;
-  document.querySelector("[data-rewards-rank-next]").textContent = progress.nextRank
-    ? `Next rank at ${money.format(progress.nextRank.threshold)} weighted wager`
-    : `${money.format(progress.currentValue)} lifetime weighted wager`;
+function lockIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
 }
 
-function renderHistory(rows = []) {
-  if (!rows.length) {
-    history.innerHTML = '<div class="rewards-empty">Your successful reward claims will appear here.</div>';
-    return;
-  }
-  history.innerHTML = rows.map((row) => `<article class="reward-history-row"><span class="reward-history-icon"><img src="assets/brand/gamrace-icon.png" alt="" /></span><span><strong>${escapeHtml(poolNames[row.type] || "Reward")}</strong><small>${new Date(row.createdAt).toLocaleString()}</small></span><b>${row.rewardUsdCents ? usd(row.rewardUsdCents) : `${escapeHtml(row.amount)} ${escapeHtml(row.currency)}`}</b></article>`).join("");
+function renderRankRewards(ranks = []) {
+  const rail = document.querySelector("[data-rank-reward-rail]");
+  if (!rail) return;
+  rail.innerHTML = ranks.map((rank) => {
+    const state = rank.claimed ? "claimed" : rank.canClaim ? "claimable" : rank.unlocked ? "unlocked" : "locked";
+    const action = rank.claimed ? "Claimed" : rank.canClaim ? `Claim ${usd(rank.rewardUsdCents)}` : rank.unlocked ? "Unlocked" : `${lockIcon()} Locked`;
+    return `<article class="rank-reward-item ${state}" data-rank-id="${escapeHtml(rank.id)}"><div class="rank-reward-image"><img src="${escapeHtml(rank.badgePath)}" alt="" /></div><h2><span>${escapeHtml(rank.name)}</span><b>${escapeHtml(rank.tier)}</b></h2><button type="button" data-claim-rank="${escapeHtml(rank.id)}" ${rank.canClaim ? "" : "disabled"}>${action}</button></article>`;
+  }).join("");
+  const current = [...rail.querySelectorAll(".rank-reward-item.unlocked,.rank-reward-item.claimable")].at(-1);
+  requestAnimationFrame(() => current?.scrollIntoView({ behavior: "instant", inline: "center", block: "nearest" }));
+  rail.querySelectorAll("[data-claim-rank]").forEach((button) => button.addEventListener("click", claimRankReward));
 }
 
 function render() {
   if (!snapshot) return;
   Object.entries(snapshot.pools || {}).forEach(([id, pool]) => renderPool(id, pool));
-  renderRank(snapshot.summary);
-  renderHistory(snapshot.history);
+  renderRankRewards(snapshot.rankRewards);
 }
 
 async function loadRewards() {
   if (loading) return;
   loading = true;
-  status.textContent = "Loading your live rewards…";
+  status.textContent = "";
   try {
     const body = await request("/rewards");
     snapshot = body.rewards;
-    serverOffset = new Date(snapshot.serverNow).getTime() - Date.now();
     render();
     status.textContent = "";
   } catch (error) {
     status.textContent = error.message;
-    if (error.status === 401) history.innerHTML = '<div class="rewards-empty">Sign in to see and claim your rewards.</div>';
   } finally { loading = false; }
+}
+
+async function claimRankReward(event) {
+  const button = event.currentTarget;
+  const rankId = button.dataset.claimRank;
+  button.disabled = true;
+  button.textContent = "Claiming…";
+  try {
+    const body = await request(`/rewards/ranks/${rankId}/claim`, { method: "POST", body: "{}" });
+    snapshot.rankRewards = body.rankRewards;
+    renderRankRewards(snapshot.rankRewards);
+    status.textContent = `${usd(body.claim.rewardUsdCents)} credited.`;
+    window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed"));
+  } catch (error) { status.textContent = error.message; renderRankRewards(snapshot.rankRewards); }
 }
 
 document.querySelectorAll("[data-claim-reward]").forEach((button) => button.addEventListener("click", async () => {
@@ -130,7 +118,6 @@ document.querySelector(".rewards-promo-form")?.addEventListener("submit", async 
   finally { button.disabled = false; button.textContent = "Claim"; }
 });
 
-window.addEventListener("gamrace:auth-state", (event) => { if (event.detail?.signedIn) loadRewards(); else status.textContent = "Sign in to unlock your reward circuit."; });
+window.addEventListener("gamrace:auth-state", (event) => { if (event.detail?.signedIn) loadRewards(); else status.textContent = ""; });
 window.addEventListener("gamrace:wallet-balance-changed", () => window.setTimeout(loadRewards, 350));
-window.setInterval(() => { if (snapshot) Object.entries(snapshot.pools || {}).forEach(([id, pool]) => renderPool(id, pool)); }, 30_000);
 if (window.GamRaceAuth?.getUser?.()) loadRewards();
