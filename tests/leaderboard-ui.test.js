@@ -45,7 +45,7 @@ test("realistic leaderboard flag artwork is compressed for live loading", async 
 
 test("lobby assets are compressed and Stack no longer narrates a missed level", async () => {
   assert.match(index, /assets\/games\/originals\/stack-v3\.webp/);
-  assert.match(index, /assets\/banners\/leaderboard-track-monument-v2\.webp/);
+  assert.match(index, /assets\/banners\/leaderboard-checkered-flag-v1\.webp/);
   assert.doesNotMatch(stack, /Missed on level/);
   const original = await stat(new URL("../dist/assets/games/originals/stack-v3.webp", import.meta.url));
   assert.ok(original.size < 500_000);

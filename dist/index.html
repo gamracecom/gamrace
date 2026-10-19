@@ -11,9 +11,10 @@
     <title>GamRace</title>
     <link rel="icon" type="image/png" href="assets/brand/gamrace-icon.png" />
     <link rel="preload" as="image" href="assets/brand/gamrace-icon.png" />
+    <link rel="preload" as="image" href="assets/banners/leaderboard-checkered-flag-v1.webp" />
     <link rel="preload" as="image" href="ranks/rookie-i.webp" />
     <script src="shell-state.js?v=player-avatars-1"></script>
-    <link rel="stylesheet" href="styles.css?v=lobby-proportions-1&amp;leaderboard=2&amp;wallet=5&amp;account=6&amp;chat=3" />
+    <link rel="stylesheet" href="styles.css?v=lobby-modern-2&amp;leaderboard=2&amp;wallet=5&amp;account=6&amp;chat=3" />
   </head>
   <body data-authenticated="pending">
     <div class="app-shell">
@@ -67,24 +68,22 @@
               <div class="leaderboard-slides" data-leaderboard-slides>
                 <article class="leaderboard-slide" data-leaderboard-cadence="weekly">
                   <div class="leaderboard-copy">
-                    <span class="leaderboard-timer">Ending in <strong data-leaderboard-countdown>Race opens soon</strong></span>
-                    <p>King of the Track</p>
+                    <p class="leaderboard-kicker">King of the Track</p>
                     <h1><strong data-leaderboard-prize>Prize TBA</strong> <span>Weekly</span></h1>
-                    <span class="leaderboard-cta">View the Starting Grid</span>
+                    <span class="leaderboard-timer">Ends in <strong data-leaderboard-countdown>Race opens soon</strong></span>
                   </div>
                   <div class="leaderboard-scene" aria-hidden="true">
-                    <img class="leaderboard-artwork" src="assets/banners/leaderboard-track-monument-v2.webp" alt="" decoding="async" fetchpriority="high" />
+                    <img class="leaderboard-flag-art" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" decoding="async" fetchpriority="high" />
                   </div>
                 </article>
                 <article class="leaderboard-slide" data-leaderboard-cadence="biweekly">
                   <div class="leaderboard-copy">
-                    <span class="leaderboard-timer">Ending in <strong data-leaderboard-countdown>Race opens soon</strong></span>
-                    <p>King of the Track</p>
+                    <p class="leaderboard-kicker">King of the Track</p>
                     <h1><strong data-leaderboard-prize>Prize TBA</strong> <span>BiWeekly</span></h1>
-                    <span class="leaderboard-cta">View the Starting Grid</span>
+                    <span class="leaderboard-timer">Ends in <strong data-leaderboard-countdown>Race opens soon</strong></span>
                   </div>
                   <div class="leaderboard-scene" aria-hidden="true">
-                    <img class="leaderboard-artwork" src="assets/banners/leaderboard-track-monument-v2.webp" alt="" decoding="async" fetchpriority="high" />
+                    <img class="leaderboard-flag-art" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" decoding="async" fetchpriority="high" />
                   </div>
                 </article>
               </div>
@@ -94,22 +93,19 @@
           <div class="hero-mode-stack">
             <button class="hero-card hero-house active" type="button" data-mode="house" aria-pressed="true" aria-label="Show Play the House games">
               <img class="hero-artwork" src="assets/banners/play-the-house.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="high" />
-              <div class="dot-field" aria-hidden="true"></div>
               <div class="hero-copy">
-                <p>Play the</p>
-                <h1>House</h1>
-                <span>Classic games. Real rewards.</span>
+                <p>GamRace Originals</p>
+                <h1>Play the House</h1>
+                <span>Instant games</span>
               </div>
             </button>
             <button class="hero-card hero-player" type="button" data-mode="player" aria-pressed="false" aria-label="Show Play the Player games">
               <img class="hero-artwork" src="assets/banners/play-the-player.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="high" />
-              <div class="dot-field" aria-hidden="true"></div>
               <div class="hero-copy">
-                <p>Play the</p>
-                <h1>Player</h1>
-                <span>Real players. Bigger wins.</span>
+                <p>Competitive Games</p>
+                <h1>Play the Player</h1>
+                <span>Real opponents</span>
               </div>
-              <span class="versus-mark" aria-hidden="true">VS</span>
             </button>
           </div>
         </section>

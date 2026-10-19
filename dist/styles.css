@@ -3284,3 +3284,245 @@ body,
 .leaderboard-page .floating-podium-card.first .podium-badge{box-shadow:0 14px 30px rgba(0,0,0,.62)}
 .leaderboard-page .podium-badge img,.leaderboard-page .race-player-badge img{width:100%;height:100%;box-sizing:border-box;padding:4px;object-fit:contain}
 .leaderboard-page .race-player-badge{overflow:hidden;border:1px solid #2c3946;box-shadow:none}
+
+/* Modern lobby: bright brand colour, flatter surfaces and artwork-led hierarchy. */
+.hero-grid{
+  min-height:clamp(252px,18vw,304px);
+  grid-template-columns:minmax(0,2.18fr) minmax(300px,.82fr);
+  gap:12px;
+}
+.leaderboard-banner{
+  min-height:252px;
+  border:0;
+  border-radius:18px;
+  background:#071b31;
+  box-shadow:0 18px 38px rgba(0,0,0,.22);
+}
+.leaderboard-banner::before{
+  background:
+    linear-gradient(105deg,rgba(6,25,48,.98) 0%,rgba(9,49,91,.94) 48%,rgba(9,84,149,.48) 100%),
+    #071b31;
+}
+.leaderboard-banner::after{
+  inset:auto -4% -42% 42%;
+  height:112%;
+  opacity:.38;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.075) 0 18px,transparent 18px 36px);
+  transform:skewX(-16deg);
+}
+.leaderboard-slide[data-leaderboard-cadence="biweekly"]{background:linear-gradient(100deg,rgba(12,20,57,.3),rgba(51,29,112,.23))}
+.leaderboard-copy{
+  width:55%;
+  justify-content:center;
+  padding:32px 24px 34px clamp(26px,3.4vw,52px);
+}
+.leaderboard-copy .leaderboard-kicker{
+  margin:0 0 9px;
+  color:#68c7ff;
+  font-size:clamp(.62rem,.72vw,.76rem);
+  font-weight:850;
+  line-height:1;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.leaderboard-copy h1{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.12em .24em;
+  margin:0;
+  color:#fff;
+  font-size:clamp(1.75rem,2.65vw,2.8rem);
+  line-height:1.02;
+  letter-spacing:-.055em;
+  white-space:normal;
+}
+.leaderboard-copy h1 strong{color:#fff}
+.leaderboard-copy h1 span{color:#40b7ff}
+.leaderboard-timer{
+  min-height:0;
+  margin-top:19px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  color:#7694aa;
+  font-size:clamp(.6rem,.69vw,.72rem);
+  backdrop-filter:none;
+}
+.leaderboard-timer strong{color:#d8edfa}
+.leaderboard-scene{inset:0 0 0 43%}
+.leaderboard-artwork{
+  right:-5%;
+  bottom:-16%;
+  width:min(72vw,820px);
+  height:118%;
+  filter:hue-rotate(112deg) saturate(1.32) brightness(1.04);
+  opacity:.88;
+}
+.leaderboard-banner:hover .leaderboard-artwork{
+  transform:translate3d(8px,-3px,0) scale(1.025);
+  filter:hue-rotate(112deg) saturate(1.38) brightness(1.08);
+}
+.leaderboard-mobile-mark{display:none}
+.leaderboard-slide-indicators{right:auto;bottom:17px;left:clamp(26px,3.4vw,52px)}
+.leaderboard-slide-indicators i{height:3px;background:rgba(255,255,255,.25)}
+.leaderboard-slide-indicators i.active{width:22px;background:#168bff}
+
+.hero-mode-stack{gap:12px}
+.hero-card{
+  border:0;
+  border-radius:16px;
+  background:#0d1823;
+  box-shadow:0 14px 28px rgba(0,0,0,.18);
+  transition:transform .22s ease,filter .22s ease;
+}
+.hero-card:hover{transform:translateY(-2px);filter:brightness(1.04)}
+.hero-card .hero-artwork{
+  inset:0;
+  width:100%;
+  height:100%;
+  filter:saturate(1.14) contrast(1.02);
+  transform:none;
+  transform-origin:center;
+  transition:transform .45s cubic-bezier(.2,.75,.2,1);
+}
+.hero-card:hover .hero-artwork{filter:saturate(1.18) contrast(1.03);transform:scale(1.035)}
+.hero-card::before{background:linear-gradient(90deg,rgba(4,12,21,.96) 0%,rgba(4,12,21,.78) 45%,rgba(4,12,21,.06) 82%)}
+.hero-card::after{display:none}
+.hero-house,.hero-house:hover,.hero-house.active,.hero-player,.hero-player:hover,.hero-player.active{border:0;box-shadow:0 14px 28px rgba(0,0,0,.18)}
+.hero-player .hero-artwork{filter:hue-rotate(42deg) saturate(1.22) contrast(1.04)}
+.hero-player:hover .hero-artwork{filter:hue-rotate(42deg) saturate(1.26) contrast(1.05)}
+.hero-copy{width:68%;padding:18px 16px 17px 22px}
+.hero-copy p{color:#7f99ac;font-size:.55rem;font-weight:850;letter-spacing:.11em;text-transform:uppercase}
+.hero-copy h1,.hero-player .hero-copy h1{
+  margin:5px 0 0;
+  color:#fff;
+  font-size:clamp(1.18rem,1.55vw,1.62rem);
+  line-height:1;
+  letter-spacing:-.04em;
+  text-shadow:none;
+}
+.hero-copy>span{margin-top:9px;color:#3ab5ff;font-size:.5rem;letter-spacing:.13em}
+.hero-player .hero-copy>span{color:#b78cff}
+
+.game-section{padding-top:24px}
+.game-card.original{
+  border-radius:14px;
+  box-shadow:0 12px 24px rgba(0,0,0,.18);
+}
+.game-card.original:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.original-card-art{
+  width:104%;
+  height:104%;
+  margin:-2%;
+  border-radius:16px;
+  transform:translate(var(--art-x,0),var(--art-y,0)) scale(calc(var(--art-sx,1) * 1.035),calc(var(--art-sy,1) * 1.035));
+}
+.game-card.catalogue-preview{
+  border:0;
+  border-radius:14px;
+  box-shadow:0 12px 24px rgba(0,0,0,.18);
+}
+.section-heading .view-all-button,.section-heading .carousel-arrow{border-color:transparent;background:#101820}
+.section-heading .view-all-button:hover,.section-heading .carousel-arrow:not(:disabled):hover{border-color:transparent;background:#17232d}
+
+@media(max-width:860px){
+  .hero-grid{grid-template-columns:1fr;gap:10px}
+  .leaderboard-banner{min-height:215px}
+  .hero-mode-stack{min-height:132px;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:1fr}
+}
+
+@media(max-width:700px){
+  .hero-grid{gap:9px}
+  .hero-mode-stack{display:grid;min-height:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .leaderboard-banner{min-height:224px;border-radius:15px}
+  .leaderboard-copy{width:68%;padding:25px 18px 28px 21px}
+  .leaderboard-copy .leaderboard-kicker{margin-bottom:8px;font-size:.56rem;letter-spacing:.12em}
+  .leaderboard-copy h1{max-width:225px;font-size:clamp(1.43rem,7.2vw,1.88rem)}
+  .leaderboard-timer{max-width:180px;margin-top:14px;font-size:.54rem;line-height:1.35}
+  .leaderboard-scene{inset:0 0 0 46%;overflow:hidden}
+  .leaderboard-artwork{display:none}
+  .leaderboard-mobile-mark{
+    position:absolute;
+    right:-24%;
+    bottom:-23%;
+    width:185%;
+    height:126%;
+    display:block;
+    object-fit:contain;
+    object-position:right bottom;
+    filter:saturate(1.06) contrast(1.04);
+    transform:rotate(-5deg);
+  }
+  .leaderboard-slide-indicators{bottom:14px;left:21px}
+  .hero-card{min-height:104px;border-radius:14px}
+  .hero-card .hero-artwork{object-position:64% center}
+  .hero-player .hero-artwork{object-position:67% center}
+  .hero-card::before{background:linear-gradient(90deg,rgba(4,12,21,.96) 0%,rgba(4,12,21,.75) 55%,rgba(4,12,21,.12) 100%)}
+  .hero-copy{width:78%;padding:16px 8px 14px 15px}
+  .hero-copy p{font-size:.42rem;letter-spacing:.08em}
+  .hero-copy h1,.hero-player .hero-copy h1{max-width:105px;font-size:.92rem;line-height:1.02}
+  .hero-copy>span{margin-top:7px;font-size:.4rem;letter-spacing:.07em}
+  .game-section{padding-top:21px}
+  .game-card.original,.game-card.catalogue-preview{border-radius:12px;box-shadow:0 9px 18px rgba(0,0,0,.18)}
+  .original-card-art{border-radius:14px}
+}
+
+/* Vibrant race lobby refinement. */
+.lobby-rail{width:min(1180px,100%)}
+.leaderboard-banner{
+  background:#0a67ef;
+  box-shadow:0 20px 42px rgba(0,0,0,.24);
+}
+.leaderboard-banner::before{
+  background:linear-gradient(112deg,#073fbd 0%,#096ce8 45%,#169dff 76%,#25d2ff 100%);
+}
+.leaderboard-banner::after{
+  z-index:1;
+  inset:auto -7% -25% 38%;
+  height:76%;
+  opacity:1;
+  background:linear-gradient(105deg,#026cff 0%,#08b7ff 55%,#5ce7ff 100%);
+  clip-path:polygon(12% 28%,100% 0,91% 100%,0 100%);
+  transform:none;
+}
+.leaderboard-slide[data-leaderboard-cadence="biweekly"]{background:linear-gradient(110deg,rgba(77,36,211,.2),rgba(112,69,255,.44))}
+.leaderboard-copy{z-index:4}
+.leaderboard-copy .leaderboard-kicker{color:#c9efff}
+.leaderboard-copy h1 strong,.leaderboard-copy h1 span{color:#fff}
+.leaderboard-timer{color:rgba(232,248,255,.76)}
+.leaderboard-timer strong{color:#fff}
+.leaderboard-scene{z-index:3;inset:0 0 0 49%;overflow:hidden}
+.leaderboard-flag-art{
+  position:absolute;
+  right:-2%;
+  bottom:-28%;
+  width:min(45vw,500px);
+  height:138%;
+  object-fit:contain;
+  object-position:right bottom;
+  transform:rotate(-5deg) perspective(700px) rotateY(-2deg) skewY(-.5deg);
+  transform-origin:16% 84%;
+  animation:lobby-flag-wave 4.2s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+.leaderboard-banner:hover .leaderboard-flag-art{animation-duration:3.4s}
+.leaderboard-slide-indicators i{background:rgba(255,255,255,.42)}
+.leaderboard-slide-indicators i.active{background:#fff}
+.hero-house::before{background:linear-gradient(90deg,#087ce9 0%,rgba(7,110,220,.9) 45%,rgba(4,36,69,.08) 100%)}
+.hero-player::before{background:linear-gradient(90deg,#7141e6 0%,rgba(92,48,205,.9) 45%,rgba(43,20,83,.08) 100%)}
+.hero-copy p{color:rgba(255,255,255,.78)}
+.hero-copy>span,.hero-player .hero-copy>span{color:#fff}
+@keyframes lobby-flag-wave{
+  0%,100%{transform:rotate(-5deg) perspective(700px) rotateY(-3deg) skewY(-.7deg) scaleX(1)}
+  28%{transform:rotate(-2.5deg) translate3d(6px,-4px,0) perspective(700px) rotateY(5deg) skewY(1deg) scaleX(.985)}
+  61%{transform:rotate(-6.5deg) translate3d(-3px,3px,0) perspective(700px) rotateY(-7deg) skewY(-1.2deg) scaleX(1.012)}
+}
+@media(max-width:700px){
+  .leaderboard-copy{width:64%}
+  .leaderboard-scene{inset:0 0 0 43%}
+  .leaderboard-flag-art{right:-34%;bottom:-20%;width:205%;height:127%}
+  .leaderboard-banner::after{inset:auto -15% -18% 35%;height:67%}
+  .hero-house::before{background:linear-gradient(90deg,#087ce9 0%,rgba(7,110,220,.9) 55%,rgba(4,36,69,.1) 100%)}
+  .hero-player::before{background:linear-gradient(90deg,#7141e6 0%,rgba(92,48,205,.9) 55%,rgba(43,20,83,.1) 100%)}
+}
+@media(prefers-reduced-motion:reduce){.leaderboard-flag-art{animation:none!important}}
