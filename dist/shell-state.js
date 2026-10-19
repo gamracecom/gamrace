@@ -44,7 +44,8 @@
     document.querySelectorAll(".profile-rank-mark").forEach((mark) => {
       mark.classList.remove("has-image", "rank-loading");
       const image = mark.querySelector(".profile-rank-image");
-      if (image) image.removeAttribute("src");
+      if (image) { image.removeAttribute("src"); image.classList.remove("custom", "fallback"); }
+      mark.style.removeProperty("--avatar-color");
     });
   }
 
@@ -85,15 +86,21 @@
       if (icon.getAttribute("src") !== iconPath) icon.src = iconPath;
     });
     document.querySelectorAll(".profile-rank-mark").forEach((mark) => {
-      const fallback = mark.querySelector(".profile-rank-fallback");
       const image = mark.querySelector(".profile-rank-image");
-      if (fallback) fallback.textContent = "";
       if (!image) return;
-      const badgePath = snapshot.rankBadgePath || DEFAULT_RANK_BADGE;
-      if (image.getAttribute("src") !== badgePath) {
+      const avatarPath = snapshot.avatarUrl || "assets/brand/gamrace-icon.png";
+      const custom = Boolean(snapshot.avatarUrl);
+      mark.style.setProperty("--avatar-color", snapshot.avatarColor || "#168bff");
+      image.classList.toggle("custom", custom);
+      image.classList.toggle("fallback", !custom);
+      if (image.getAttribute("src") !== avatarPath) {
         image.addEventListener("load", () => mark.classList.add("has-image"), { once: true });
-        image.addEventListener("error", () => mark.classList.remove("has-image"), { once: true });
-        image.src = badgePath;
+        image.addEventListener("error", () => {
+          image.src = "assets/brand/gamrace-icon.png";
+          image.classList.remove("custom");
+          image.classList.add("fallback");
+        }, { once: true });
+        image.src = avatarPath;
       }
       if (image.complete && image.naturalWidth) mark.classList.add("has-image");
     });

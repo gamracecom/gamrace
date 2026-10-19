@@ -14,7 +14,10 @@ test("live chat is shared, wager gated and available on every main surface", () 
   assert.match(chat, /window\.setInterval\(refresh, 2_500\)/);
   assert.match(chat, /Everyone can still read chat/);
   assert.match(chat, /minimumWagerUsdCents|remainingUsdCents/);
-  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-1/);
+  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-3/);
+  assert.match(chat, /live-chat-mention/);
+  assert.match(chat, /mentionedMe/);
+  assert.match(chat, /live-chat-send/);
   assert.match(admin, /\/admin\/chat\/settings/);
   assert.match(admin, /Minimum lifetime wager \(USD\)/);
 });
@@ -26,4 +29,6 @@ test("mobile chat toggles over the previous page and account transactions cannot
   assert.match(styles, /body\.live-chat-open/);
   assert.match(styles, /\.account-workspace \.account-table-row\{width:100%;box-sizing:border-box;grid-template-columns:minmax\(0,1fr\)!important\}/);
   assert.match(styles, /overflow-x:hidden!important/);
+  assert.match(styles, /\.live-chat-avatar/);
+  assert.match(styles, /\.live-chat-mention-highlight/);
 });

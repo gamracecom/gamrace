@@ -22,6 +22,7 @@ const provider = new GoogleAuthProvider();
 window.GamRaceAuth = {
   getToken: async () => auth.currentUser ? auth.currentUser.getIdToken() : null,
   getUser: () => auth.currentUser,
+  getProfile: () => currentProfile,
 };
 const googleButtons = [...document.querySelectorAll(".google-auth")];
 const authStatus = document.querySelector("#auth-status");
@@ -145,8 +146,8 @@ function createProfileDialog() {
         <div class="profile-content">
           <section class="profile-section" data-profile-panel="profile">
             <span class="profile-section-label">PUBLIC PROFILE</span><h3>Profile</h3><p class="settings-copy">Control the identity and information other players can see.</p>
-            <article class="profile-identity account-card"><span class="profile-avatar" aria-hidden="true"></span><div><strong class="profile-current-name"></strong><span class="profile-email"></span><small class="profile-join-date">Member since —</small></div><span class="profile-inline-rank">Rookie I</span></article>
-            <div class="account-grid two-column"><article class="account-card"><div class="account-card-heading"><div><span class="section-kicker">PUBLIC PROFILE</span><h4>Player identity</h4></div></div><div class="account-data-list"><div><span>Avatar</span><strong>Initial avatar</strong></div><div><span>Username</span><strong class="profile-data-username">—</strong></div><div><span>Display name</span><strong class="profile-display-name">—</strong></div><div><span>Bio</span><strong>Not set</strong></div><div><span>Profile URL</span><strong class="profile-url">gamrace.com/u/—</strong></div></div></article><article class="account-card visibility-card"><div class="account-card-heading"><div><span class="section-kicker">VISIBILITY</span><h4>Profile visibility</h4></div></div>${PROFILE_VISIBILITY_OPTIONS.map((option) => toggleMarkup(option, preferences[option.id])).join("")}</article></div>
+            <article class="profile-identity account-card"><span class="profile-avatar" aria-hidden="true"><img alt="" /></span><div><strong class="profile-current-name"></strong><span class="profile-email"></span><small class="profile-join-date">Member since —</small></div><span class="profile-inline-rank">Rookie I</span></article>
+            <div class="account-grid two-column"><article class="account-card"><div class="account-card-heading"><div><span class="section-kicker">PUBLIC PROFILE</span><h4>Player identity</h4></div></div><div class="account-data-list"><div><span>Avatar</span><strong class="profile-avatar-label">GamRace flag</strong></div><div><span>Username</span><strong class="profile-data-username">—</strong></div><div><span>Display name</span><strong class="profile-display-name">—</strong></div><div><span>Bio</span><strong>Not set</strong></div><div><span>Profile URL</span><strong class="profile-url">gamrace.com/u/—</strong></div></div></article><article class="account-card visibility-card"><div class="account-card-heading"><div><span class="section-kicker">VISIBILITY</span><h4>Profile visibility</h4></div></div>${PROFILE_VISIBILITY_OPTIONS.map((option) => toggleMarkup(option, preferences[option.id])).join("")}</article></div>
           </section>
 
           <section class="profile-section" data-profile-panel="vip" hidden>
@@ -176,7 +177,7 @@ function createProfileDialog() {
           <section class="profile-section settings-section" data-profile-panel="settings" hidden>
             <span class="profile-section-label">SETTINGS</span><h3>Account settings</h3><p class="settings-copy">Manage your account, security, privacy, and play controls.</p>
             <div class="settings-layout"><nav class="settings-navigation" aria-label="Settings sections">${settingsNavigationMarkup()}</nav><div class="settings-panels">
-              <section data-settings-panel="account"><div class="account-card-heading"><div><span class="section-kicker">ACCOUNT</span><h4>Account details</h4></div></div><form class="username-form account-form-grid"><label><span>Email</span><input class="settings-email" type="email" disabled /></label><label><span>Username</span><input id="profile-username" name="username" type="text" minlength="3" maxlength="20" autocomplete="off" spellcheck="false" required /></label><label><span>Display name</span><input class="settings-display-name" type="text" disabled /></label><p class="username-help">Your username can be changed once.</p><button class="auth-submit username-save" type="submit">Save username</button><p class="profile-status" role="status" aria-live="polite"></p></form></section>
+              <section data-settings-panel="account"><div class="account-card-heading"><div><span class="section-kicker">ACCOUNT</span><h4>Account details</h4></div></div><div class="profile-avatar-uploader"><span class="settings-avatar-preview profile-avatar" aria-hidden="true"><img alt="" /></span><div><strong>Profile picture</strong><small>Square JPG, PNG or WebP. Your image is cropped and optimised before upload.</small><button class="account-outline-button avatar-upload-button" type="button">Upload picture</button><input class="avatar-file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden /><p class="avatar-upload-status" role="status" aria-live="polite"></p></div></div><form class="username-form account-form-grid"><label><span>Email</span><input class="settings-email" type="email" disabled /></label><label><span>Username</span><input id="profile-username" name="username" type="text" minlength="3" maxlength="20" autocomplete="off" spellcheck="false" required /></label><label><span>Display name</span><input class="settings-display-name" type="text" disabled /></label><p class="username-help">Your username can be changed once.</p><button class="auth-submit username-save" type="submit">Save username</button><p class="profile-status" role="status" aria-live="polite"></p></form></section>
               <section data-settings-panel="verification" hidden><div class="account-card-heading"><div><span class="section-kicker">VERIFICATION</span><h4>Personal information</h4></div><span class="status-chip verification-status-chip">NOT COMPLETE</span></div><div class="verification-levels"></div><form class="verification-form account-form-grid"><label><span>Legal first name</span><input name="legalFirstName" maxlength="80" autocomplete="given-name" required /></label><label><span>Legal last name</span><input name="legalLastName" maxlength="80" autocomplete="family-name" required /></label><label><span>Date of birth</span><input name="dateOfBirth" type="date" autocomplete="bday" required /></label><label><span>Country code</span><input name="countryCode" minlength="2" maxlength="2" placeholder="GB" autocomplete="country" required /></label><label class="wide"><span>Address</span><input name="addressLine1" maxlength="120" autocomplete="address-line1" required /></label><label class="wide"><span>Address line 2</span><input name="addressLine2" maxlength="120" autocomplete="address-line2" /></label><label><span>City</span><input name="city" maxlength="80" autocomplete="address-level2" required /></label><label><span>Postal code</span><input name="postalCode" maxlength="24" autocomplete="postal-code" required /></label><label><span>Language</span><select name="language"><option value="en">English</option></select></label><label><span>Display currency</span><select name="displayCurrency"><option>USD</option><option>GBP</option><option>EUR</option></select></label><label class="wide"><span>Timezone</span><input name="timezone" maxlength="80" required /></label><button class="auth-submit verification-save" type="submit">Save Level 1 information</button><p class="verification-form-status" role="status" aria-live="polite"></p></form><p class="service-note">Level 1 is based on your saved information. Government-document approval will only be offered after a licensed KYC provider is connected.</p></section>
               <section data-settings-panel="security" hidden><div class="account-card-heading"><div><span class="section-kicker">SECURITY</span><h4>Security controls</h4></div><span class="status-chip security-status-chip">LIVE STATUS</span></div><div class="security-list security-live-status"></div>${toggleMarkup({ id: "loginAlerts", label: "New sign-in alerts", detail: "Keep a live preference for alerts when a new device signs in." }, preferences.loginAlerts)}${toggleMarkup({ id: "withdrawalConfirmation", label: "Withdrawal confirmation", detail: "Require confirmation prompts for withdrawal requests." }, preferences.withdrawalConfirmation)}</section>
               <section data-settings-panel="sessions" hidden><div class="account-card-heading"><div><span class="section-kicker">SESSIONS & DEVICES</span><h4>Recent sessions</h4></div><button class="account-outline-button session-refresh" type="button">Refresh</button></div><div class="session-list"></div></section>
@@ -192,7 +193,7 @@ function createProfileDialog() {
     </section>`;
   document.body.append(overlay);
   return {
-    overlay, close: overlay.querySelector(".profile-close"), tabs: [...overlay.querySelectorAll("[data-profile-section]")], panels: [...overlay.querySelectorAll("[data-profile-panel]")], settingsTabs: [...overlay.querySelectorAll("[data-settings-section]")], settingsPanels: [...overlay.querySelectorAll("[data-settings-panel]")], activityTabs: [...overlay.querySelectorAll("[data-activity-tab]")], activityPanels: [...overlay.querySelectorAll("[data-activity-panel]")], currentName: overlay.querySelector(".profile-current-name"), email: overlay.querySelector(".profile-email"), avatar: overlay.querySelector(".profile-avatar"), joinDate: overlay.querySelector(".profile-join-date"), inlineRank: overlay.querySelector(".profile-inline-rank"), dataUsername: overlay.querySelector(".profile-data-username"), displayName: overlay.querySelector(".profile-display-name"), profileUrl: overlay.querySelector(".profile-url"), settingsEmail: overlay.querySelector(".settings-email"), settingsDisplayName: overlay.querySelector(".settings-display-name"), rankBadge: overlay.querySelector(".rank-badge"), rankBadgeImage: overlay.querySelector(".rank-badge-image"), rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"), rankBadgeTier: overlay.querySelector(".rank-badge-tier"), rankName: overlay.querySelector(".rank-name"), rankSubtitle: overlay.querySelector(".rank-subtitle"), rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")], rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"), rankProgressValues: overlay.querySelector(".rank-progress-values"), rankNext: overlay.querySelector(".rank-next"), rankProgressTrack: overlay.querySelector(".rank-progress-track"), rankProgressFill: overlay.querySelector(".rank-progress-fill"), form: overlay.querySelector(".username-form"), input: overlay.querySelector("#profile-username"), help: overlay.querySelector(".username-help"), save: overlay.querySelector(".username-save"), status: overlay.querySelector(".profile-status"), verificationLevels: overlay.querySelector(".verification-levels"), verificationForm: overlay.querySelector(".verification-form"), verificationStatus: overlay.querySelector(".verification-form-status"), verificationChip: overlay.querySelector(".verification-status-chip"), securityStatus: overlay.querySelector(".security-live-status"), sessionList: overlay.querySelector(".session-list"), sessionRefresh: overlay.querySelector(".session-refresh"), statisticsGrid: overlay.querySelector(".statistics-grid"), betsTableBody: overlay.querySelector(".account-table-body"), pagePrevious: overlay.querySelector(".account-page-previous"), pageNext: overlay.querySelector(".account-page-next"), pageSelect: overlay.querySelector(".account-page-select"), pageTotal: overlay.querySelector(".account-page-total"), promoForm: overlay.querySelector(".promo-redeem-form"), promoInput: overlay.querySelector(".promo-code-input"), promoStatus: overlay.querySelector(".promo-redeem-status"), referralLink: overlay.querySelector(".referral-link"), preferenceInputs: [...overlay.querySelectorAll("[data-preference]")],
+    overlay, close: overlay.querySelector(".profile-close"), tabs: [...overlay.querySelectorAll("[data-profile-section]")], panels: [...overlay.querySelectorAll("[data-profile-panel]")], settingsTabs: [...overlay.querySelectorAll("[data-settings-section]")], settingsPanels: [...overlay.querySelectorAll("[data-settings-panel]")], activityTabs: [...overlay.querySelectorAll("[data-activity-tab]")], activityPanels: [...overlay.querySelectorAll("[data-activity-panel]")], currentName: overlay.querySelector(".profile-current-name"), email: overlay.querySelector(".profile-email"), avatar: overlay.querySelector(".profile-identity .profile-avatar"), avatarPreview: overlay.querySelector(".settings-avatar-preview"), avatarLabel: overlay.querySelector(".profile-avatar-label"), avatarInput: overlay.querySelector(".avatar-file-input"), avatarButton: overlay.querySelector(".avatar-upload-button"), avatarStatus: overlay.querySelector(".avatar-upload-status"), joinDate: overlay.querySelector(".profile-join-date"), inlineRank: overlay.querySelector(".profile-inline-rank"), dataUsername: overlay.querySelector(".profile-data-username"), displayName: overlay.querySelector(".profile-display-name"), profileUrl: overlay.querySelector(".profile-url"), settingsEmail: overlay.querySelector(".settings-email"), settingsDisplayName: overlay.querySelector(".settings-display-name"), rankBadge: overlay.querySelector(".rank-badge"), rankBadgeImage: overlay.querySelector(".rank-badge-image"), rankBadgeFallback: overlay.querySelector(".rank-badge-fallback"), rankBadgeTier: overlay.querySelector(".rank-badge-tier"), rankName: overlay.querySelector(".rank-name"), rankSubtitle: overlay.querySelector(".rank-subtitle"), rankTierIndicators: [...overlay.querySelectorAll("[data-rank-tier]")], rankLifetimeWager: overlay.querySelector(".rank-lifetime-wager"), rankProgressValues: overlay.querySelector(".rank-progress-values"), rankNext: overlay.querySelector(".rank-next"), rankProgressTrack: overlay.querySelector(".rank-progress-track"), rankProgressFill: overlay.querySelector(".rank-progress-fill"), form: overlay.querySelector(".username-form"), input: overlay.querySelector("#profile-username"), help: overlay.querySelector(".username-help"), save: overlay.querySelector(".username-save"), status: overlay.querySelector(".profile-status"), verificationLevels: overlay.querySelector(".verification-levels"), verificationForm: overlay.querySelector(".verification-form"), verificationStatus: overlay.querySelector(".verification-form-status"), verificationChip: overlay.querySelector(".verification-status-chip"), securityStatus: overlay.querySelector(".security-live-status"), sessionList: overlay.querySelector(".session-list"), sessionRefresh: overlay.querySelector(".session-refresh"), statisticsGrid: overlay.querySelector(".statistics-grid"), betsTableBody: overlay.querySelector(".account-table-body"), pagePrevious: overlay.querySelector(".account-page-previous"), pageNext: overlay.querySelector(".account-page-next"), pageSelect: overlay.querySelector(".account-page-select"), pageTotal: overlay.querySelector(".account-page-total"), promoForm: overlay.querySelector(".promo-redeem-form"), promoInput: overlay.querySelector(".promo-code-input"), promoStatus: overlay.querySelector(".promo-redeem-status"), referralLink: overlay.querySelector(".referral-link"), preferenceInputs: [...overlay.querySelectorAll("[data-preference]")],
   };
 }
 
@@ -241,13 +242,42 @@ function renderRank(source) {
   accountMenu.rankValues.textContent = progressValues;
   accountMenu.rankNext.textContent = nextLabel;
   accountMenu.rankFill.style.width = `${stats.percentage}%`;
-  const headerMark = profileButton?.querySelector(".profile-rank-mark");
-  const headerImage = profileButton?.querySelector(".profile-rank-image");
-  const headerFallback = profileButton?.querySelector(".profile-rank-fallback");
-  loadRankBadge(headerMark, headerImage, rankDefinition.badgePath);
-  if (headerFallback) headerFallback.textContent = fallback;
-  window.GamRaceShellState?.write({ signedIn: true, rankBadgePath: rankDefinition.badgePath, rankFallback: fallback });
   profileDialog.inlineRank.textContent = rankDefinition.label;
+}
+
+function fallbackAvatarColor(uid = auth.currentUser?.uid || "racer") {
+  const colors = ["#168bff", "#15c7d9", "#8b5cf6", "#e95393", "#f28b35", "#35b779", "#526dff", "#c557e8"];
+  let hash = 2166136261;
+  for (const character of String(uid)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function paintAvatar(container, avatar = null) {
+  if (!container) return;
+  const image = container.querySelector("img");
+  const color = avatar?.color || fallbackAvatarColor();
+  container.style.setProperty("--avatar-color", color);
+  container.classList.toggle("has-image", Boolean(avatar?.url));
+  if (!image) return;
+  image.classList.remove("custom", "fallback");
+  image.classList.add(avatar?.url ? "custom" : "fallback");
+  image.src = avatar?.url || "assets/brand/gamrace-icon.png";
+  image.onerror = () => {
+    image.onerror = null;
+    image.src = "assets/brand/gamrace-icon.png";
+    image.classList.remove("custom");
+    image.classList.add("fallback");
+    container.classList.remove("has-image");
+  };
+}
+
+function renderAvatar(avatar = currentProfile?.avatar || null) {
+  const normalized = avatar || { url: null, color: fallbackAvatarColor(), custom: false };
+  paintAvatar(profileButton?.querySelector(".profile-rank-mark"), normalized);
+  paintAvatar(profileDialog.avatar, normalized);
+  paintAvatar(profileDialog.avatarPreview, normalized);
+  if (profileDialog.avatarLabel) profileDialog.avatarLabel.textContent = normalized.custom ? "Custom profile picture" : "GamRace flag";
+  window.GamRaceShellState?.write({ signedIn: true, avatarUrl: normalized.url || null, avatarColor: normalized.color });
 }
 
 function loadRankBadge(container, image, path) {
@@ -369,8 +399,9 @@ async function refreshLiveAccountData({ compact = false } = {}) {
   if (auth.currentUser?.uid !== user.uid) return;
   accountSnapshot = { ...accountSnapshot, ...snapshot, summary: snapshot.summary || {}, activity: snapshot.activity || accountSnapshot.activity || [] };
   preferences = profileServices.preferences.save({ ...preferences, ...(snapshot.preferences || {}) });
-  currentProfile = { ...currentProfile, ...accountSnapshot.summary };
+  currentProfile = { ...currentProfile, ...accountSnapshot.summary, avatar: snapshot.avatar || currentProfile.avatar };
   renderRank(currentProfile);
+  renderAvatar(currentProfile.avatar);
   renderAccountSummary(accountSnapshot.summary);
   if (!compact) {
     renderAccountDetails(snapshot);
@@ -393,7 +424,7 @@ function refreshProfileDialog() {
   profileDialog.input.value = username;
   profileDialog.currentName.textContent = username;
   profileDialog.email.textContent = email;
-  profileDialog.avatar.textContent = username.charAt(0).toUpperCase();
+  renderAvatar(currentProfile.avatar);
   profileDialog.joinDate.textContent = profileCreatedDate(currentProfile);
   profileDialog.dataUsername.textContent = username;
   profileDialog.displayName.textContent = auth.currentUser?.displayName || username;
@@ -408,7 +439,7 @@ function refreshProfileDialog() {
   profileDialog.preferenceInputs.forEach((input) => { input.checked = Boolean(preferences[input.dataset.preference]); });
   const label = profileButton?.querySelector(".profile-label");
   if (label) label.textContent = username;
-  window.GamRaceShellState?.write({ signedIn: true, username });
+  window.GamRaceShellState?.write({ signedIn: true, username, avatarUrl: currentProfile.avatar?.url || null, avatarColor: currentProfile.avatar?.color || fallbackAvatarColor() });
   renderRank(currentProfile);
 }
 
@@ -503,6 +534,41 @@ async function changeUsername(user, requestedUsername) {
   return updatedProfile;
 }
 
+async function imageSourceFromFile(file) {
+  if ("createImageBitmap" in window) return createImageBitmap(file, { imageOrientation: "from-image" });
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return image;
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+}
+
+async function resizeAvatarFile(file) {
+  if (!file || !/^image\/(?:png|jpeg|webp)$/.test(file.type)) throw new Error("Choose a PNG, JPG or WebP profile picture.");
+  if (file.size > 10_000_000) throw new Error("Choose an image smaller than 10 MB.");
+  const source = await imageSourceFromFile(file);
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d", { alpha: false });
+  const sourceWidth = source.width || source.naturalWidth;
+  const sourceHeight = source.height || source.naturalHeight;
+  const cropSize = Math.min(sourceWidth, sourceHeight);
+  context.fillStyle = "#101318";
+  context.fillRect(0, 0, size, size);
+  context.drawImage(source, (sourceWidth - cropSize) / 2, (sourceHeight - cropSize) / 2, cropSize, cropSize, 0, 0, size, size);
+  source.close?.();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.78));
+  if (!blob) throw new Error("That image could not be prepared. Try a different file.");
+  if (blob.size > 180_000) throw new Error("That image is still too large after resizing. Try a simpler image.");
+  return blob;
+}
+
 function signedInLabel(user) { return currentProfile?.username || user?.displayName?.trim()?.split(/\s+/)[0] || "Account"; }
 
 function provisionalProfile(user) {
@@ -519,7 +585,9 @@ function renderUser(user) {
   headerRegister.textContent = "Sign Up";
   profileButton?.setAttribute("aria-label", signedIn ? `Account menu for ${signedInLabel(user)}` : "Account menu");
   if (signedIn) {
-    window.GamRaceShellState?.write({ signedIn: true, username: signedInLabel(user) });
+    const avatar = currentProfile?.avatar || { url: null, color: fallbackAvatarColor(user.uid), custom: false };
+    window.GamRaceShellState?.write({ signedIn: true, username: signedInLabel(user), avatarUrl: avatar.url || null, avatarColor: avatar.color });
+    renderAvatar(avatar);
     if (authModal) authModal.hidden = true;
     if (profileDialog.overlay.hidden) document.body.classList.remove("modal-open");
     setStatus();
@@ -559,8 +627,6 @@ profileDialog.rankBadgeImage.addEventListener("load", () => profileDialog.rankBa
 profileDialog.rankBadgeImage.addEventListener("error", () => profileDialog.rankBadge.classList.remove("has-image"));
 accountMenu.rankImage.addEventListener("load", () => accountMenu.rankBadge.classList.add("has-image"));
 accountMenu.rankImage.addEventListener("error", () => accountMenu.rankBadge.classList.remove("has-image"));
-profileButton?.querySelector(".profile-rank-image")?.addEventListener("load", () => profileButton.querySelector(".profile-rank-mark")?.classList.add("has-image"));
-profileButton?.querySelector(".profile-rank-image")?.addEventListener("error", () => profileButton.querySelector(".profile-rank-mark")?.classList.remove("has-image"));
 googleButtons.forEach((button) => button.addEventListener("click", continueWithGoogle));
 document.querySelectorAll('a[href$="#promotions"]').forEach((link) => link.addEventListener("click", (event) => {
   event.preventDefault();
@@ -607,6 +673,40 @@ profileDialog.preferenceInputs.forEach((input) => input.addEventListener("change
     setProfileStatus("That setting is saved on this device and will sync when the service reconnects.", "error");
   }
 }));
+profileDialog.avatarButton.addEventListener("click", () => profileDialog.avatarInput.click());
+profileDialog.avatarInput.addEventListener("change", async () => {
+  const [file] = profileDialog.avatarInput.files || [];
+  if (!file || !auth.currentUser) return;
+  profileDialog.avatarButton.disabled = true;
+  profileDialog.avatarButton.textContent = "Preparing…";
+  profileDialog.avatarStatus.textContent = "Cropping and optimising your picture…";
+  delete profileDialog.avatarStatus.dataset.state;
+  try {
+    const blob = await resizeAvatarFile(file);
+    const token = await auth.currentUser.getIdToken();
+    profileDialog.avatarButton.textContent = "Uploading…";
+    const response = await fetch(`${WALLET_API_BASE_URL}/profile/avatar`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": blob.type },
+      body: blob,
+      cache: "no-store",
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "Your profile picture could not be uploaded");
+    currentProfile = { ...currentProfile, avatar: body.avatar };
+    renderAvatar(body.avatar);
+    profileDialog.avatarStatus.textContent = "Profile picture updated everywhere on GamRace.";
+    profileDialog.avatarStatus.dataset.state = "success";
+    window.dispatchEvent(new CustomEvent("gamrace:avatar-updated", { detail: body.avatar }));
+  } catch (error) {
+    profileDialog.avatarStatus.textContent = error.message;
+    profileDialog.avatarStatus.dataset.state = "error";
+  } finally {
+    profileDialog.avatarInput.value = "";
+    profileDialog.avatarButton.disabled = false;
+    profileDialog.avatarButton.textContent = "Upload picture";
+  }
+});
 profileDialog.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!auth.currentUser || !currentProfile || profileBusy) return;

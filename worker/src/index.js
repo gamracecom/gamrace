@@ -162,6 +162,46 @@ function json(request, env, status, body) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders(request, env) });
 }
 
+const AVATAR_COLORS = Object.freeze(["#168bff", "#15c7d9", "#8b5cf6", "#e95393", "#f28b35", "#35b779", "#526dff", "#c557e8"]);
+
+function avatarColor(uid) {
+  let hash = 2166136261;
+  for (const character of String(uid || "racer")) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function avatarUrl(request, publicId, hasImage = true, version = null) {
+  return publicId && hasImage ? `${new URL(request.url).origin}/avatars/${encodeURIComponent(publicId)}${version ? `?v=${encodeURIComponent(version)}` : ""}` : null;
+}
+
+async function ensurePlayerAvatar(env, uid) {
+  let row = await env.DB.prepare("SELECT public_id, mime_type, image_base64, updated_at FROM player_avatars WHERE uid = ?").bind(uid).first();
+  if (row) return row;
+  const publicId = crypto.randomUUID().replaceAll("-", "");
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO player_avatars(uid, public_id, mime_type, image_base64, updated_at)
+    VALUES(?, ?, NULL, NULL, ?)
+  `).bind(uid, publicId, now()).run();
+  row = await env.DB.prepare("SELECT public_id, mime_type, image_base64, updated_at FROM player_avatars WHERE uid = ?").bind(uid).first();
+  return row || { public_id: publicId, mime_type: null, image_base64: null, updated_at: now() };
+}
+
+function playerAvatarResponse(request, uid, row) {
+  return {
+    url: avatarUrl(request, row?.public_id, Boolean(row?.image_base64), row?.updated_at),
+    color: avatarColor(uid),
+    custom: Boolean(row?.image_base64),
+  };
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 8192, bytes.length)));
+  }
+  return btoa(binary);
+}
+
 async function requestJson(request) {
   const length = Number(request.headers.get("Content-Length") || 0);
   if (length > 65_536) throw httpError(413, "Request is too large");
@@ -1166,15 +1206,17 @@ async function readAccountPreferences(env, uid) {
 
 async function handleAccountSnapshot(request, env, user) {
   const compact = new URL(request.url).searchParams.get("compact") === "1";
-  const [account, preferences, profile] = await Promise.all([
+  const [account, preferences, profile, avatarRow] = await Promise.all([
     liveAccountSnapshot(env, user.sub, { includeActivity: !compact }),
     readAccountPreferences(env, user.sub),
     readAccountProfile(env, user.sub),
+    ensurePlayerAvatar(env, user.sub),
   ]);
   return json(request, env, 200, {
     ...account,
     preferences,
     ...profile,
+    avatar: playerAvatarResponse(request, user.sub, avatarRow),
     security: {
       emailVerified: Boolean(user.email_verified),
       provider: String(user.firebase?.sign_in_provider || "unknown"),
@@ -1182,6 +1224,39 @@ async function handleAccountSnapshot(request, env, user) {
       passkeysAvailable: false,
     },
   });
+}
+
+async function handleProfileAvatar(request, env, user) {
+  const mimeType = String(request.headers.get("Content-Type") || "").split(";")[0].toLowerCase();
+  if (!new Set(["image/webp", "image/jpeg", "image/png"]).has(mimeType)) throw httpError(415, "Choose a PNG, JPG or WebP profile picture");
+  const statedLength = Number(request.headers.get("Content-Length") || 0);
+  if (statedLength > 180_000) throw httpError(413, "Profile pictures must be smaller than 180 KB after resizing");
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length || bytes.length > 180_000) throw httpError(413, "Profile pictures must be smaller than 180 KB after resizing");
+  const isPng = mimeType === "image/png" && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  const isJpeg = mimeType === "image/jpeg" && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const isWebp = mimeType === "image/webp" && String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF" && String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP";
+  if (!isPng && !isJpeg && !isWebp) throw httpError(400, "That profile picture is not a valid image");
+  const avatar = await ensurePlayerAvatar(env, user.sub);
+  const timestamp = now();
+  await env.DB.prepare(`
+    UPDATE player_avatars SET mime_type = ?, image_base64 = ?, updated_at = ? WHERE uid = ?
+  `).bind(mimeType, bytesToBase64(bytes), timestamp, user.sub).run();
+  return json(request, env, 200, { avatar: { url: avatarUrl(request, avatar.public_id, true, timestamp), color: avatarColor(user.sub), custom: true } });
+}
+
+async function handlePublicAvatar(request, env, publicId) {
+  if (!/^[a-f0-9]{32}$/i.test(publicId)) return new Response("Not found", { status: 404 });
+  const row = await env.DB.prepare("SELECT mime_type, image_base64 FROM player_avatars WHERE public_id = ?").bind(publicId).first();
+  if (!row?.image_base64 || !row?.mime_type) return new Response("Not found", { status: 404 });
+  let bytes;
+  try { bytes = Uint8Array.from(atob(String(row.image_base64)), (character) => character.charCodeAt(0)); }
+  catch { return new Response("Not found", { status: 404 }); }
+  return new Response(bytes, { headers: {
+    "Content-Type": String(row.mime_type),
+    "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
+    "X-Content-Type-Options": "nosniff",
+  } });
 }
 
 async function handleAccountPreferences(request, env, user) {
@@ -4701,32 +4776,39 @@ async function readChatMinimumWagerUsdCents(env) {
   return Number.isSafeInteger(value) && value >= 0 ? value : 10_000;
 }
 
-function chatMessageResponse(row) {
+function chatMessageResponse(request, row, viewer = null) {
   return {
     id: row.id,
     username: row.username,
     rankLabel: row.rank_label,
     badgePath: row.badge_path,
+    avatarUrl: avatarUrl(request, row.avatar_public_id, Boolean(row.avatar_has_image), row.avatar_updated_at),
+    avatarColor: avatarColor(row.uid),
     message: row.message,
+    mentionedUsername: row.mentioned_username || null,
+    mentionedMe: Boolean(viewer?.sub && row.mentioned_uid === viewer.sub),
+    mentionable: row.username !== "Hidden Racer",
     createdAt: Number(row.created_at),
   };
 }
 
-async function handleChatMessages(request, env) {
+async function handleChatMessages(request, env, viewer) {
   const url = new URL(request.url);
   const after = Math.max(0, Number(url.searchParams.get("after") || 0));
   const result = after
     ? await env.DB.prepare(`
-        SELECT id, username, rank_label, badge_path, message, created_at
-        FROM chat_messages WHERE deleted_at IS NULL AND created_at > ? ORDER BY created_at ASC LIMIT 100
+        SELECT m.id, m.uid, m.username, m.rank_label, m.badge_path, m.message, m.mentioned_uid, m.mentioned_username, m.created_at,
+          a.public_id AS avatar_public_id, CASE WHEN a.image_base64 IS NULL THEN 0 ELSE 1 END AS avatar_has_image, a.updated_at AS avatar_updated_at
+        FROM chat_messages m LEFT JOIN player_avatars a ON a.uid = m.uid
+        WHERE m.deleted_at IS NULL AND m.created_at > ? ORDER BY m.created_at ASC LIMIT 100
       `).bind(after).all()
     : await env.DB.prepare(`
-        SELECT id, username, rank_label, badge_path, message, created_at
-        FROM (SELECT id, username, rank_label, badge_path, message, created_at
-          FROM chat_messages WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100)
-        ORDER BY created_at ASC
+        SELECT recent.*, a.public_id AS avatar_public_id, CASE WHEN a.image_base64 IS NULL THEN 0 ELSE 1 END AS avatar_has_image, a.updated_at AS avatar_updated_at
+        FROM (SELECT id, uid, username, rank_label, badge_path, message, mentioned_uid, mentioned_username, created_at
+          FROM chat_messages WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100) recent
+        LEFT JOIN player_avatars a ON a.uid = recent.uid ORDER BY recent.created_at ASC
       `).all();
-  return json(request, env, 200, { messages: (result.results || []).map(chatMessageResponse), generatedAt: now() });
+  return json(request, env, 200, { messages: (result.results || []).map((row) => chatMessageResponse(request, row, viewer)), generatedAt: now() });
 }
 
 async function chatAccessSnapshot(env, user) {
@@ -4760,12 +4842,21 @@ async function handleSendChatMessage(request, env, user) {
   const profile = await env.DB.prepare("SELECT username, show_username FROM player_profiles WHERE uid = ?").bind(user.sub).first();
   const rank = leaderboardRank(access.wagerUsdCents / 100);
   const username = Boolean(profile?.show_username ?? 1) ? String(profile?.username || user.name || "Racer") : "Hidden Racer";
+  const mentionMatch = message.match(/(?:^|\s)@([A-Za-z][A-Za-z0-9_]{2,19})\b/);
+  const mentionedProfile = mentionMatch
+    ? await env.DB.prepare("SELECT uid, username FROM player_profiles WHERE username = ? COLLATE NOCASE AND show_username = 1 LIMIT 1").bind(mentionMatch[1]).first()
+    : null;
+  const avatar = await ensurePlayerAvatar(env, user.sub);
   const id = `chat_${crypto.randomUUID()}`;
   await env.DB.prepare(`
-    INSERT INTO chat_messages(id, uid, username, rank_label, badge_path, message, created_at)
-    VALUES(?, ?, ?, ?, ?, ?, ?)
-  `).bind(id, user.sub, username, rank.label, rank.badgePath, message, timestamp).run();
-  return json(request, env, 201, { message: chatMessageResponse({ id, username, rank_label: rank.label, badge_path: rank.badgePath, message, created_at: timestamp }) });
+    INSERT INTO chat_messages(id, uid, username, rank_label, badge_path, message, mentioned_uid, mentioned_username, created_at)
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(id, user.sub, username, rank.label, rank.badgePath, message, mentionedProfile?.uid || null, mentionedProfile?.username || null, timestamp).run();
+  return json(request, env, 201, { message: chatMessageResponse(request, {
+    id, uid: user.sub, username, rank_label: rank.label, badge_path: rank.badgePath, message,
+    mentioned_uid: mentionedProfile?.uid || null, mentioned_username: mentionedProfile?.username || null,
+    avatar_public_id: avatar.public_id, avatar_has_image: Boolean(avatar.image_base64), avatar_updated_at: avatar.updated_at, created_at: timestamp,
+  }, user) });
 }
 
 async function handleAdminChatSettings(request, env, user) {
@@ -5514,7 +5605,9 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/health") return json(request, env, 200, { ok: true, provider: "oxapay", mode: "live" });
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
   if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env, await optionalUser(request, env));
-  if (request.method === "GET" && path === "/chat/messages") return handleChatMessages(request, env);
+  if (request.method === "GET" && path === "/chat/messages") return handleChatMessages(request, env, await optionalUser(request, env));
+  const publicAvatarMatch = path.match(/^\/avatars\/([a-f0-9]{32})$/i);
+  if (request.method === "GET" && publicAvatarMatch) return handlePublicAvatar(request, env, publicAvatarMatch[1]);
   if (request.method === "GET" && path === "/games/settings") return handleGameSettings(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/deposit") return handleDepositWebhook(request, env);
   if (request.method === "POST" && path === "/webhooks/oxapay/payout") return handlePayoutWebhook(request, env);
@@ -5563,6 +5656,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/account/preferences") return handleAccountPreferences(request, env, user);
   if (request.method === "POST" && path === "/promotions/claim") return handlePromotionClaim(request, env, user);
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
+  if (request.method === "POST" && path === "/profile/avatar") return handleProfileAvatar(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);
   if (request.method === "POST" && NEW_GAME_BET_PATHS[path]) await requireGameAvailable(env, NEW_GAME_BET_PATHS[path]);

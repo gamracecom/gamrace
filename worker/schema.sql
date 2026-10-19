@@ -205,6 +205,15 @@ CREATE TABLE IF NOT EXISTS player_profiles (
 );
 CREATE INDEX IF NOT EXISTS player_profiles_username_idx ON player_profiles(username COLLATE NOCASE);
 
+CREATE TABLE IF NOT EXISTS player_avatars (
+  uid TEXT PRIMARY KEY,
+  public_id TEXT NOT NULL UNIQUE,
+  mime_type TEXT,
+  image_base64 TEXT,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS player_avatars_public_id_idx ON player_avatars(public_id);
+
 CREATE TABLE IF NOT EXISTS player_preferences (
   uid TEXT PRIMARY KEY,
   preferences_json TEXT NOT NULL DEFAULT '{}',
@@ -478,6 +487,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   rank_label TEXT NOT NULL,
   badge_path TEXT NOT NULL,
   message TEXT NOT NULL,
+  mentioned_uid TEXT,
+  mentioned_username TEXT,
   created_at INTEGER NOT NULL,
   deleted_at INTEGER
 );

@@ -64,4 +64,8 @@ test("leaderboard settlements and shared chat are persisted and duplicate safe",
   assert.ok(payoutIndexes.some((index) => index.unique === 1));
   assert.equal(database.prepare("SELECT value_text FROM site_settings WHERE setting_key = 'chat_minimum_wager_usd_cents'").get().value_text, "10000");
   assert.ok(database.prepare("PRAGMA table_info(chat_messages)").all().some((column) => column.name === "message"));
+  assert.ok(database.prepare("PRAGMA table_info(chat_messages)").all().some((column) => column.name === "mentioned_uid"));
+  assert.ok(database.prepare("PRAGMA table_info(player_avatars)").all().some((column) => column.name === "public_id"));
+  assert.match(worker, /path === "\/profile\/avatar"/);
+  assert.match(worker, /mentionedMe/);
 });
