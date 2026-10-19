@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/fireba
 import { browserLocalPersistence, getAuth, GoogleAuthProvider, onAuthStateChanged, setPersistence, signInWithPopup, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getPlayerRankStats } from "./player-rank-service.js?v=rank-badges-2";
-import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS } from "./profile-config.js";
+import { ACTIVITY_TABS, NOTIFICATION_GROUPS, PROFILE_MENU, PROFILE_VISIBILITY_OPTIONS, RESPONSIBLE_PLAY_CONTROLS, SETTINGS_SECTIONS } from "./profile-config.js?v=rewards-page-2";
 import { profileServices } from "./profile-services.js?v=account-live-2";
 
 const firebaseConfig = {
