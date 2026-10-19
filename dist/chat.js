@@ -28,8 +28,8 @@
     <div class="live-chat-messages" data-chat-messages role="log" aria-live="polite"></div>
     <div class="live-chat-gate" data-chat-gate role="status"></div>
     <form class="live-chat-form" data-chat-form>
-      <input type="text" maxlength="240" autocomplete="off" placeholder="Start typing…" aria-label="Chat message" />
-      <button type="submit" class="live-chat-send" aria-label="Send message">${sendIcon}</button>
+      <input type="text" maxlength="240" autocomplete="off" placeholder="Chat wager requirement" aria-label="Chat message" disabled />
+      <button type="submit" class="live-chat-send" aria-label="Send message" disabled>${sendIcon}</button>
     </form>`;
   document.body.append(launcher, panel);
 
@@ -137,13 +137,41 @@
     messagesRoot.dataset.initialized = "true";
   }
 
+  function lockComposer(placeholder) {
+    form.hidden = false;
+    input.value = "";
+    input.disabled = true;
+    send.disabled = true;
+    input.placeholder = placeholder;
+  }
+
+  function unlockComposer() {
+    form.hidden = false;
+    input.disabled = false;
+    send.disabled = false;
+    input.placeholder = "Start typing…";
+  }
+
   function renderAccess() {
     const signedIn = Boolean(window.GamRaceAuth?.getUser?.());
-    if (!signedIn) { gate.textContent = "Sign in to join the conversation. Everyone can still read chat."; form.hidden = true; return; }
-    if (!access) { gate.textContent = "Checking chat access…"; form.hidden = true; return; }
-    if (!access.canSend) { gate.textContent = `Wager ${money(access.remainingUsdCents)} more to unlock chat.`; form.hidden = true; return; }
+    delete gate.dataset.state;
+    if (!signedIn) {
+      gate.textContent = "Everyone can read the chat.";
+      lockComposer("Sign in to chat");
+      return;
+    }
+    if (!access) {
+      gate.textContent = "";
+      lockComposer("Chat wager requirement");
+      return;
+    }
+    if (!access.canSend) {
+      gate.textContent = "";
+      lockComposer(`Requirement to chat: ${money(access.minimumWagerUsdCents)} wager`);
+      return;
+    }
     gate.textContent = "";
-    form.hidden = false;
+    unlockComposer();
   }
 
   async function loadAccess() {
@@ -173,7 +201,7 @@
       renderAccess();
       await Promise.allSettled([refresh(), loadAccess()]);
       pollingTimer = window.setInterval(refresh, 2_500);
-      if (!form.hidden) input.focus({ preventScroll: true });
+      if (!input.disabled) input.focus({ preventScroll: true });
     }
     emitState();
   }
@@ -199,7 +227,7 @@
       await refresh();
       input.focus({ preventScroll: true });
     } catch (error) { gate.textContent = error.message; gate.dataset.state = "error"; }
-    finally { send.disabled = false; }
+    finally { send.disabled = !access?.canSend; }
   });
 
   window.addEventListener("gamrace:auth-state", () => { access = null; if (open) Promise.allSettled([loadAccess(), refresh()]); });

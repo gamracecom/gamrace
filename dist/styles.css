@@ -6,8 +6,9 @@
   --line: #2c313a;
   --muted: #9299a5;
   --text: #f4f6f8;
-  --cyan: #249cff;
-  --blue: #168cf2;
+  --brand-blue: #168bff;
+  --cyan: var(--brand-blue);
+  --blue: var(--brand-blue);
   --yellow: #ffca32;
   --icon-white-filter: brightness(0) saturate(100%) invert(100%);
   --icon-blue-filter: brightness(0) saturate(100%) invert(69%) sepia(83%) saturate(1351%) hue-rotate(158deg) brightness(105%) contrast(102%);
@@ -3479,12 +3480,19 @@ body,
 }
 .leaderboard-banner::after{
   z-index:1;
-  inset:auto -7% -25% 38%;
-  height:76%;
-  opacity:1;
-  background:linear-gradient(105deg,#026cff 0%,#08b7ff 55%,#5ce7ff 100%);
-  clip-path:polygon(12% 28%,100% 0,91% 100%,0 100%);
-  transform:none;
+  inset:auto 22px 17px auto;
+  width:136px;
+  height:68px;
+  opacity:.68;
+  background:
+    radial-gradient(circle at 9px 10px,rgba(255,255,255,.86) 0 2px,transparent 2.7px),
+    radial-gradient(circle at 23px 22px,rgba(118,224,255,.9) 0 1.7px,transparent 2.5px),
+    linear-gradient(105deg,transparent 0 45%,rgba(255,255,255,.52) 46% 47%,transparent 48% 100%);
+  background-size:34px 30px,38px 34px,58px 44px;
+  clip-path:none;
+  transform:skewX(-10deg);
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 28%,#000 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 28%,#000 100%);
 }
 .leaderboard-slide[data-leaderboard-cadence="biweekly"]{background:linear-gradient(110deg,rgba(77,36,211,.2),rgba(112,69,255,.44))}
 .leaderboard-copy{z-index:4}
@@ -3521,8 +3529,74 @@ body,
   .leaderboard-copy{width:64%}
   .leaderboard-scene{inset:0 0 0 43%}
   .leaderboard-flag-art{right:-34%;bottom:-20%;width:205%;height:127%}
-  .leaderboard-banner::after{inset:auto -15% -18% 35%;height:67%}
+  .leaderboard-banner::after{inset:auto 8px 10px auto;width:92px;height:52px;opacity:.58}
   .hero-house::before{background:linear-gradient(90deg,#087ce9 0%,rgba(7,110,220,.9) 55%,rgba(4,36,69,.1) 100%)}
   .hero-player::before{background:linear-gradient(90deg,#7141e6 0%,rgba(92,48,205,.9) 55%,rgba(43,20,83,.1) 100%)}
 }
 @media(prefers-reduced-motion:reduce){.leaderboard-flag-art{animation:none!important}}
+
+/* One vivid GamRace blue across interactive highlights. */
+.utility.wallet,
+.auth.register,
+.auth-submit,
+.wallet-primary,
+.mines-primary-button,
+.dice-primary-button,
+.plinko-primary-button,
+.keno-primary-button,
+.wheel-primary-button,
+.hilo-primary-button,
+.coinflip-primary,
+.crash-primary:not(.is-cashout),
+.blackjack-primary,
+.towers-primary:not(.cashout),
+.moles-primary:not(.cashout),
+.limbo-primary,
+.stack-primary,
+.chat-launcher,
+.live-chat-form .live-chat-send,
+.transaction-tab.active,
+.leaderboard-page .leaderboard-period-tabs button.active,
+.leaderboard-page .race-cadence-tabs button.active{
+  border-color:var(--brand-blue)!important;
+  background:var(--brand-blue)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+.utility.wallet:hover,
+.auth.register:hover,
+.auth-submit:hover,
+.wallet-primary:hover,
+.mines-primary-button:hover:not(:disabled),
+.dice-primary-button:hover:not(:disabled),
+.plinko-primary-button:hover:not(:disabled),
+.keno-primary-button:hover:not(:disabled),
+.wheel-primary-button:hover:not(:disabled),
+.hilo-primary-button:hover:not(:disabled),
+.coinflip-primary:hover:not(:disabled),
+.crash-primary:not(.is-cashout):hover:not(:disabled),
+.blackjack-primary:hover:not(:disabled),
+.towers-primary:not(.cashout):hover:not(:disabled),
+.moles-primary:not(.cashout):hover:not(:disabled),
+.limbo-primary:hover:not(:disabled),
+.stack-primary:hover:not(:disabled),
+.chat-launcher:hover,
+.live-chat-form .live-chat-send:hover:not(:disabled){
+  border-color:#2b9aff!important;
+  background:#2b9aff!important;
+  filter:none!important;
+}
+.live-chat-form input:disabled{
+  color:#9ecfff;
+  opacity:1;
+  -webkit-text-fill-color:#9ecfff;
+  cursor:not-allowed;
+}
+.live-chat-form input:disabled::placeholder{color:#9ecfff;opacity:1}
+.live-chat-form .live-chat-send:disabled{
+  border-color:#2a333d!important;
+  background:#242c35!important;
+  color:#657483!important;
+  opacity:1;
+  cursor:not-allowed;
+}
