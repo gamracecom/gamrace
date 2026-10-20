@@ -46,8 +46,8 @@ let depositPollTimer = null;
 const depositRequestIds = new Map();
 const depositCache = new Map();
 const depositLoadPromises = new Map();
-const allowedAssetsByContext = { deposit: [], withdraw: [] };
-const rememberedNetworkByContext = { deposit: new Map(), withdraw: new Map() };
+const allowedAssetsByContext = { deposit: [], withdraw: [], tip: [] };
+const rememberedNetworkByContext = { deposit: new Map(), withdraw: new Map(), tip: new Map() };
 let preloadGeneration = 0;
 let busy = false;
 let balancePreferences = loadBalancePreferences();
@@ -172,8 +172,16 @@ function createWalletDialog() {
         <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="buy" hidden>
           <span class="wallet-placeholder-icon" aria-hidden="true">＋</span><h3>Buy Crypto</h3><p>This section is reserved for the future card and bank purchase provider.</p>
         </section>
-        <section class="wallet-panel wallet-placeholder-panel" data-wallet-panel="tip" hidden>
-          <span class="wallet-placeholder-icon" aria-hidden="true">↗</span><h3>Tip User</h3><p>This section is reserved for player-to-player tips.</p>
+        <section class="wallet-panel" data-wallet-panel="tip" hidden>
+          <form class="wallet-stack wallet-tip-form" data-wallet-form="tip">
+            <label><span>Crypto</span>${createAssetField("tipCurrency", "tip")}</label>
+            <label><span>Network</span>${createNetworkField("tip")}</label>
+            <label><span>Username</span><input name="username" type="text" minlength="3" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Enter the exact username" required /></label>
+            <label><span>Amount <small data-tip-available></small></span><span class="wallet-input-shell wallet-coin-input"><img src="${iconUrl("usdt")}" alt="" data-tip-amount-icon /><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" required /></span></label>
+            <p class="wallet-tip-note">Minimum tip value is $0.10. Tips are transferred instantly and cannot be reversed.</p>
+            <button class="wallet-primary" type="submit">Send tip</button>
+          </form>
+          <button class="wallet-history-toggle" type="button" data-open-transactions>Transaction history</button>
         </section>
         <section class="wallet-panel" data-wallet-panel="transactions" hidden>
           <div class="wallet-transaction-filters" aria-label="Transaction filters">
@@ -191,11 +199,15 @@ function createWalletDialog() {
     tabs: [...overlay.querySelectorAll("[data-wallet-tab]")],
     panels: [...overlay.querySelectorAll("[data-wallet-panel]")],
     withdrawalForm: overlay.querySelector('[data-wallet-form="withdraw"]'),
+    tipForm: overlay.querySelector('[data-wallet-form="tip"]'),
     depositSelect: overlay.querySelector('[name="payCurrency"]'),
     withdrawalSelect: overlay.querySelector('[name="payoutCurrency"]'),
+    tipSelect: overlay.querySelector('[name="tipCurrency"]'),
     withdrawalAvailable: overlay.querySelector("[data-withdraw-available]"),
     withdrawalMemoField: overlay.querySelector("[data-withdraw-memo-field]"),
     withdrawalAmountIcon: overlay.querySelector("[data-withdraw-amount-icon]"),
+    tipAvailable: overlay.querySelector("[data-tip-available]"),
+    tipAmountIcon: overlay.querySelector("[data-tip-amount-icon]"),
     instructions: overlay.querySelector("[data-deposit-instructions]"),
     depositAddress: overlay.querySelector("[data-deposit-address]"),
     depositAddressLabel: overlay.querySelector("[data-deposit-address-label]"),
@@ -393,16 +405,20 @@ function updateBalanceMenus() {
     const list = button.parentElement?.querySelector(".balance-menu-list");
     if (!list) return;
     list.replaceChildren();
-    const visibleAssets = currencies.filter((asset) => !balancePreferences.hideZeroBalances || Number(balanceFor(asset.code).available) > 0);
-    if (!visibleAssets.length) {
+    const visibleGroups = currencyGroups(currencies).filter((group) => !balancePreferences.hideZeroBalances || combinedAvailable(group) > 0);
+    if (!visibleGroups.length) {
       const empty = document.createElement("p");
       empty.className = "balance-menu-empty";
       empty.textContent = "No funded balances";
       list.append(empty);
     }
-    visibleAssets.forEach((asset) => {
-      const balance = balanceFor(asset.code);
-      const selected = walletSnapshot?.selectedCurrency === asset.code;
+    visibleGroups.forEach((group) => {
+      const currentAsset = assetFor(walletSnapshot?.selectedCurrency);
+      const selected = group.some((asset) => asset.code === walletSnapshot?.selectedCurrency);
+      const asset = group.find((item) => item.code === currentAsset?.code)
+        || [...group].sort((left, right) => Number(balanceFor(right.code).available) - Number(balanceFor(left.code).available))[0];
+      const groupAvailable = combinedAvailable(group);
+      const groupUsdCents = group.reduce((sum, item) => sum + Number(balanceFor(item.code).usdCents || 0), 0);
       const option = document.createElement("button");
       option.type = "button";
       option.className = "balance-option";
@@ -410,8 +426,9 @@ function updateBalanceMenus() {
       option.dataset.currency = asset.code;
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(selected));
-      const shownBalance = balancePreferences.displayFiat ? money(balance.usdCents || 0) : cleanCryptoAmount(balance.available);
-      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}<small>${asset.network}</small></strong><em>${shownBalance}</em></span><i aria-hidden="true"></i>`;
+      const shownBalance = balancePreferences.displayFiat ? money(groupUsdCents) : cleanCryptoAmount(groupAvailable);
+      const networkLabel = group.length === 1 ? `<small>${asset.network}</small>` : "";
+      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}${networkLabel}</strong><em>${shownBalance}</em></span><i aria-hidden="true"></i>`;
       option.addEventListener("click", async () => {
         closeBalanceMenus();
         try { await selectWalletCurrency(asset.code); } catch (error) { setStatus(error.message, "error"); }
@@ -463,7 +480,7 @@ function combinedAvailable(assets) {
 }
 
 function fillAssetSelect(select, allowedAssets = currencies) {
-  const context = select === dialog.depositSelect ? "deposit" : "withdraw";
+  const context = select === dialog.depositSelect ? "deposit" : select === dialog.tipSelect ? "tip" : "withdraw";
   const previous = select.value;
   allowedAssetsByContext[context] = allowedAssets;
   select.replaceChildren();
@@ -476,7 +493,7 @@ function fillAssetSelect(select, allowedAssets = currencies) {
 }
 
 function updateChoiceControls(context) {
-  const select = context === "deposit" ? dialog.depositSelect : dialog.withdrawalSelect;
+  const select = context === "deposit" ? dialog.depositSelect : context === "tip" ? dialog.tipSelect : dialog.withdrawalSelect;
   const allowedAssets = allowedAssetsByContext[context];
   const asset = allowedAssets.find((item) => item.code === select.value) || assetFor(select.value);
   if (!asset) return;
@@ -487,7 +504,7 @@ function updateChoiceControls(context) {
   currencyControl.querySelector("[data-asset-icon]").src = iconUrl(asset);
   currencyControl.querySelector("[data-asset-label]").textContent = `${asset.name} (${asset.symbol})`;
   const selectedGroup = allowedAssets.filter((item) => item.symbol === asset.symbol);
-  currencyControl.querySelector("[data-asset-balance]").textContent = context === "withdraw" ? `${cleanCryptoAmount(combinedAvailable(selectedGroup))} ${asset.symbol}` : "";
+  currencyControl.querySelector("[data-asset-balance]").textContent = context !== "deposit" ? `${cleanCryptoAmount(combinedAvailable(selectedGroup))} ${asset.symbol}` : "";
   currencyMenu.replaceChildren();
   currencyGroups(allowedAssets).forEach((group) => {
     const representative = group[0];
@@ -522,7 +539,7 @@ function updateChoiceControls(context) {
   const networkTrigger = networkControl.querySelector("[data-choice-trigger]");
   networkControl.querySelector("[data-network-icon]").src = networkIconUrl(asset);
   networkControl.querySelector("[data-network-label]").textContent = asset.network;
-  networkControl.querySelector("[data-network-balance]").textContent = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(asset.code).available)} ${asset.symbol}` : "";
+  networkControl.querySelector("[data-network-balance]").textContent = context !== "deposit" ? `${cleanCryptoAmount(balanceFor(asset.code).available)} ${asset.symbol}` : "";
   networkMenu.replaceChildren();
   selectedGroup.forEach((networkAsset) => {
     const selected = networkAsset.code === asset.code;
@@ -533,7 +550,7 @@ function updateChoiceControls(context) {
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", String(selected));
     item.classList.toggle("selected", selected);
-    const detail = context === "withdraw" ? `${cleanCryptoAmount(balanceFor(networkAsset.code).available)} ${networkAsset.symbol} available` : `${networkAsset.symbol} network`;
+    const detail = context !== "deposit" ? `${cleanCryptoAmount(balanceFor(networkAsset.code).available)} ${networkAsset.symbol} available` : `${networkAsset.symbol} network`;
     item.innerHTML = `<img src="${networkIconUrl(networkAsset)}" alt="" /><span><strong>${networkAsset.network}</strong><small>${detail}</small></span><i aria-hidden="true"></i>`;
     item.addEventListener("click", () => {
       select.value = networkAsset.code;
@@ -550,7 +567,7 @@ function updateChoiceControls(context) {
 }
 
 function updateAssetControl(context) {
-  const select = context === "deposit" ? dialog.depositSelect : dialog.withdrawalSelect;
+  const select = context === "deposit" ? dialog.depositSelect : context === "tip" ? dialog.tipSelect : dialog.withdrawalSelect;
   const asset = assetFor(select.value);
   if (!asset) return;
   rememberedNetworkByContext[context].set(asset.symbol, asset.code);
@@ -563,15 +580,24 @@ function updateAssetControl(context) {
     dialog.withdrawalMemoField.hidden = !asset.requiresExtraId;
     dialog.withdrawalMemoField.querySelector("input").required = Boolean(asset.requiresExtraId);
   }
+  if (context === "tip") {
+    const available = balanceFor(asset.code).available;
+    dialog.tipAvailable.textContent = `Available: ${cleanCryptoAmount(available)} ${asset.symbol}`;
+    dialog.tipAmountIcon.src = iconUrl(asset);
+  }
 }
 
 function refreshControls() {
   fillAssetSelect(dialog.depositSelect, currencies);
   const positiveBalances = currencies.filter((asset) => Number(balanceFor(asset.code).available) > 0);
   const selectedAsset = assetFor(walletSnapshot?.selectedCurrency);
-  fillAssetSelect(dialog.withdrawalSelect, positiveBalances.length ? positiveBalances : (selectedAsset ? [selectedAsset] : currencies.slice(0, 1)));
+  const fundedSymbols = new Set(positiveBalances.map((asset) => asset.symbol));
+  const withdrawalAssets = fundedSymbols.size ? currencies.filter((asset) => fundedSymbols.has(asset.symbol)) : (selectedAsset ? [selectedAsset] : currencies.slice(0, 1));
+  fillAssetSelect(dialog.withdrawalSelect, withdrawalAssets);
+  fillAssetSelect(dialog.tipSelect, positiveBalances.length ? positiveBalances : (selectedAsset ? [selectedAsset] : currencies.slice(0, 1)));
   updateAssetControl("deposit");
   updateAssetControl("withdraw");
+  updateAssetControl("tip");
   updateHeader();
 }
 
@@ -598,9 +624,10 @@ function renderWalletTransactions(filter = "all") {
     const row = document.createElement("article");
     row.className = "wallet-activity-row";
     const asset = assetFor(item.currency);
-    const rewardLabels = { promo_reward: "Promo claim", leaderboard_payout: "Leaderboard payout", leaderboard_reward: "Leaderboard payout", rakeback_claim: "Rakeback claim", vip_reward: "VIP reward", bonus_reward: "Bonus reward", reward: "Reward" };
+    const rewardLabels = { promo_reward: "Promo claim", leaderboard_payout: "Leaderboard payout", leaderboard_reward: "Leaderboard payout", rakeback_claim: "Rakeback claim", vip_reward: "VIP reward", bonus_reward: "Bonus reward", reward: "Reward", tip_sent: "Tip sent", tip_received: "Tip received" };
     const title = item.type === "withdrawal" ? "Withdrawal" : item.type === "deposit" ? "Deposit" : item.type === "bet" ? `${item.game || "Game"} bet` : rewardLabels[item.type] || "Wallet activity";
-    const amount = item.type === "bet" ? `${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}` : `${item.type === "withdrawal" ? "−" : "+"}${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}`;
+    const debit = item.type === "withdrawal" || item.type === "tip_sent";
+    const amount = item.type === "bet" ? `${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}` : `${debit ? "−" : "+"}${cleanCryptoAmount(item.amount)} ${asset?.symbol || ""}`;
     const detail = item.type === "bet" && item.multiplier ? `${Number(item.multiplier).toFixed(2)}× · ${String(item.status || "open")}` : String(item.status || "Pending").replaceAll("_", " ");
     row.innerHTML = `<img class="wallet-activity-icon" src="${iconUrl(asset || item.currency)}" alt="" /><div><strong>${title}</strong><span>${asset?.symbol || String(item.currency || "").toUpperCase()} · ${detail}</span></div><strong>${amount}</strong>`;
     dialog.transactionList.append(row);
@@ -878,6 +905,7 @@ dialog.withdrawalSelect.addEventListener("change", async () => {
   updateAssetControl("withdraw");
   try { await selectWalletCurrency(dialog.withdrawalSelect.value); } catch (error) { setStatus(error.message, "error"); }
 });
+dialog.tipSelect.addEventListener("change", () => updateAssetControl("tip"));
 
 dialog.overlay.querySelectorAll("[data-withdraw-percent]").forEach((button) => button.addEventListener("click", () => {
   const available = Number(balanceFor(dialog.withdrawalSelect.value).available || 0);
@@ -903,6 +931,31 @@ dialog.withdrawalForm.addEventListener("submit", async (event) => {
     setStatus(`Withdrawal ${friendlyStatus(result.withdrawal.status).toLowerCase()}.`, "success");
     await loadWallet();
     refreshControls();
+  } catch (error) { setStatus(error.message, "error"); }
+  finally { setBusy(false); }
+});
+
+dialog.tipForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (busy) return;
+  const data = new FormData(dialog.tipForm);
+  setBusy(true);
+  setStatus("Sending tip…");
+  try {
+    const result = await api("/wallet/tips", {
+      method: "POST",
+      body: JSON.stringify({
+        requestId: crypto.randomUUID().replaceAll("-", ""),
+        currency: dialog.tipSelect.value,
+        amount: data.get("amount"),
+        username: data.get("username"),
+      }),
+    });
+    walletSnapshot = result.wallet;
+    dialog.tipForm.reset();
+    refreshControls();
+    setStatus(`Tip sent to ${result.tip.recipientUsername}.`, "success");
+    window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed", { detail: { wallet: walletSnapshot } }));
   } catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); }
 });

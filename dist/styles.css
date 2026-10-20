@@ -3635,3 +3635,35 @@ body,
   .live-chat-emoji-panel{right:50px;bottom:55px}
   .mobile-tab-action.active>.mobile-tab-icon,.mobile-tab-action[aria-expanded="true"]>.mobile-tab-icon,body.mobile-menu-open .mobile-tab-action.active>.mobile-tab-icon,body.mobile-menu-open .mobile-tab-action[aria-expanded="true"]>.mobile-tab-icon{filter:var(--icon-blue-filter)!important}
 }
+
+/* Exact brand-blue mobile navigation, reward carousel slide and wallet transfer polish. */
+@media(max-width:700px){
+  .live-chat-panel>header [data-chat-close]{display:none!important}
+  .mobile-tab-icon-mask{
+    display:block;
+    background:#f4f8fc;
+    filter:none!important;
+    -webkit-mask:var(--mobile-tab-icon) center/contain no-repeat;
+    mask:var(--mobile-tab-icon) center/contain no-repeat;
+  }
+  .mobile-tab-action.active>.mobile-tab-icon-mask,
+  .mobile-tab-action[aria-expanded="true"]>.mobile-tab-icon-mask,
+  body.mobile-menu-open .mobile-tab-action[aria-expanded="true"]>.mobile-tab-icon-mask{background:#168bff;filter:none!important}
+  body.mobile-menu-open .mobile-tab-action.active:not([aria-expanded="true"])>.mobile-tab-icon-mask{background:#f4f8fc;filter:none!important}
+}
+.rewards-banner-slide{background:linear-gradient(112deg,#073fbd 0%,#168bff 58%,#168bff 100%)}
+.rewards-banner-slide::after{position:absolute;right:4%;bottom:-46%;width:43%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.09);content:""}
+.rewards-banner-copy{z-index:4}
+.rewards-banner-scene{position:absolute;z-index:3;inset:0 1% 0 48%;overflow:hidden}
+.rewards-banner-art{position:absolute;right:2%;bottom:-24%;width:min(37vw,430px);height:132%;object-fit:contain;filter:drop-shadow(0 22px 24px rgba(0,0,0,.34));transition:transform .35s ease}
+.leaderboard-banner:hover .rewards-banner-art{transform:translateY(-4px) rotate(-1deg) scale(1.025)}
+.deposit-address-row>div,.deposit-memo-row>div{border-color:#2b3440!important;background:#151a21!important}
+.deposit-address-row button,.deposit-memo-row button{border-left-color:#2b3440!important;background:#20262e!important;color:#fff!important}
+.deposit-address-row button:hover,.deposit-memo-row button:hover{background:#29313b!important;color:#168bff!important}
+.wallet-tip-form{max-width:100%}
+.wallet-tip-note{margin:0;color:#8195a5;font-size:.7rem;line-height:1.45}
+@media(max-width:700px){
+  .rewards-banner-scene{inset:0 -7% 0 45%}
+  .rewards-banner-art{right:-18%;bottom:-11%;width:190%;height:116%}
+  .rewards-banner-slide::after{right:-9%;bottom:-20%;width:68%}
+}

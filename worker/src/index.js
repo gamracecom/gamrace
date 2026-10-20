@@ -1033,7 +1033,7 @@ async function pagedAccountActivity(env, uid, pageValue = 1, pageSizeValue = 20)
 
 const REWARD_LEDGER_TYPES = Object.freeze([
   "promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim",
-  "vip_reward", "bonus_reward", "reward",
+  "vip_reward", "bonus_reward", "reward", "tip_sent", "tip_received",
 ]);
 
 function fundingActivityResponse(row) {
@@ -1055,7 +1055,7 @@ function rewardActivityResponse(row) {
     id: row.id,
     type: row.type,
     status: "credited",
-    amount: assetUnitsToString(Math.max(0, Number(row.amount_units || 0)), false),
+    amount: assetUnitsToString(Math.abs(Number(row.amount_units || 0)), false),
     payout: "0",
     multiplier: 0,
     currency: row.currency,
@@ -1281,10 +1281,10 @@ async function walletFundingActivity(env, uid) {
       payout_currency AS currency, created_at FROM crypto_withdrawals WHERE uid = ?
     UNION ALL
     SELECT id, type, 'credited' AS status,
-      printf('%.8f', amount_units / 100000000.0) AS amount,
+      printf('%.8f', ABS(amount_units) / 100000000.0) AS amount,
       currency, created_at FROM crypto_ledger WHERE uid = ? AND type IN (
         'promo_reward', 'leaderboard_payout', 'leaderboard_reward', 'rakeback_claim',
-        'vip_reward', 'bonus_reward', 'reward'
+        'vip_reward', 'bonus_reward', 'reward', 'tip_sent', 'tip_received'
       )
     ORDER BY created_at DESC LIMIT 50
   `).bind(uid, uid, uid).all();
@@ -1363,6 +1363,68 @@ async function handleSelectCurrency(request, env, user) {
     ON CONFLICT(uid) DO UPDATE SET selected_currency = excluded.selected_currency, updated_at = excluded.updated_at
   `).bind(user.sub, asset.code, now()).run();
   return json(request, env, 200, { wallet: await walletResponse(env, user.sub) });
+}
+
+function walletTipResponse(row) {
+  return {
+    id: String(row.id),
+    requestId: String(row.request_id),
+    recipientUsername: String(row.recipient_username),
+    currency: String(row.currency),
+    amount: assetUnitsToString(Number(row.amount_units), false),
+    usdCentsAtSend: Number(row.usd_cents_at_send),
+    createdAt: new Date(Number(row.created_at)).toISOString(),
+  };
+}
+
+async function handleCreateWalletTip(request, env, user) {
+  const body = await requestJson(request);
+  const requestId = normalizeRequestId(body.requestId);
+  const existing = await env.DB.prepare("SELECT * FROM wallet_tips WHERE sender_uid = ? AND request_id = ?")
+    .bind(user.sub, requestId).first();
+  if (existing) return json(request, env, 200, { tip: walletTipResponse(existing), wallet: await walletResponse(env, user.sub) });
+
+  const username = String(body.username || "").trim();
+  if (!/^[A-Za-z][A-Za-z0-9_]{2,19}$/.test(username)) throw httpError(400, "Enter a valid username");
+  const recipientMatches = await env.DB.prepare("SELECT uid, username FROM player_profiles WHERE username = ? COLLATE NOCASE ORDER BY updated_at DESC LIMIT 2")
+    .bind(username).all();
+  if (!recipientMatches.results?.length) throw httpError(404, "That username was not found");
+  if (recipientMatches.results.length > 1) throw httpError(409, "That username is not uniquely available");
+  const recipient = recipientMatches.results[0];
+  if (recipient.uid === user.sub) throw httpError(400, "You cannot tip your own account");
+
+  const asset = requireWalletAsset(normalizeCurrency(body.currency));
+  const amountUnits = parseAssetUnits(body.amount, { maximumUnits: 1_000_000_000_000_000 });
+  let prices = {};
+  try { prices = await providerPrices(env); } catch { prices = {}; }
+  const price = Number(prices?.[asset.providerCurrency] || stablecoinPrice(asset));
+  if (!Number.isFinite(price) || price <= 0) throw httpError(503, "A live USD price is not available for that coin right now");
+  const usdValue = Number(assetUnitsToString(amountUnits, false)) * price;
+  if (!Number.isFinite(usdValue) || usdValue + 1e-9 < 0.10) throw httpError(400, "The minimum tip is $0.10");
+  const usdCentsAtSend = Math.max(10, Math.round(usdValue * 100));
+
+  await enforceCooldown(env, user.sub, "wallet_tip", 1);
+  const id = crypto.randomUUID();
+  const timestamp = now();
+  try {
+    await env.DB.prepare(`
+      INSERT INTO wallet_tips(
+        id, request_id, sender_uid, recipient_uid, recipient_username,
+        currency, amount_units, usd_cents_at_send, created_at
+      ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id, requestId, user.sub, recipient.uid, recipient.username,
+      asset.code, amountUnits, usdCentsAtSend, timestamp,
+    ).run();
+  } catch (error) {
+    const duplicate = await env.DB.prepare("SELECT * FROM wallet_tips WHERE sender_uid = ? AND request_id = ?")
+      .bind(user.sub, requestId).first();
+    if (duplicate) return json(request, env, 200, { tip: walletTipResponse(duplicate), wallet: await walletResponse(env, user.sub) });
+    if (String(error?.message || error).includes("INSUFFICIENT_FUNDS")) throw httpError(409, "Your available balance is too low");
+    throw error;
+  }
+  const created = await env.DB.prepare("SELECT * FROM wallet_tips WHERE id = ?").bind(id).first();
+  return json(request, env, 201, { tip: walletTipResponse(created), wallet: await walletResponse(env, user.sub) });
 }
 
 function secureRandomInt(maximum) {
@@ -6024,6 +6086,7 @@ async function route(request, env) {
   if (request.method === "POST" && path === "/profile/sync") return handleSyncProfile(request, env, user);
   if (request.method === "POST" && path === "/profile/avatar") return handleProfileAvatar(request, env, user);
   if (request.method === "POST" && path === "/wallet/selection") return handleSelectCurrency(request, env, user);
+  if (request.method === "POST" && path === "/wallet/tips") return handleCreateWalletTip(request, env, user);
   if (request.method === "GET" && path === "/games/history") return handleGameHistory(request, env, user);
   if (request.method === "POST" && NEW_GAME_BET_PATHS[path]) await requireGameAvailable(env, NEW_GAME_BET_PATHS[path]);
   if (request.method === "GET" && path === "/games/towers/rounds/active") return handleGetActiveTowersRound(request, env, user);

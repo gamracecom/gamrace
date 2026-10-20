@@ -2,6 +2,15 @@
   "use strict";
 
   const actions = [...document.querySelectorAll(".mobile-tab-action")];
+  actions.forEach((button) => {
+    const image = button.querySelector("img.mobile-tab-icon");
+    if (!image) return;
+    const icon = document.createElement("span");
+    icon.className = "mobile-tab-icon mobile-tab-icon-mask";
+    icon.setAttribute("aria-hidden", "true");
+    icon.style.setProperty("--mobile-tab-icon", `url("${image.getAttribute("src")}")`);
+    image.replaceWith(icon);
+  });
   const menuButton = actions.find((button) => button.dataset.mobileAction === "menu");
   const menuCloseButton = document.querySelector(".mobile-menu-close");
   const searchInput = document.querySelector("#game-search");

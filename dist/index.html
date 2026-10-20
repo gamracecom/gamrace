@@ -14,7 +14,7 @@
     <link rel="preload" as="image" href="assets/banners/leaderboard-checkered-flag-v1.webp" />
     <link rel="preload" as="image" href="ranks/rookie-i.webp" />
     <script src="shell-state.js?v=global-announcement-1"></script>
-    <link rel="stylesheet" href="styles.css?v=lobby-modern-2&amp;leaderboard=2&amp;wallet=6&amp;account=6&amp;chat=5" />
+    <link rel="stylesheet" href="styles.css?v=lobby-modern-2&amp;brand-blue=3&amp;rewards-banner=1&amp;wallet=7&amp;chat=6" />
   </head>
   <body data-authenticated="pending">
     <div class="app-shell">
@@ -85,8 +85,18 @@
                     <img class="leaderboard-flag-art" src="assets/banners/leaderboard-checkered-flag-v1.webp" alt="" decoding="async" fetchpriority="high" />
                   </div>
                 </article>
+                <article class="leaderboard-slide rewards-banner-slide" data-banner-href="rewards.html">
+                  <div class="leaderboard-copy rewards-banner-copy">
+                    <p class="leaderboard-kicker">GamRace Rewards</p>
+                    <h1><strong>Claim your</strong> <span>rewards</span></h1>
+                    <span class="leaderboard-timer">Instant · Weekly · Monthly</span>
+                  </div>
+                  <div class="rewards-banner-scene" aria-hidden="true">
+                    <img class="rewards-banner-art" src="assets/rewards/instant-rakeback.webp" alt="" decoding="async" />
+                  </div>
+                </article>
               </div>
-              <span class="leaderboard-slide-indicators" aria-hidden="true"><i class="active"></i><i></i></span>
+              <span class="leaderboard-slide-indicators" aria-hidden="true"><i class="active"></i><i></i><i></i></span>
             </a>
           </div>
           <div class="hero-mode-stack">
@@ -325,11 +335,11 @@
     </div>
 
     <script type="module" src="region-access.js?v=region-access-1"></script>
-    <script src="script.js?v=leaderboard-banner-1"></script>
-    <script src="mobile-nav.js?v=rewards-route-2"></script>
+    <script src="script.js?v=rewards-banner-2"></script>
+    <script src="mobile-nav.js?v=exact-blue-3"></script>
     <script src="chat.js?v=live-chat-6" defer></script>
-    <script type="module" src="firebase-auth.js?v=rewards-page-2"></script>
+    <script type="module" src="firebase-auth.js?v=wallet-tips-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=balance-stability-2"></script>
+    <script type="module" src="wallet.js?v=wallet-tips-1"></script>
   </body>
 </html>

@@ -17,7 +17,7 @@ let selectedPlayMode = "house";
 
 const LEADERBOARD_API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
 const leaderboardBanner = document.querySelector("[data-leaderboard-banner]");
-const leaderboardSlides = leaderboardBanner ? [...leaderboardBanner.querySelectorAll("[data-leaderboard-cadence]")] : [];
+const leaderboardSlides = leaderboardBanner ? [...leaderboardBanner.querySelectorAll(".leaderboard-slide")] : [];
 const leaderboardIndicators = leaderboardBanner ? [...leaderboardBanner.querySelectorAll(".leaderboard-slide-indicators i")] : [];
 const leaderboardState = new Map();
 let leaderboardSlideIndex = 0;
@@ -46,6 +46,7 @@ function leaderboardCountdown(campaign) {
 
 function renderLeaderboardBanner() {
   leaderboardSlides.forEach((slide) => {
+    if (!slide.dataset.leaderboardCadence) return;
     const campaign = leaderboardState.get(slide.dataset.leaderboardCadence);
     slide.querySelector("[data-leaderboard-prize]").textContent = leaderboardPrize(campaign?.prizeUsdCents);
     slide.querySelector("[data-leaderboard-countdown]").textContent = leaderboardCountdown(campaign);
@@ -56,6 +57,9 @@ function showLeaderboardSlide(index) {
   if (!leaderboardBanner || !leaderboardSlides.length) return;
   leaderboardSlideIndex = ((index % leaderboardSlides.length) + leaderboardSlides.length) % leaderboardSlides.length;
   leaderboardBanner.style.setProperty("--leaderboard-index", String(leaderboardSlideIndex));
+  const slide = leaderboardSlides[leaderboardSlideIndex];
+  leaderboardBanner.href = slide?.dataset.bannerHref || "leaderboard.html";
+  leaderboardBanner.setAttribute("aria-label", slide?.dataset.bannerHref ? "Open GamRace Rewards" : "Open King of the Track leaderboard");
   leaderboardIndicators.forEach((indicator, itemIndex) => indicator.classList.toggle("active", itemIndex === leaderboardSlideIndex));
 }
 

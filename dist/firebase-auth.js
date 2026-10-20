@@ -331,14 +331,15 @@ function renderBetActivity(activity = [], pagination = accountSnapshot.paginatio
       deposit: "Deposit", withdrawal: "Withdrawal", promo_reward: "Promo claim",
       leaderboard_payout: "Leaderboard payout", leaderboard_reward: "Leaderboard payout",
       rakeback_claim: "Rakeback claim", vip_reward: "VIP reward", bonus_reward: "Bonus reward", reward: "Reward",
+      tip_sent: "Tip sent", tip_received: "Tip received",
     };
-    const creditTypes = new Set(["deposit", "promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim", "vip_reward", "bonus_reward", "reward"]);
+    const creditTypes = new Set(["deposit", "promo_reward", "leaderboard_payout", "leaderboard_reward", "rakeback_claim", "vip_reward", "bonus_reward", "reward", "tip_received"]);
     for (const item of activity) {
       const row = document.createElement("div");
       const status = String(item.status || "pending").toLowerCase();
       const isBet = item.type === "bet";
       const title = isBet ? `${item.game || "Game"} bet` : labels[item.type] || "Account activity";
-      const prefix = item.type === "withdrawal" || isBet ? "−" : creditTypes.has(item.type) ? "+" : "";
+      const prefix = item.type === "withdrawal" || item.type === "tip_sent" || isBet ? "−" : creditTypes.has(item.type) ? "+" : "";
       const detail = isBet ? `${Number(item.multiplier || 0).toFixed(2)}× · ${item.payout || "0"} ${accountCurrencyLabel(item.currency)} payout` : item.reference ? `Ref ${String(item.reference).slice(0, 18)}` : "Wallet credit";
       const tone = ["win", "loss", "push", "open"].includes(status) ? status : "open";
       row.className = "account-table-row";
