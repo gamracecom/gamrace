@@ -20,7 +20,7 @@ test("public player profiles respect visibility and expose only opted-in statist
   assert.match(worker, /GET" && publicPlayerProfileMatch/);
   assert.match(profile, /Bets placed/);
   assert.match(profile, /Profit \/ loss/);
-  assert.match(profile, /Highest win/);
+  assert.match(profile, /Highest multiplier/);
   assert.match(profile, /Private/);
 });
 
@@ -44,5 +44,6 @@ test("wallet balances are compact and rank cards centre without offset-parent as
   assert.match(styles, /\.balance-option\{min-height:45px;grid-template-columns:25px minmax\(0,1fr\)/);
   assert.doesNotMatch(wallet, /\$\{shownBalance\}<\/em><\/span><i/);
   assert.match(rewards, /getBoundingClientRect\(\)/);
-  assert.match(styles, /padding-inline:max\(16px,calc\(\(100% - var\(--rank-card-width\)\)\/2\)\)/);
+  assert.match(styles, /--rank-card-width:calc\(100% - 32px\)/);
+  assert.match(styles, /padding-inline:16px/);
 });
