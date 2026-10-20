@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#040d14" />
     <title>Control Room | GamRace</title>
     <link rel="icon" href="assets/brand/gamrace-icon.png" />
-    <link rel="stylesheet" href="admin.css?v=rank-rewards-1" />
+    <link rel="stylesheet" href="admin.css?v=chat-announcements-1" />
   </head>
   <body>
     <div class="admin-ambient" aria-hidden="true"></div>
@@ -204,7 +204,20 @@
 
           <section class="admin-view" data-admin-panel="support" hidden><div class="page-intro"><div><p class="section-kicker">PLAYER CARE</p><h2>Support</h2><p>Future workspace for player conversations, escalations, disputes and account notes.</p></div><span class="future-badge">INBOX READY TO CONNECT</span></div><div class="support-shell"><aside><button class="active" type="button">Open <b>0</b></button><button type="button">Waiting <b>0</b></button><button type="button">Resolved <b>0</b></button></aside><div><span class="large-mark">S</span><h3>Your support queue is ready</h3><p>Connect email or live chat later and conversations will appear here with player and transaction context.</p></div></div></section>
 
-          <section class="admin-view" data-admin-panel="content" hidden><div class="page-intro"><div><p class="section-kicker">SITE</p><h2>Content & lobby</h2><p>Future publishing controls for banners, navigation, game rows, legal pages and announcements.</p></div><button class="solid-button" type="button" disabled>New content block</button></div><div class="future-control-grid"><article><span>Homepage</span><strong>Hero banners</strong><p>Schedule the 70/30 banner layout and destination links.</p></article><article><span>Lobby</span><strong>Game sections</strong><p>Order rows, feature games and tune visible categories.</p></article><article><span>Messaging</span><strong>Announcements</strong><p>Site-wide notices, maintenance and campaign messages.</p></article><article><span>Legal</span><strong>Policy pages</strong><p>Version terms, privacy, bonus and safer-play content.</p></article></div></section>
+          <section class="admin-view" data-admin-panel="content" hidden>
+            <div class="page-intro"><div><p class="section-kicker">SITE</p><h2>Site announcements</h2><p>Publish a bright notice beneath the GamRace header for every visitor.</p></div><span class="status-pill" id="announcement-live-status">OFF</span></div>
+            <article class="panel-card announcement-control-card">
+              <div class="announcement-preview" id="announcement-preview"><span>!</span><strong>Your announcement preview appears here.</strong></div>
+              <form id="announcement-form" class="announcement-admin-form">
+                <label class="wide"><span>Announcement text</span><textarea id="announcement-text" maxlength="180" rows="3" placeholder="Enter the message shown across GamRace"></textarea><small><b id="announcement-character-count">0</b> / 180</small></label>
+                <label><span>Starts</span><input id="announcement-starts" type="datetime-local" /></label>
+                <label><span>Ends</span><input id="announcement-ends" type="datetime-local" /></label>
+                <label class="announcement-enabled"><input id="announcement-enabled" type="checkbox" /><span>Announcement on</span></label>
+                <button class="solid-button" type="submit">Save announcement</button>
+                <p class="dialog-status" id="announcement-status" role="status" aria-live="polite"></p>
+              </form>
+            </article>
+          </section>
 
           <section class="admin-view" data-admin-panel="integrations" hidden><div class="page-intro"><div><p class="section-kicker">PLATFORM</p><h2>Integrations</h2><p>Connection health without exposing keys or provider credentials.</p></div><span class="security-note"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/></svg><span>Secrets never shown</span></span></div><div class="integration-grid"><article><div class="integration-logo firebase">F</div><div><strong>Firebase</strong><small>Identity & player profiles</small></div><span class="status-pill live">CONNECTED</span></article><article><div class="integration-logo cloudflare">C</div><div><strong>Cloudflare</strong><small>Wallet API & D1</small></div><span class="status-pill live">CONNECTED</span></article><article><div class="integration-logo payments">₿</div><div><strong>Crypto payments</strong><small>Live deposit provider</small></div><span class="status-pill" id="payments-integration-status">CHECKING</span></article><article><div class="integration-logo github">G</div><div><strong>GitHub Pages</strong><small>GamRace frontend</small></div><span class="status-pill live">CONNECTED</span></article><article class="integration-add"><span>+</span><strong>Game provider</strong><small>Not connected</small></article><article class="integration-add"><span>+</span><strong>KYC / AML provider</strong><small>Not connected</small></article></div></section>
 
@@ -249,6 +262,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="admin.js?v=rank-rewards-1"></script>
+    <script type="module" src="admin.js?v=chat-announcements-1"></script>
   </body>
 </html>

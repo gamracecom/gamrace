@@ -5044,12 +5044,24 @@ function playerRankIndex(totalWagered) {
 }
 
 const CHAT_MINIMUM_WAGER_SETTING = "chat_minimum_wager_usd_cents";
+const CHAT_COOLDOWN_SETTING = "chat_cooldown_ms";
+const CHAT_MAX_CHARACTERS_SETTING = "chat_max_characters";
+const GLOBAL_ANNOUNCEMENT_SETTING = "global_announcement";
 
-async function readChatMinimumWagerUsdCents(env) {
-  const row = await env.DB.prepare("SELECT value_text FROM site_settings WHERE setting_key = ?")
-    .bind(CHAT_MINIMUM_WAGER_SETTING).first();
-  const value = Number(row?.value_text ?? 10_000);
-  return Number.isSafeInteger(value) && value >= 0 ? value : 10_000;
+async function readChatSettings(env) {
+  const result = await env.DB.prepare(`
+    SELECT setting_key, value_text FROM site_settings
+    WHERE setting_key IN (?, ?, ?)
+  `).bind(CHAT_MINIMUM_WAGER_SETTING, CHAT_COOLDOWN_SETTING, CHAT_MAX_CHARACTERS_SETTING).all();
+  const settings = new Map((result.results || []).map((row) => [row.setting_key, Number(row.value_text)]));
+  const minimumWagerUsdCents = settings.get(CHAT_MINIMUM_WAGER_SETTING) ?? 10_000;
+  const cooldownMs = settings.get(CHAT_COOLDOWN_SETTING) ?? 1_500;
+  const maxCharacters = settings.get(CHAT_MAX_CHARACTERS_SETTING) ?? 240;
+  return {
+    minimumWagerUsdCents: Number.isSafeInteger(minimumWagerUsdCents) && minimumWagerUsdCents >= 0 ? minimumWagerUsdCents : 10_000,
+    cooldownMs: Number.isSafeInteger(cooldownMs) && cooldownMs >= 0 && cooldownMs <= 300_000 ? cooldownMs : 1_500,
+    maxCharacters: Number.isSafeInteger(maxCharacters) && maxCharacters >= 1 && maxCharacters <= 1_000 ? maxCharacters : 240,
+  };
 }
 
 function chatMessageResponse(request, row, viewer = null) {
@@ -5088,16 +5100,16 @@ async function handleChatMessages(request, env, viewer) {
 }
 
 async function chatAccessSnapshot(env, user) {
-  const [minimumWagerUsdCents, account] = await Promise.all([
-    readChatMinimumWagerUsdCents(env),
+  const [settings, account] = await Promise.all([
+    readChatSettings(env),
     liveAccountSnapshot(env, user.sub, { includeActivity: false }),
   ]);
   const wagerUsdCents = Math.max(0, Math.round(Number(account.summary.totalWagered || 0) * 100));
   return {
-    minimumWagerUsdCents,
+    ...settings,
     wagerUsdCents,
-    canSend: wagerUsdCents >= minimumWagerUsdCents,
-    remainingUsdCents: Math.max(0, minimumWagerUsdCents - wagerUsdCents),
+    canSend: wagerUsdCents >= settings.minimumWagerUsdCents,
+    remainingUsdCents: Math.max(0, settings.minimumWagerUsdCents - wagerUsdCents),
   };
 }
 
@@ -5110,11 +5122,12 @@ async function handleSendChatMessage(request, env, user) {
   if (!access.canSend) throw httpError(403, `Wager $${(access.remainingUsdCents / 100).toFixed(2)} more to unlock chat`, "CHAT_WAGER_REQUIRED");
   const body = await requestJson(request);
   const message = String(body.message || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!message || message.length > 240) throw httpError(400, "Chat messages must be between 1 and 240 characters");
+  if (!message) throw httpError(400, "Enter a message", "CHAT_MESSAGE_EMPTY");
+  if (message.length > access.maxCharacters) throw httpError(400, "That message is too long", "CHAT_MESSAGE_TOO_LONG");
   const recent = await env.DB.prepare("SELECT created_at FROM chat_messages WHERE uid = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1")
     .bind(user.sub).first();
   const timestamp = now();
-  if (recent && timestamp - Number(recent.created_at) < 1_500) throw httpError(429, "Wait a moment before sending another message");
+  if (recent && timestamp - Number(recent.created_at) < access.cooldownMs) throw httpError(429, "Wait a moment before sending another message", "CHAT_COOLDOWN");
   const profile = await env.DB.prepare("SELECT username, show_username FROM player_profiles WHERE uid = ?").bind(user.sub).first();
   const rank = leaderboardRank(access.wagerUsdCents / 100);
   const username = Boolean(profile?.show_username ?? 1) ? String(profile?.username || user.name || "Racer") : "Hidden Racer";
@@ -5137,20 +5150,86 @@ async function handleSendChatMessage(request, env, user) {
 
 async function handleAdminChatSettings(request, env, user) {
   await requireAdminSession(request, env, user);
-  return json(request, env, 200, { minimumWagerUsdCents: await readChatMinimumWagerUsdCents(env) });
+  const settings = await readChatSettings(env);
+  return json(request, env, 200, { ...settings, cooldownSeconds: settings.cooldownMs / 1_000 });
 }
 
 async function handleAdminUpdateChatSettings(request, env, user) {
   await requireAdminSession(request, env, user);
   const body = await requestJson(request);
   const minimumWagerUsdCents = parseUsdCents(body.minimumWagerUsd, "Minimum wager");
+  const cooldownSeconds = Number(body.cooldownSeconds);
+  const maxCharacters = Number(body.maxCharacters);
+  if (!Number.isFinite(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 300) throw httpError(400, "Chat cooldown must be between 0 and 300 seconds");
+  if (!Number.isSafeInteger(maxCharacters) || maxCharacters < 1 || maxCharacters > 1_000) throw httpError(400, "Maximum chat characters must be between 1 and 1000");
+  const cooldownMs = Math.round(cooldownSeconds * 1_000);
   const timestamp = now();
+  const upsert = (key, value) => env.DB.prepare(`
+      INSERT INTO site_settings(setting_key, value_text, updated_at, updated_by) VALUES(?, ?, ?, ?)
+      ON CONFLICT(setting_key) DO UPDATE SET value_text = excluded.value_text, updated_at = excluded.updated_at, updated_by = excluded.updated_by
+    `).bind(key, String(value), timestamp, user.sub);
+  await env.DB.batch([
+    upsert(CHAT_MINIMUM_WAGER_SETTING, minimumWagerUsdCents),
+    upsert(CHAT_COOLDOWN_SETTING, cooldownMs),
+    upsert(CHAT_MAX_CHARACTERS_SETTING, maxCharacters),
+  ]);
+  await writeAdminAudit(env, user, "chat.settings.updated", "live-chat", JSON.stringify({ minimumWagerUsdCents, cooldownMs, maxCharacters }));
+  return json(request, env, 200, { minimumWagerUsdCents, cooldownMs, cooldownSeconds: cooldownMs / 1_000, maxCharacters });
+}
+
+async function readAnnouncement(env) {
+  const row = await env.DB.prepare("SELECT value_text, updated_at FROM site_settings WHERE setting_key = ?")
+    .bind(GLOBAL_ANNOUNCEMENT_SETTING).first();
+  try {
+    const parsed = JSON.parse(row?.value_text || "{}");
+    return {
+      text: String(parsed.text || "").slice(0, 180),
+      enabled: Boolean(parsed.enabled),
+      startsAt: Number(parsed.startsAt || 0),
+      endsAt: Number(parsed.endsAt || 0),
+      updatedAt: Number(row?.updated_at || 0),
+    };
+  } catch {
+    return { text: "", enabled: false, startsAt: 0, endsAt: 0, updatedAt: 0 };
+  }
+}
+
+async function handleCurrentAnnouncement(request, env) {
+  const announcement = await readAnnouncement(env);
+  const timestamp = now();
+  const active = announcement.enabled && Boolean(announcement.text) && (!announcement.startsAt || timestamp >= announcement.startsAt) && (!announcement.endsAt || timestamp < announcement.endsAt);
+  return json(request, env, 200, { announcement: active ? { text: announcement.text, endsAt: announcement.endsAt || null } : null });
+}
+
+async function handleAdminAnnouncement(request, env, user) {
+  await requireAdminSession(request, env, user);
+  return json(request, env, 200, { announcement: await readAnnouncement(env) });
+}
+
+async function handleAdminUpdateAnnouncement(request, env, user) {
+  await requireAdminSession(request, env, user);
+  const body = await requestJson(request);
+  const text = String(body.text || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  const enabled = Boolean(body.enabled);
+  if (text.length > 180) throw httpError(400, "Announcement text must be 180 characters or fewer");
+  if (enabled && !text) throw httpError(400, "Enter announcement text before turning it on");
+  const parseTime = (value, label) => {
+    if (!value) return 0;
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) throw httpError(400, `${label} is not a valid date`);
+    return timestamp;
+  };
+  const startsAt = parseTime(body.startsAt, "Start time");
+  const endsAt = parseTime(body.endsAt, "End time");
+  if (startsAt && endsAt && endsAt <= startsAt) throw httpError(400, "End time must be after the start time");
+  const timestamp = now();
+  const announcement = { text, enabled, startsAt, endsAt };
   await env.DB.prepare(`
     INSERT INTO site_settings(setting_key, value_text, updated_at, updated_by) VALUES(?, ?, ?, ?)
     ON CONFLICT(setting_key) DO UPDATE SET value_text = excluded.value_text, updated_at = excluded.updated_at, updated_by = excluded.updated_by
-  `).bind(CHAT_MINIMUM_WAGER_SETTING, String(minimumWagerUsdCents), timestamp, user.sub).run();
-  await writeAdminAudit(env, user, "chat.minimum_wager.updated", CHAT_MINIMUM_WAGER_SETTING, JSON.stringify({ minimumWagerUsdCents }));
-  return json(request, env, 200, { minimumWagerUsdCents });
+  `).bind(GLOBAL_ANNOUNCEMENT_SETTING, JSON.stringify(announcement), timestamp, user.sub).run();
+  await writeAdminAudit(env, user, "announcement.updated", GLOBAL_ANNOUNCEMENT_SETTING, JSON.stringify(announcement));
+  return json(request, env, 200, { announcement: { ...announcement, updatedAt: timestamp } });
 }
 
 function promotionResponse(row) {
@@ -5882,6 +5961,7 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
   if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env, await optionalUser(request, env));
   if (request.method === "GET" && path === "/chat/messages") return handleChatMessages(request, env, await optionalUser(request, env));
+  if (request.method === "GET" && path === "/announcements/current") return handleCurrentAnnouncement(request, env);
   const publicAvatarMatch = path.match(/^\/avatars\/([a-f0-9]{32})$/i);
   if (request.method === "GET" && publicAvatarMatch) return handlePublicAvatar(request, env, publicAvatarMatch[1]);
   if (request.method === "GET" && path === "/games/settings") return handleGameSettings(request, env);
@@ -5904,6 +5984,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/admin/leaderboards") return handleAdminLeaderboards(request, env, user);
   if (request.method === "GET" && path === "/admin/chat/settings") return handleAdminChatSettings(request, env, user);
   if (request.method === "POST" && path === "/admin/chat/settings") return handleAdminUpdateChatSettings(request, env, user);
+  if (request.method === "GET" && path === "/admin/announcement") return handleAdminAnnouncement(request, env, user);
+  if (request.method === "POST" && path === "/admin/announcement") return handleAdminUpdateAnnouncement(request, env, user);
   if (request.method === "GET" && path === "/admin/promotions") return handleAdminPromotions(request, env, user);
   if (request.method === "POST" && path === "/admin/promotions") return handleAdminCreatePromotion(request, env, user);
   const removePromotionMatch = path.match(/^\/admin\/promotions\/([A-Za-z0-9-]+)\/remove$/);
@@ -6047,6 +6129,7 @@ export default {
       if (status >= 500) console.error("Wallet request failed", { path: pathFrom(request), message: error?.message, code: error?.code });
       return json(request, env, status, {
         error: publicError(error),
+        ...(error?.code && error.code !== "REQUEST_FAILED" ? { code: error.code } : {}),
         ...(capacityLimited ? { code: "DATABASE_CAPACITY_REACHED", retryable: true } : {}),
       });
     }

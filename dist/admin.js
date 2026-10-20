@@ -54,6 +54,7 @@ let promotionsCache = null;
 let gameEdgesCache = null;
 let chatSettingsCache = null;
 let rankRewardsCache = null;
+let announcementCache = null;
 
 const viewMeta = {
   overview: ["COMMAND", "Overview"],
@@ -334,6 +335,7 @@ async function loadView(view, force = false) {
   if (view === "promotions") return loadPromotionsWorkspace(force);
   if (view === "audit") return loadAudit();
   if (view === "risk") return loadCountryAccess(force);
+  if (view === "content") return loadAnnouncementSettings(force);
   if (view === "system" || view === "integrations") return loadSystem(force);
   setLastRefresh();
 }
@@ -954,7 +956,7 @@ function ensureChatSettingsControl() {
   if (card) return card;
   card = document.createElement("article");
   card.className = "panel-card chat-access-control";
-  card.innerHTML = `<div class="panel-heading"><div><p class="section-kicker">LIVE CHAT</p><h3>Chat access requirement</h3><p>Everyone can read chat. Set the lifetime site wager required before a signed-in player can send messages.</p></div></div><form id="chat-access-form"><label><span>Minimum lifetime wager (USD)</span><div class="leaderboard-money-input"><b>$</b><input id="chat-minimum-wager" type="number" inputmode="decimal" min="0" max="100000000" step="0.01" value="100.00" required /></div></label><button class="solid-button" type="submit">Save chat requirement</button><p class="dialog-status" id="chat-access-status" role="status" aria-live="polite"></p></form>`;
+  card.innerHTML = `<div class="panel-heading"><div><p class="section-kicker">LIVE CHAT</p><h3>Chat controls</h3><p>Everyone can read chat. Control who can send, how often they can post and the maximum message length.</p></div></div><form id="chat-access-form"><label><span>Minimum lifetime wager (USD)</span><div class="leaderboard-money-input"><b>$</b><input id="chat-minimum-wager" type="number" inputmode="decimal" min="0" max="100000000" step="0.01" value="100.00" required /></div></label><label><span>Cooldown (seconds)</span><input id="chat-cooldown" type="number" inputmode="decimal" min="0" max="300" step="0.1" value="1.5" required /></label><label><span>Maximum characters</span><input id="chat-max-characters" type="number" inputmode="numeric" min="1" max="1000" step="1" value="240" required /></label><button class="solid-button" type="submit">Save chat controls</button><p class="dialog-status" id="chat-access-status" role="status" aria-live="polite"></p></form>`;
   const systemPanel = document.querySelector('[data-admin-panel="system"]');
   systemPanel?.querySelector(".global-controls")?.before(card);
   card.querySelector("form").addEventListener("submit", async (event) => {
@@ -966,10 +968,14 @@ function ensureChatSettingsControl() {
     try {
       chatSettingsCache = await api("/admin/chat/settings", {
         method: "POST",
-        body: JSON.stringify({ minimumWagerUsd: event.currentTarget.querySelector("input").value }),
+        body: JSON.stringify({
+          minimumWagerUsd: event.currentTarget.querySelector("#chat-minimum-wager").value,
+          cooldownSeconds: Number(event.currentTarget.querySelector("#chat-cooldown").value),
+          maxCharacters: Number(event.currentTarget.querySelector("#chat-max-characters").value),
+        }),
       });
       renderChatSettings(chatSettingsCache);
-      status.textContent = "Live chat requirement updated for every player.";
+      status.textContent = "Live chat controls updated for every player.";
       status.dataset.state = "success";
       showToast("Chat requirement updated");
     } catch (error) {
@@ -984,9 +990,77 @@ function ensureChatSettingsControl() {
 
 function renderChatSettings(settings) {
   const card = ensureChatSettingsControl();
-  const input = card?.querySelector("#chat-minimum-wager");
-  if (input) input.value = (Number(settings?.minimumWagerUsdCents || 0) / 100).toFixed(2);
+  const minimum = card?.querySelector("#chat-minimum-wager");
+  const cooldown = card?.querySelector("#chat-cooldown");
+  const maximum = card?.querySelector("#chat-max-characters");
+  if (minimum) minimum.value = (Number(settings?.minimumWagerUsdCents || 0) / 100).toFixed(2);
+  if (cooldown) cooldown.value = String(Number(settings?.cooldownSeconds ?? 1.5));
+  if (maximum) maximum.value = String(Number(settings?.maxCharacters || 240));
 }
+
+function localDateTimeValue(timestamp) {
+  if (!Number(timestamp)) return "";
+  const date = new Date(Number(timestamp) - new Date(Number(timestamp)).getTimezoneOffset() * 60_000);
+  return date.toISOString().slice(0, 16);
+}
+
+function renderAnnouncementSettings(data) {
+  const announcement = data?.announcement || {};
+  const text = document.querySelector("#announcement-text");
+  const enabled = document.querySelector("#announcement-enabled");
+  if (!text || !enabled) return;
+  text.value = announcement.text || "";
+  enabled.checked = Boolean(announcement.enabled);
+  document.querySelector("#announcement-starts").value = localDateTimeValue(announcement.startsAt);
+  document.querySelector("#announcement-ends").value = localDateTimeValue(announcement.endsAt);
+  updateAnnouncementPreview();
+}
+
+async function loadAnnouncementSettings(force = false) {
+  if (!announcementCache || force) announcementCache = await api("/admin/announcement");
+  renderAnnouncementSettings(announcementCache);
+  setLastRefresh();
+}
+
+function updateAnnouncementPreview() {
+  const text = document.querySelector("#announcement-text")?.value || "";
+  const enabled = Boolean(document.querySelector("#announcement-enabled")?.checked);
+  const preview = document.querySelector("#announcement-preview strong");
+  const count = document.querySelector("#announcement-character-count");
+  const liveStatus = document.querySelector("#announcement-live-status");
+  if (preview) preview.textContent = text.trim() || "Your announcement preview appears here.";
+  if (count) count.textContent = String(text.length);
+  if (liveStatus) { liveStatus.textContent = enabled ? "ON" : "OFF"; liveStatus.className = `status-pill ${enabled ? "live" : ""}`; }
+}
+
+document.querySelector("#announcement-text")?.addEventListener("input", updateAnnouncementPreview);
+document.querySelector("#announcement-enabled")?.addEventListener("change", updateAnnouncementPreview);
+document.querySelector("#announcement-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  const status = document.querySelector("#announcement-status");
+  const toIso = (value) => value ? new Date(value).toISOString() : null;
+  button.disabled = true;
+  status.textContent = "";
+  try {
+    announcementCache = await api("/admin/announcement", {
+      method: "POST",
+      body: JSON.stringify({
+        text: document.querySelector("#announcement-text").value,
+        enabled: document.querySelector("#announcement-enabled").checked,
+        startsAt: toIso(document.querySelector("#announcement-starts").value),
+        endsAt: toIso(document.querySelector("#announcement-ends").value),
+      }),
+    });
+    renderAnnouncementSettings(announcementCache);
+    status.textContent = "Announcement updated across GamRace.";
+    status.dataset.state = "success";
+    showToast("Announcement updated");
+  } catch (error) {
+    status.textContent = error.message;
+    status.dataset.state = "error";
+  } finally { button.disabled = false; }
+});
 
 function renderSystem(data) {
   const services = data.services || [];

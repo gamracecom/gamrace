@@ -40,14 +40,20 @@ function lockIcon() {
 function renderRankRewards(ranks = []) {
   const rail = document.querySelector("[data-rank-reward-rail]");
   if (!rail) return;
+  const currentRankId = [...ranks].reverse().find((rank) => rank.unlocked)?.id || "";
   rail.innerHTML = ranks.map((rank) => {
     const starterRank = rank.id === "rookie-1";
-    const state = rank.claimed ? "claimed" : rank.canClaim ? "claimable" : starterRank && rank.unlocked ? "current" : "locked";
-    const action = rank.claimed ? "Claimed" : rank.canClaim ? `Claim ${usd(rank.rewardUsdCents)}` : starterRank && rank.unlocked ? "Current" : `${lockIcon()} Locked`;
+    const starterCurrent = starterRank && rank.id === currentRankId;
+    const starterCompleted = starterRank && rank.unlocked && !starterCurrent;
+    const state = rank.claimed ? "claimed" : rank.canClaim ? "claimable" : starterCurrent ? "current" : starterCompleted ? "completed" : "locked";
+    const action = rank.claimed ? "Claimed" : rank.canClaim ? `Claim ${usd(rank.rewardUsdCents)}` : starterCurrent ? "Current" : starterCompleted ? "Completed" : `${lockIcon()} Locked`;
     return `<article class="rank-reward-item ${state}" data-rank-id="${escapeHtml(rank.id)}"><div class="rank-reward-image"><img src="${escapeHtml(rank.badgePath)}" alt="" /></div><h2><span>${escapeHtml(rank.name)}</span><b>${escapeHtml(rank.tier)}</b></h2><button type="button" data-claim-rank="${escapeHtml(rank.id)}" ${rank.canClaim ? "" : "disabled"}>${action}</button></article>`;
   }).join("");
   const current = [...rail.querySelectorAll(".rank-reward-item.current,.rank-reward-item.claimable")].at(-1);
-  requestAnimationFrame(() => current?.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" }));
+  requestAnimationFrame(() => {
+    if (!current) return;
+    rail.scrollLeft = Math.max(0, current.offsetLeft - (rail.clientWidth - current.clientWidth) / 2);
+  });
   rail.querySelectorAll("[data-claim-rank]").forEach((button) => button.addEventListener("click", claimRankReward));
 }
 

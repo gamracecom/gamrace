@@ -16,12 +16,18 @@ test("live chat is shared, wager gated and available on every main surface", () 
   assert.match(chat, /Requirement to chat:/);
   assert.match(chat, /minimumWagerUsdCents/);
   assert.doesNotMatch(chat, /Checking chat access/);
-  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-4/);
+  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-5/);
   assert.match(chat, /live-chat-mention/);
   assert.match(chat, /mentionedMe/);
   assert.match(chat, /live-chat-send/);
+  assert.match(chat, /live-chat-emoji-toggle/);
+  assert.match(chat, /data-chat-emoji/);
+  assert.match(chat, /access\?\.maxCharacters/);
+  assert.match(chat, /access\?\.cooldownMs/);
   assert.match(admin, /\/admin\/chat\/settings/);
   assert.match(admin, /Minimum lifetime wager \(USD\)/);
+  assert.match(admin, /Cooldown \(seconds\)/);
+  assert.match(admin, /Maximum characters/);
 });
 
 test("mobile chat toggles over the previous page and account transactions cannot overflow", () => {
@@ -33,4 +39,6 @@ test("mobile chat toggles over the previous page and account transactions cannot
   assert.match(styles, /overflow-x:hidden!important/);
   assert.match(styles, /\.live-chat-avatar/);
   assert.match(styles, /\.live-chat-mention-highlight/);
+  assert.match(styles, /bottom:calc\(var\(--mobile-tabbar-height,62px\) \+ env\(safe-area-inset-bottom\)\)!important/);
+  assert.match(styles, /\.mobile-tab-action\.active[\s\S]*?color:#168bff!important/);
 });

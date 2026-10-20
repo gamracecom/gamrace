@@ -32,6 +32,8 @@ test("Rewards claims, promo claims and history are live wallet-backed actions", 
   assert.match(client, /lockIcon/);
   assert.match(client, /gamraceWallet\?\.refresh\?\.\(\)/);
   assert.match(client, /starterRank[\s\S]*?"Current"/);
+  assert.match(client, /currentRankId/);
+  assert.match(client, /rail\.scrollLeft/);
   assert.doesNotMatch(client, /Next drop in/);
   assert.match(worker, /\["i", "ii", "iii"\]\[tierIndex\]/);
 });

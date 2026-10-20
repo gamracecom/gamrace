@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = "gamrace-shell-state-v1";
   const WALLET_SELECTION_KEY = "gamrace-wallet-selection-v1";
+  const API_BASE = "https://gamrace-wallet-api.gamracecom.workers.dev";
   const DEFAULT_RANK_BADGE = "ranks/rookie-i.webp";
   const PRELOAD_ASSETS = [
     "assets/brand/gamrace-icon.png",
@@ -106,13 +107,45 @@
     });
   }
 
+  function announcementBanner() {
+    let banner = document.querySelector(".global-announcement");
+    if (banner) return banner;
+    banner = document.createElement("div");
+    banner.className = "global-announcement";
+    banner.hidden = true;
+    banner.setAttribute("role", "status");
+    banner.setAttribute("aria-live", "polite");
+    banner.innerHTML = '<span aria-hidden="true">!</span><strong></strong>';
+    const main = document.querySelector(".main-content");
+    const topbar = main?.querySelector(":scope > .topbar");
+    if (topbar) topbar.insertAdjacentElement("afterend", banner);
+    else (main || document.body).prepend(banner);
+    return banner;
+  }
+
+  async function loadAnnouncement() {
+    const banner = announcementBanner();
+    try {
+      const response = await fetch(`${API_BASE}/announcements/current`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      const text = response.ok ? String(body.announcement?.text || "") : "";
+      banner.querySelector("strong").textContent = text;
+      banner.hidden = !text;
+      document.body.classList.toggle("has-global-announcement", Boolean(text));
+    } catch {
+      banner.hidden = true;
+      document.body.classList.remove("has-global-announcement");
+    }
+  }
+
   const initial = read();
   const initialWalletSelection = readWalletSelection();
   if (initialWalletSelection) window.gamraceWalletSelection = initialWalletSelection;
   document.documentElement.dataset.sessionState = initial?.signedIn ? "signed-in" : "unknown";
   PRELOAD_ASSETS.forEach((source) => { const image = new Image(); image.src = source; });
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => apply(initial), { once: true });
-  else apply(initial);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { apply(initial); loadAnnouncement(); }, { once: true });
+  else { apply(initial); loadAnnouncement(); }
+  window.setInterval(loadAnnouncement, 30_000);
   window.setTimeout(() => {
     if (document.body?.dataset.authenticated !== "pending") return;
     document.body.dataset.authenticated = "false";
