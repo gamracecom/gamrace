@@ -16,7 +16,7 @@ test("live chat is shared, wager gated and available on every main surface", () 
   assert.match(chat, /Requirement to chat:/);
   assert.match(chat, /minimumWagerUsdCents/);
   assert.doesNotMatch(chat, /Checking chat access/);
-  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-5/);
+  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-6/);
   assert.match(chat, /live-chat-mention/);
   assert.match(chat, /mentionedMe/);
   assert.match(chat, /live-chat-send/);
@@ -24,6 +24,8 @@ test("live chat is shared, wager gated and available on every main surface", () 
   assert.match(chat, /data-chat-emoji/);
   assert.match(chat, /access\?\.maxCharacters/);
   assert.match(chat, /access\?\.cooldownMs/);
+  assert.match(chat, /send\.disabled = !allowed \|\| coolingDown/);
+  assert.match(chat, /<circle cx="16" cy="16" r="10\.5"/);
   assert.match(admin, /\/admin\/chat\/settings/);
   assert.match(admin, /Minimum lifetime wager \(USD\)/);
   assert.match(admin, /Cooldown \(seconds\)/);
@@ -41,4 +43,6 @@ test("mobile chat toggles over the previous page and account transactions cannot
   assert.match(styles, /\.live-chat-mention-highlight/);
   assert.match(styles, /bottom:calc\(var\(--mobile-tabbar-height,62px\) \+ env\(safe-area-inset-bottom\)\)!important/);
   assert.match(styles, /\.mobile-tab-action\.active[\s\S]*?color:#168bff!important/);
+  assert.match(styles, /\.live-chat-form input\{height:42px;font-size:16px!important\}/);
+  assert.match(styles, /grid-template-columns:minmax\(0,1fr\) 42px 42px/);
 });

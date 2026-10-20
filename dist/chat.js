@@ -10,7 +10,7 @@
   let access = null;
 
   const sendIcon = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 6.5 27 16 5 25.5l2.2-7.2L18 16 7.2 13.7 5 6.5Z" fill="currentColor"/><path d="m18 16-10.8 2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>`;
-  const emojiIcon = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11.5 10.5 6h11L25 11.5V20l-5 6h-8l-5-6v-8.5Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M11 12.5h10l2 3.5-3 6h-8l-3-6 2-3.5Z" fill="currentColor" opacity=".18"/><circle cx="12.5" cy="16" r="1.3" fill="currentColor"/><circle cx="19.5" cy="16" r="1.3" fill="currentColor"/><path d="M12.5 20c2.1 1.5 4.9 1.5 7 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+  const emojiIcon = `<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" stroke-width="2.3"/><circle cx="12.25" cy="13.6" r="1.35" fill="currentColor"/><circle cx="19.75" cy="13.6" r="1.35" fill="currentColor"/><path d="M11.5 18.3c1.15 2.15 2.7 3.15 4.5 3.15s3.35-1 4.5-3.15" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>`;
   const mentionIcon = `<svg viewBox="0 0 28 28" aria-hidden="true"><path d="M19.8 20.8A9 9 0 1 1 22.7 14v2.1c0 2.3-3.5 2.5-3.8.2V9.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><circle cx="14" cy="14" r="4.5" fill="none" stroke="currentColor" stroke-width="2.1"/></svg>`;
   const emojis = ["🏁", "🏎️", "🔥", "⚡", "💙", "😂", "🎉", "🚀", "💰", "🏆", "✅", "👀"];
 
@@ -159,7 +159,7 @@
   function syncComposer() {
     const coolingDown = Date.now() < cooldownUntil;
     const allowed = Boolean(access?.canSend) && !input.disabled;
-    send.disabled = !allowed || coolingDown || !input.value.trim();
+    send.disabled = !allowed || coolingDown;
     emojiToggle.disabled = !allowed || coolingDown;
   }
 

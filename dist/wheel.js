@@ -119,8 +119,8 @@
     if (multiplier === 0) return index % 2 ? ["#28313b", "#171c23"] : ["#35404d", "#202731"];
     if (multiplier < 1) return index % 2 ? ["#ff5470", "#c72d4b"] : ["#ff7458", "#c6472d"];
     const palettes = risk === "medium"
-      ? [["#168bff", "#075db8"], ["#15c7d9", "#078999"], ["#8b5cf6", "#5c36bd"], ["#32d583", "#168a54"]]
-      : [["#249cff", "#0d66bc"], ["#20d4e6", "#078d9d"], ["#7c6cff", "#4d3cc5"], ["#38d996", "#15845a"]];
+      ? [["#168bff", "#075db8"], ["#168bff", "#078999"], ["#8b5cf6", "#5c36bd"], ["#32d583", "#168a54"]]
+      : [["#168bff", "#0d66bc"], ["#168bff", "#078d9d"], ["#7c6cff", "#4d3cc5"], ["#38d996", "#15845a"]];
     return palettes[index % palettes.length];
   }
 

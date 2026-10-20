@@ -194,7 +194,7 @@
     if (ball.collision) {
       context.beginPath();
       context.arc(ball.collision.x, ball.collision.y, 8 + 12 * ball.collision.strength, 0, Math.PI * 2);
-      context.strokeStyle = `rgba(47, 128, 255, ${.34 * (1 - ball.collision.strength)})`;
+      context.strokeStyle = `rgba(22,139,255, ${.34 * (1 - ball.collision.strength)})`;
       context.lineWidth = 2;
       context.stroke();
     }
@@ -202,12 +202,12 @@
     context.arc(ball.x, ball.y, 9, 0, Math.PI * 2);
     const fill = context.createRadialGradient(ball.x - 3, ball.y - 4, 1, ball.x, ball.y, 11);
     fill.addColorStop(0, "#ffffff");
-    fill.addColorStop(.28, "#8fc7ff");
+    fill.addColorStop(.28, "#168bff");
     fill.addColorStop(1, "#168bff");
     context.fillStyle = fill;
     context.fill();
     context.lineWidth = 1.5;
-    context.strokeStyle = "#72b9ff";
+    context.strokeStyle = "#168bff";
     context.stroke();
   }
 
