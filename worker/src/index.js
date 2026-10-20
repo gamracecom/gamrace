@@ -1271,6 +1271,61 @@ async function handleAccountPreferences(request, env, user) {
   return json(request, env, 200, { preferences });
 }
 
+async function handlePublicPlayerProfile(request, env, viewer, usernameValue) {
+  const username = decodeURIComponent(String(usernameValue || "")).trim();
+  if (!/^[A-Za-z][A-Za-z0-9_]{2,19}$/.test(username)) throw httpError(404, "Player profile not found");
+  const result = await env.DB.prepare(`
+    SELECT p.uid, p.username, p.profile_public, p.show_username, p.show_rank,
+      pref.preferences_json, avatar.public_id AS avatar_public_id,
+      avatar.image_base64 AS avatar_image_base64, avatar.updated_at AS avatar_updated_at
+    FROM player_profiles p
+    LEFT JOIN player_preferences pref ON pref.uid = p.uid
+    LEFT JOIN player_avatars avatar ON avatar.uid = p.uid
+    WHERE p.username = ? COLLATE NOCASE
+    ORDER BY p.updated_at DESC LIMIT 2
+  `).bind(username).all();
+  const matches = result.results || [];
+  if (!matches.length) throw httpError(404, "Player profile not found");
+  if (matches.length > 1) throw httpError(409, "That username is not uniquely available");
+  const row = matches[0];
+  let preferences = {};
+  try { preferences = safeAccountPreferences(JSON.parse(String(row.preferences_json || "{}"))); }
+  catch { preferences = {}; }
+  const isSelf = Boolean(viewer?.sub && viewer.sub === row.uid);
+  const profilePublic = isSelf || (Boolean(row.profile_public) && preferences.profilePublic !== false);
+  const usernameVisible = isSelf || (profilePublic && Boolean(row.show_username) && preferences.showUsername !== false);
+  if (!profilePublic || !usernameVisible) throw httpError(404, "This player keeps their profile private");
+
+  const account = await liveAccountSnapshot(env, row.uid, { includeActivity: false });
+  const summary = account.summary || {};
+  const showRank = isSelf || (Boolean(row.show_rank) && preferences.showRank !== false);
+  const showWagers = isSelf || preferences.showWagers === true;
+  const showProfit = isSelf || preferences.showProfit === true;
+  const showFavorites = isSelf || preferences.showFavorites !== false;
+  const rank = showRank ? leaderboardRank(Number(summary.lifetimeWeightedWager || 0)) : null;
+  return json(request, env, 200, {
+    profile: {
+      username: String(row.username),
+      avatar: playerAvatarResponse(request, row.uid, {
+        public_id: row.avatar_public_id,
+        image_base64: row.avatar_image_base64,
+        updated_at: row.avatar_updated_at,
+      }),
+      rank,
+      isSelf,
+      canTip: !isSelf && preferences.allowTips !== false,
+      stats: {
+        totalBets: Number(summary.totalBets || 0),
+        winRate: Number(summary.winRate || 0),
+        netProfitLoss: showProfit ? Number(summary.netProfitLoss || 0) : null,
+        totalWagered: showWagers ? Number(summary.totalWagered || 0) : null,
+        highestMultiplier: Number(summary.highestMultiplier || 0),
+        favouriteGame: showFavorites ? String(summary.favouriteGame || "—") : null,
+      },
+    },
+  });
+}
+
 async function walletFundingActivity(env, uid) {
   const result = await env.DB.prepare(`
     SELECT payment_id AS id, 'deposit' AS type, status, pay_amount AS amount,
@@ -1392,6 +1447,8 @@ async function handleCreateWalletTip(request, env, user) {
   if (recipientMatches.results.length > 1) throw httpError(409, "That username is not uniquely available");
   const recipient = recipientMatches.results[0];
   if (recipient.uid === user.sub) throw httpError(400, "You cannot tip your own account");
+  const recipientPreferences = await readAccountPreferences(env, recipient.uid);
+  if (recipientPreferences.allowTips === false) throw httpError(409, "That player is not accepting tips");
 
   const asset = requireWalletAsset(normalizeCurrency(body.currency));
   const amountUnits = parseAssetUnits(body.amount, { maximumUnits: 1_000_000_000_000_000 });
@@ -5127,17 +5184,22 @@ async function readChatSettings(env) {
 }
 
 function chatMessageResponse(request, row, viewer = null) {
+  const isSelf = Boolean(viewer?.sub && row.uid === viewer.sub);
+  const profileVisible = isSelf || (Boolean(row.profile_public ?? 1) && Boolean(row.show_username ?? 1));
+  const rankVisible = isSelf || (profileVisible && Boolean(row.show_rank ?? 1));
+  const username = profileVisible ? String(row.current_username || row.username || "Racer") : "Hidden Racer";
   return {
     id: row.id,
-    username: row.username,
-    rankLabel: row.rank_label,
-    badgePath: row.badge_path,
-    avatarUrl: avatarUrl(request, row.avatar_public_id, Boolean(row.avatar_has_image), row.avatar_updated_at),
-    avatarColor: avatarColor(row.uid),
+    username,
+    rankLabel: rankVisible ? row.rank_label : null,
+    badgePath: rankVisible ? row.badge_path : null,
+    avatarUrl: profileVisible ? avatarUrl(request, row.avatar_public_id, Boolean(row.avatar_has_image), row.avatar_updated_at) : null,
+    avatarColor: profileVisible ? avatarColor(row.uid) : "#26313c",
+    profileVisible,
     message: row.message,
     mentionedUsername: row.mentioned_username || null,
     mentionedMe: Boolean(viewer?.sub && row.mentioned_uid === viewer.sub),
-    mentionable: row.username !== "Hidden Racer",
+    mentionable: profileVisible,
     createdAt: Number(row.created_at),
   };
 }
@@ -5147,16 +5209,18 @@ async function handleChatMessages(request, env, viewer) {
   const after = Math.max(0, Number(url.searchParams.get("after") || 0));
   const result = after
     ? await env.DB.prepare(`
-        SELECT m.id, m.uid, m.username, m.rank_label, m.badge_path, m.message, m.mentioned_uid, m.mentioned_username, m.created_at,
+        SELECT m.id, m.uid, m.username, p.username AS current_username, p.profile_public, p.show_username, p.show_rank,
+          m.rank_label, m.badge_path, m.message, m.mentioned_uid, m.mentioned_username, m.created_at,
           a.public_id AS avatar_public_id, CASE WHEN a.image_base64 IS NULL THEN 0 ELSE 1 END AS avatar_has_image, a.updated_at AS avatar_updated_at
-        FROM chat_messages m LEFT JOIN player_avatars a ON a.uid = m.uid
+        FROM chat_messages m LEFT JOIN player_avatars a ON a.uid = m.uid LEFT JOIN player_profiles p ON p.uid = m.uid
         WHERE m.deleted_at IS NULL AND m.created_at > ? ORDER BY m.created_at ASC LIMIT 100
       `).bind(after).all()
     : await env.DB.prepare(`
-        SELECT recent.*, a.public_id AS avatar_public_id, CASE WHEN a.image_base64 IS NULL THEN 0 ELSE 1 END AS avatar_has_image, a.updated_at AS avatar_updated_at
+        SELECT recent.*, p.username AS current_username, p.profile_public, p.show_username, p.show_rank,
+          a.public_id AS avatar_public_id, CASE WHEN a.image_base64 IS NULL THEN 0 ELSE 1 END AS avatar_has_image, a.updated_at AS avatar_updated_at
         FROM (SELECT id, uid, username, rank_label, badge_path, message, mentioned_uid, mentioned_username, created_at
           FROM chat_messages WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100) recent
-        LEFT JOIN player_avatars a ON a.uid = recent.uid ORDER BY recent.created_at ASC
+        LEFT JOIN player_avatars a ON a.uid = recent.uid LEFT JOIN player_profiles p ON p.uid = recent.uid ORDER BY recent.created_at ASC
       `).all();
   return json(request, env, 200, { messages: (result.results || []).map((row) => chatMessageResponse(request, row, viewer)), generatedAt: now() });
 }
@@ -6023,6 +6087,8 @@ async function route(request, env) {
   if (request.method === "GET" && path === "/region-access") return handleRegionAccess(request, env);
   if (request.method === "GET" && path === "/leaderboards") return handleLeaderboards(request, env, await optionalUser(request, env));
   if (request.method === "GET" && path === "/chat/messages") return handleChatMessages(request, env, await optionalUser(request, env));
+  const publicPlayerProfileMatch = path.match(/^\/players\/([A-Za-z][A-Za-z0-9_]{2,19})\/profile$/);
+  if (request.method === "GET" && publicPlayerProfileMatch) return handlePublicPlayerProfile(request, env, await optionalUser(request, env), publicPlayerProfileMatch[1]);
   if (request.method === "GET" && path === "/announcements/current") return handleCurrentAnnouncement(request, env);
   const publicAvatarMatch = path.match(/^\/avatars\/([a-f0-9]{32})$/i);
   if (request.method === "GET" && publicAvatarMatch) return handlePublicAvatar(request, env, publicAvatarMatch[1]);

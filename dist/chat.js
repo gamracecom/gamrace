@@ -57,8 +57,13 @@
   }
 
   function avatarNode(message) {
-    const avatar = document.createElement("span");
+    const avatar = document.createElement(message.profileVisible ? "button" : "span");
     avatar.className = "live-chat-avatar";
+    if (message.profileVisible) {
+      avatar.type = "button";
+      avatar.dataset.playerProfile = message.username;
+      avatar.setAttribute("aria-label", `View ${message.username}'s profile`);
+    }
     avatar.style.setProperty("--avatar-color", message.avatarColor || "#168bff");
     const image = document.createElement("img");
     image.alt = "";
@@ -106,14 +111,22 @@
     meta.className = "live-chat-message-meta";
     const identity = document.createElement("span");
     identity.className = "live-chat-identity";
-    const rank = document.createElement("img");
-    rank.alt = message.rankLabel || "Player rank";
-    rank.title = message.rankLabel || "Player rank";
-    rank.src = message.badgePath || "ranks/rookie-i.webp";
-    rank.addEventListener("error", () => { rank.src = "ranks/rookie-i.webp"; }, { once: true });
-    const name = document.createElement("strong");
+    if (message.badgePath) {
+      const rank = document.createElement("img");
+      rank.alt = message.rankLabel || "Player rank";
+      rank.title = message.rankLabel || "Player rank";
+      rank.src = message.badgePath;
+      rank.addEventListener("error", () => { rank.hidden = true; }, { once: true });
+      identity.append(rank);
+    }
+    const name = document.createElement(message.profileVisible ? "button" : "strong");
+    if (message.profileVisible) {
+      name.type = "button";
+      name.className = "live-chat-profile-link";
+      name.dataset.playerProfile = message.username;
+    }
     name.textContent = message.username || "Racer";
-    identity.append(rank, name);
+    identity.append(name);
     meta.append(identity);
     if (message.mentionable !== false) {
       const mention = document.createElement("button");

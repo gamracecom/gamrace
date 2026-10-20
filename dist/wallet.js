@@ -398,6 +398,13 @@ window.gamraceWallet = {
   applyGameResult: (result) => applyWalletSnapshot(result?.wallet),
   refresh: async () => { await loadWallet(); return walletSelectionDetail(); },
   selection: () => walletSelectionDetail(),
+  openTip: async (username = "") => {
+    await openWallet("tip");
+    if (dialog.overlay.hidden) return;
+    const input = dialog.tipForm.elements.username;
+    input.value = String(username || "").trim();
+    input.focus({ preventScroll: true });
+  },
 };
 
 function updateBalanceMenus() {
@@ -428,7 +435,7 @@ function updateBalanceMenus() {
       option.setAttribute("aria-selected", String(selected));
       const shownBalance = balancePreferences.displayFiat ? money(groupUsdCents) : cleanCryptoAmount(groupAvailable);
       const networkLabel = group.length === 1 ? `<small>${asset.network}</small>` : "";
-      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}${networkLabel}</strong><em>${shownBalance}</em></span><i aria-hidden="true"></i>`;
+      option.innerHTML = `<img src="${iconUrl(asset)}" alt="" /><span><strong>${asset.symbol}${networkLabel}</strong><em>${shownBalance}</em></span>`;
       option.addEventListener("click", async () => {
         closeBalanceMenus();
         try { await selectWalletCurrency(asset.code); } catch (error) { setStatus(error.message, "error"); }

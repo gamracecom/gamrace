@@ -87,7 +87,19 @@
     const card = podiumCards.find((item) => Number(item.dataset.podiumPosition) === position);
     if (!card) return;
     const image = card.querySelector("[data-racer-badge]");
-    card.querySelector("[data-racer-name]").textContent = entry?.username || "Grid position open";
+    const playerName = card.querySelector("[data-racer-name]");
+    const playerBadge = card.querySelector(".podium-badge");
+    playerName.textContent = entry?.username || "Grid position open";
+    const profileUsername = entry?.profileVisible ? entry.username : "";
+    playerName.disabled = !profileUsername;
+    playerBadge.disabled = !profileUsername;
+    if (profileUsername) {
+      playerName.dataset.playerProfile = profileUsername;
+      playerBadge.dataset.playerProfile = profileUsername;
+    } else {
+      delete playerName.dataset.playerProfile;
+      delete playerBadge.dataset.playerProfile;
+    }
     card.querySelector("[data-racer-rank]").textContent = entry?.playerRank?.label || "Qualify to take the seat";
     card.querySelector("[data-racer-wager]").textContent = entry ? wagerFromCents(entry.wagerUsdCents) : "—";
     card.querySelector("[data-racer-prize]").textContent = prizeForPosition(campaign, position);
@@ -110,8 +122,13 @@
 
     const racer = document.createElement("span");
     racer.className = "race-player";
-    const badge = document.createElement("span");
+    const badge = document.createElement(entry.profileVisible ? "button" : "span");
     badge.className = "race-player-badge";
+    if (entry.profileVisible) {
+      badge.type = "button";
+      badge.dataset.playerProfile = entry.username;
+      badge.setAttribute("aria-label", `View ${entry.username}'s profile`);
+    }
     if (entry.playerRank?.badgePath) {
       const image = document.createElement("img");
       image.alt = "";
@@ -119,7 +136,12 @@
       badge.append(image);
       loadBadge(image, entry.playerRank.badgePath, entry.playerRank.label || "Player rank");
     }
-    const username = document.createElement("strong");
+    const username = document.createElement(entry.profileVisible ? "button" : "strong");
+    if (entry.profileVisible) {
+      username.type = "button";
+      username.className = "race-player-profile-name";
+      username.dataset.playerProfile = entry.username;
+    }
     username.textContent = entry.username || "Hidden Racer";
     racer.append(badge, username);
 
@@ -146,6 +168,8 @@
     currentPlayerRow.hidden = false;
     currentPlayerRow.querySelector("[data-current-player-position]").textContent = player.position ? String(player.position) : "—";
     currentPlayerRow.querySelector("[data-current-player-name]").textContent = player.username || "You";
+    currentPlayerRow.querySelector("[data-current-player-name]").dataset.playerProfile = player.username || "";
+    currentPlayerRow.querySelector("[data-current-player-profile]").dataset.playerProfile = player.username || "";
     currentPlayerRow.querySelector("[data-current-player-wager]").textContent = wagerFromCents(player.wagerUsdCents);
     loadBadge(currentPlayerRow.querySelector("[data-current-player-badge]"), player.playerRank?.badgePath, player.playerRank?.label);
     const cutoff = standings[places - 1];

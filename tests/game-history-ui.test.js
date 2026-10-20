@@ -29,7 +29,7 @@ test("game result tables use site typography and return only three winning leade
 
 test("live result users include rank badges and privacy-aware profiles", () => {
   assert.match(script, /history-rank-badge/);
-  assert.match(script, /openProfile\(entry\)/);
+  assert.match(script, /button\.dataset\.playerProfile = entry\.username/);
   assert.match(worker, /Hidden Player/);
   assert.match(worker, /profileVisible/);
 });

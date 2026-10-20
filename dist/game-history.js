@@ -86,43 +86,6 @@
     return element;
   }
 
-  function ensureProfileDialog() {
-    let overlay = document.querySelector("#public-player-profile");
-    if (overlay) return overlay;
-    overlay = document.createElement("div");
-    overlay.className = "public-profile-overlay";
-    overlay.id = "public-player-profile";
-    overlay.hidden = true;
-    overlay.innerHTML = `
-      <section class="public-profile-card" role="dialog" aria-modal="true" aria-labelledby="public-profile-name">
-        <button class="public-profile-close" type="button" aria-label="Close player profile">×</button>
-        <img class="public-profile-badge" alt="" />
-        <span class="section-kicker">GAMRACE PLAYER</span>
-        <h2 id="public-profile-name">Player</h2>
-        <p class="public-profile-rank">Rookie I</p>
-        <p class="public-profile-copy">This player has shared their public GamRace profile.</p>
-      </section>`;
-    const close = () => { overlay.hidden = true; };
-    overlay.querySelector(".public-profile-close").addEventListener("click", close);
-    overlay.addEventListener("click", (event) => { if (event.target === overlay) close(); });
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !overlay.hidden) close(); });
-    document.body.append(overlay);
-    return overlay;
-  }
-
-  function openProfile(entry) {
-    if (!entry.profileVisible || entry.usernameHidden) return;
-    const overlay = ensureProfileDialog();
-    const rank = entry.playerRank || { label: "Rank hidden", badgePath: "" };
-    overlay.querySelector("#public-profile-name").textContent = entry.username;
-    overlay.querySelector(".public-profile-rank").textContent = rank.label;
-    const badge = overlay.querySelector(".public-profile-badge");
-    badge.src = rank.badgePath || "";
-    badge.hidden = !rank.badgePath;
-    overlay.hidden = false;
-    overlay.querySelector(".public-profile-close").focus();
-  }
-
   function playerCell(entry) {
     const element = document.createElement("td");
     element.className = "history-user-cell";
@@ -139,7 +102,7 @@
       button.className = "history-user-button";
       button.type = "button";
       button.textContent = username;
-      button.addEventListener("click", () => openProfile(entry));
+      button.dataset.playerProfile = entry.username;
       element.append(button);
     } else {
       const label = document.createElement("span");

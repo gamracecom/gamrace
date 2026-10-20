@@ -11,7 +11,7 @@
     <link rel="preload" as="image" href="ranks/rookie-i.webp" />
     <script src="shell-state.js?v=global-announcement-1"></script>
     <link rel="preload" as="image" href="assets/banners/leaderboard-checkered-flag-v1.webp" />
-    <link rel="stylesheet" href="styles.css?v=brand-blue-3&amp;leaderboard-page=8&amp;wallet=7&amp;chat=6" />
+    <link rel="stylesheet" href="styles.css?v=brand-blue-3&amp;leaderboard-page=9&amp;profile=1&amp;wallet=8" />
   </head>
   <body class="leaderboard-page" data-authenticated="pending">
     <div class="app-shell">
@@ -79,22 +79,22 @@
             <div class="race-podium" data-leaderboard-podium>
               <article class="podium-racer floating-podium-card second" data-podium-position="2">
                 <span class="podium-aura" aria-hidden="true"></span><span class="podium-medal">2</span>
-                <div class="podium-badge"><img alt="" data-racer-badge /></div>
-                <strong data-racer-name>Grid position open</strong><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
+                <button class="podium-badge" type="button" disabled><img alt="" data-racer-badge /></button>
+                <button class="podium-profile-name" type="button" data-racer-name disabled>Grid position open</button><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
                 <b data-racer-wager>—</b><small>Weighted wager</small>
                 <div class="podium-prize" data-racer-prize>Prize TBA</div>
               </article>
               <article class="podium-racer floating-podium-card first" data-podium-position="1">
                 <span class="podium-aura" aria-hidden="true"></span><span class="podium-medal">1</span>
-                <div class="podium-badge"><img alt="" data-racer-badge /></div>
-                <strong data-racer-name>Grid position open</strong><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
+                <button class="podium-badge" type="button" disabled><img alt="" data-racer-badge /></button>
+                <button class="podium-profile-name" type="button" data-racer-name disabled>Grid position open</button><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
                 <b data-racer-wager>—</b><small>Weighted wager</small>
                 <div class="podium-prize" data-racer-prize>Prize TBA</div>
               </article>
               <article class="podium-racer floating-podium-card third" data-podium-position="3">
                 <span class="podium-aura" aria-hidden="true"></span><span class="podium-medal">3</span>
-                <div class="podium-badge"><img alt="" data-racer-badge /></div>
-                <strong data-racer-name>Grid position open</strong><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
+                <button class="podium-badge" type="button" disabled><img alt="" data-racer-badge /></button>
+                <button class="podium-profile-name" type="button" data-racer-name disabled>Grid position open</button><span class="podium-rank" data-racer-rank>Qualify to take the seat</span>
                 <b data-racer-wager>—</b><small>Weighted wager</small>
                 <div class="podium-prize" data-racer-prize>Prize TBA</div>
               </article>
@@ -111,7 +111,7 @@
             </div>
             <div class="race-grid-row current-player-row" data-current-player-row hidden>
               <strong class="race-position" data-current-player-position>—</strong>
-              <span class="race-player"><span class="race-player-badge"><img alt="" data-current-player-badge /></span><span><strong data-current-player-name>You</strong><small>Your position</small></span></span>
+              <span class="race-player"><button class="race-player-badge" type="button" data-current-player-profile><img alt="" data-current-player-badge /></button><span><button class="race-player-profile-name" type="button" data-current-player-name>You</button><small>Your position</small></span></span>
               <strong class="race-wager-value" data-current-player-wager>$0.00</strong>
               <strong class="race-prize-value" data-current-player-needed>—</strong>
             </div>
@@ -132,10 +132,11 @@
 
     <script type="module" src="region-access.js?v=region-access-1"></script>
     <script src="mobile-nav.js?v=exact-blue-3" defer></script>
-    <script src="chat.js?v=live-chat-6" defer></script>
+    <script src="public-profile.js?v=player-profile-1" defer></script>
+    <script src="chat.js?v=player-profile-1" defer></script>
     <script type="module" src="firebase-auth.js?v=wallet-tips-1"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
-    <script type="module" src="wallet.js?v=wallet-tips-1"></script>
-    <script src="leaderboard.js?v=live-grid-6" defer></script>
+    <script type="module" src="wallet.js?v=compact-balances-1"></script>
+    <script src="leaderboard.js?v=player-profile-1" defer></script>
   </body>
 </html>

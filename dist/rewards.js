@@ -52,7 +52,9 @@ function renderRankRewards(ranks = []) {
   const current = [...rail.querySelectorAll(".rank-reward-item.current,.rank-reward-item.claimable")].at(-1);
   requestAnimationFrame(() => {
     if (!current) return;
-    rail.scrollLeft = Math.max(0, current.offsetLeft - (rail.clientWidth - current.clientWidth) / 2);
+    const railBox = rail.getBoundingClientRect();
+    const cardBox = current.getBoundingClientRect();
+    rail.scrollLeft = Math.max(0, rail.scrollLeft + cardBox.left - railBox.left - (rail.clientWidth - cardBox.width) / 2);
   });
   rail.querySelectorAll("[data-claim-rank]").forEach((button) => button.addEventListener("click", claimRankReward));
 }

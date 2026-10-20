@@ -16,7 +16,7 @@ test("live chat is shared, wager gated and available on every main surface", () 
   assert.match(chat, /Requirement to chat:/);
   assert.match(chat, /minimumWagerUsdCents/);
   assert.doesNotMatch(chat, /Checking chat access/);
-  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=live-chat-6/);
+  for (const html of [index, game, leaderboard]) assert.match(html, /chat\.js\?v=player-profile-1/);
   assert.match(chat, /live-chat-mention/);
   assert.match(chat, /mentionedMe/);
   assert.match(chat, /live-chat-send/);
