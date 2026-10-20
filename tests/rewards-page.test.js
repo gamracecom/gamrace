@@ -6,6 +6,7 @@ const page = fs.readFileSync(new URL("../dist/rewards.html", import.meta.url), "
 const client = fs.readFileSync(new URL("../dist/rewards.js", import.meta.url), "utf8");
 const profileConfig = fs.readFileSync(new URL("../dist/profile-config.js", import.meta.url), "utf8");
 const mobileNav = fs.readFileSync(new URL("../dist/mobile-nav.js", import.meta.url), "utf8");
+const worker = fs.readFileSync(new URL("../worker/src/index.js", import.meta.url), "utf8");
 
 test("Rewards is minimal, puts promo first and floats three race reward stations", () => {
   assert.ok(page.indexOf('id="promo"') < page.indexOf('class="reward-stations"'));
@@ -17,6 +18,9 @@ test("Rewards is minimal, puts promo first and floats three race reward stations
   assert.match(page, /GamRace racing car surrounded by gold reward coins/);
   for (const removed of ["YOUR REWARD CIRCUIT", "Builds from every eligible wager", "AVAILABLE NOW", "WEEKLY DROP", "MONTHLY DROP", "RECENT ACTIVITY", "Reward history"]) assert.doesNotMatch(page, new RegExp(removed));
   assert.match(page, /data-rank-reward-rail/);
+  assert.match(page, /class="rewards-faq"/);
+  assert.match(page, /How does Instant Rakeback work\?/);
+  assert.match(page, /How are Weekly and Monthly rewards calculated\?/);
 });
 
 test("Rewards claims, promo claims and history are live wallet-backed actions", () => {
@@ -26,7 +30,10 @@ test("Rewards claims, promo claims and history are live wallet-backed actions", 
   assert.match(client, /gamrace:wallet-balance-changed/);
   assert.match(client, /\/rewards\/ranks\/\$\{rankId\}\/claim/);
   assert.match(client, /lockIcon/);
+  assert.match(client, /gamraceWallet\?\.refresh\?\.\(\)/);
+  assert.match(client, /starterRank[\s\S]*?"Current"/);
   assert.doesNotMatch(client, /Next drop in/);
+  assert.match(worker, /\["i", "ii", "iii"\]\[tierIndex\]/);
 });
 
 test("Account and mobile navigation use the dedicated Rewards page", () => {

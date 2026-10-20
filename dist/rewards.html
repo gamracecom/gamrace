@@ -11,7 +11,7 @@
     <link rel="preload" as="image" href="assets/rewards/weekly-rakeback.webp" />
     <link rel="preload" as="image" href="assets/rewards/monthly-rakeback.webp" />
     <script src="shell-state.js?v=player-avatars-1"></script>
-    <link rel="stylesheet" href="styles.css?v=rewards-minimal-2&amp;wallet=5&amp;account=6&amp;chat=3" />
+    <link rel="stylesheet" href="styles.css?v=rewards-mobile-3&amp;wallet=5&amp;account=6&amp;chat=3" />
   </head>
   <body class="rewards-page" data-authenticated="pending">
     <div class="app-shell">
@@ -71,6 +71,25 @@
           </section>
 
           <section class="rank-reward-carousel" id="rank" aria-label="Rank rewards"><div class="rank-reward-rail" data-rank-reward-rail></div></section>
+          <section class="rewards-faq" aria-labelledby="rewards-faq-title">
+            <h2 id="rewards-faq-title">FAQ</h2>
+            <details>
+              <summary>How does Instant Rakeback work?<span aria-hidden="true"></span></summary>
+              <p>A portion of every eligible wager builds your Instant Rakeback. When it is available, claim it straight into your selected wallet.</p>
+            </details>
+            <details>
+              <summary>How does Weekly Rakeback work?<span aria-hidden="true"></span></summary>
+              <p>Your completed weekly activity is assessed when the reward period ends. If you qualify, the claim button becomes available here.</p>
+            </details>
+            <details>
+              <summary>How does Monthly Rakeback work?<span aria-hidden="true"></span></summary>
+              <p>Your completed monthly activity is assessed at the end of the reward period. Eligible rewards are then made available to claim.</p>
+            </details>
+            <details>
+              <summary>How are Weekly and Monthly rewards calculated?<span aria-hidden="true"></span></summary>
+              <p>They use eligible wager activity and your net result for that period, with extra weighting for losing periods. Pending amounts stay hidden until they are ready.</p>
+            </details>
+          </section>
           <p class="rewards-page-status" data-rewards-status role="status" aria-live="polite"></p>
         </div>
       </main>
@@ -89,6 +108,6 @@
     <script type="module" src="firebase-auth.js?v=rewards-page-2"></script>
     <script src="vendor/qrcode.js?v=1.4.4"></script>
     <script type="module" src="wallet.js?v=balance-stability-2"></script>
-    <script type="module" src="rewards.js?v=rewards-minimal-2"></script>
+    <script type="module" src="rewards.js?v=rewards-mobile-3"></script>
   </body>
 </html>

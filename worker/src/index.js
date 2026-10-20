@@ -4837,7 +4837,7 @@ function rankRewardDefinitions() {
     name: RANK_STAGE_NAMES[stageId] || stageId,
     tier: RANK_TIER_NAMES[tierIndex],
     thresholdUsdCents: threshold * 100,
-    badgePath: `/ranks/${stageId}-${tierIndex + 1}.webp`,
+    badgePath: `/ranks/${stageId}-${["i", "ii", "iii"][tierIndex]}.webp`,
   })));
 }
 

@@ -41,12 +41,13 @@ function renderRankRewards(ranks = []) {
   const rail = document.querySelector("[data-rank-reward-rail]");
   if (!rail) return;
   rail.innerHTML = ranks.map((rank) => {
-    const state = rank.claimed ? "claimed" : rank.canClaim ? "claimable" : rank.unlocked ? "unlocked" : "locked";
-    const action = rank.claimed ? "Claimed" : rank.canClaim ? `Claim ${usd(rank.rewardUsdCents)}` : rank.unlocked ? "Unlocked" : `${lockIcon()} Locked`;
+    const starterRank = rank.id === "rookie-1";
+    const state = rank.claimed ? "claimed" : rank.canClaim ? "claimable" : starterRank && rank.unlocked ? "current" : "locked";
+    const action = rank.claimed ? "Claimed" : rank.canClaim ? `Claim ${usd(rank.rewardUsdCents)}` : starterRank && rank.unlocked ? "Current" : `${lockIcon()} Locked`;
     return `<article class="rank-reward-item ${state}" data-rank-id="${escapeHtml(rank.id)}"><div class="rank-reward-image"><img src="${escapeHtml(rank.badgePath)}" alt="" /></div><h2><span>${escapeHtml(rank.name)}</span><b>${escapeHtml(rank.tier)}</b></h2><button type="button" data-claim-rank="${escapeHtml(rank.id)}" ${rank.canClaim ? "" : "disabled"}>${action}</button></article>`;
   }).join("");
-  const current = [...rail.querySelectorAll(".rank-reward-item.unlocked,.rank-reward-item.claimable")].at(-1);
-  requestAnimationFrame(() => current?.scrollIntoView({ behavior: "instant", inline: "center", block: "nearest" }));
+  const current = [...rail.querySelectorAll(".rank-reward-item.current,.rank-reward-item.claimable")].at(-1);
+  requestAnimationFrame(() => current?.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" }));
   rail.querySelectorAll("[data-claim-rank]").forEach((button) => button.addEventListener("click", claimRankReward));
 }
 
@@ -79,6 +80,7 @@ async function claimRankReward(event) {
     const body = await request(`/rewards/ranks/${rankId}/claim`, { method: "POST", body: "{}" });
     snapshot.rankRewards = body.rankRewards;
     renderRankRewards(snapshot.rankRewards);
+    await window.gamraceWallet?.refresh?.();
     status.textContent = `${usd(body.claim.rewardUsdCents)} credited.`;
     window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed"));
   } catch (error) { status.textContent = error.message; renderRankRewards(snapshot.rankRewards); }
@@ -93,6 +95,7 @@ document.querySelectorAll("[data-claim-reward]").forEach((button) => button.addE
     const body = await request(`/rewards/${pool}/claim`, { method: "POST", body: "{}" });
     snapshot = body.rewards;
     render();
+    await window.gamraceWallet?.refresh?.();
     status.textContent = `${poolNames[pool]} credited to your wallet.`;
     window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed"));
   } catch (error) { status.textContent = error.message; button.textContent = previous; }
@@ -112,6 +115,7 @@ document.querySelector(".rewards-promo-form")?.addEventListener("submit", async 
     const body = await request("/promotions/claim", { method: "POST", body: JSON.stringify({ code: input.value.trim() }) });
     message.textContent = `${body.promotion?.title || "Promo"} claimed successfully.`;
     input.value = "";
+    await window.gamraceWallet?.refresh?.();
     window.dispatchEvent(new CustomEvent("gamrace:wallet-balance-changed"));
     await loadRewards();
   } catch (error) { message.textContent = error.message; }
